@@ -40,20 +40,45 @@ services:
       postgres:
         condition: service_healthy
 
-  grafana:
+  superset:
     build:
       context: .
-      dockerfile: Dockerfile.grafana
-      args:
-        GF_ADMIN_USER: admin
-        GF_ADMIN_PASSWORD: admin
-    ports: ["3000:3000"]
+      dockerfile: Dockerfile.superset
+    ports: ["8088:8088"]
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-CHANGE_ME_TO_A_RANDOM_SECRET}
+      SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:-admin}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
+      SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL:-admin@finops.local}
+      SUPERSET_DATABASE_URI: postgresql://finops:finops_dev@postgres:5432/superset_meta
+      FINOPS_PG_URI: postgresql://finops:finops_dev@postgres:5432/finops
+      PYTHONPATH: /app/pythonpath
     volumes:
-      - grafana_data:/var/lib/grafana
+      - superset_data:/app/superset_home
+    depends_on:
+      postgres:
+        condition: service_healthy
+      superset-init:
+        condition: service_completed_successfully
+
+  superset-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.superset
+    entrypoint: ["/bin/bash", "/app/bootstrap/init_superset.sh"]
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-CHANGE_ME_TO_A_RANDOM_SECRET}
+      SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:-admin}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
+      SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL:-admin@finops.local}
+      SUPERSET_DATABASE_URI: postgresql://finops:finops_dev@postgres:5432/superset_meta
+      FINOPS_PG_URI: postgresql://finops:finops_dev@postgres:5432/finops
+      SUPERSET_BASE_URL: http://superset:8088
+      PYTHONPATH: /app/pythonpath
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
   pg_data:
-  grafana_data:
+  superset_data:

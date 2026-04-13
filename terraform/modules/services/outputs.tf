@@ -8,17 +8,8 @@ output "grafana_url" {
   value       = google_cloud_run_v2_service.grafana.uri
 }
 
-output "bifrost_url" {
-  description = "URL of the Bifrost Cloud Run Service"
-  value       = google_cloud_run_v2_service.bifrost.uri
-}
-
 output "grafana_service_name" {
   description = "Name of the Grafana Cloud Run Service"
   value       = google_cloud_run_v2_service.grafana.name
 }
 
-output "bifrost_service_name" {
-  description = "Name of the Bifrost Cloud Run Service"
-  value       = google_cloud_run_v2_service.bifrost.name
-}

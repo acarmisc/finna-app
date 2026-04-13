@@ -1,0 +1,26 @@
+# =============================================================================
+# FinOps Multi-Cloud Monitoring -- Apache Superset Custom Image
+# =============================================================================
+# Build:  docker build -f Dockerfile.superset -t finops-superset .
+# =============================================================================
+
+FROM apache/superset:latest
+
+USER root
+
+# Copy Superset configuration into the Python path
+COPY superset/superset_config.py /app/pythonpath/superset_config.py
+
+# Copy bootstrap scripts
+COPY superset/bootstrap.py /app/bootstrap/bootstrap.py
+COPY superset/init_superset.sh /app/bootstrap/init_superset.sh
+RUN chmod +x /app/bootstrap/init_superset.sh
+
+# Ensure the pythonpath directory is on PYTHONPATH
+ENV PYTHONPATH=/app/pythonpath:$PYTHONPATH
+
+USER superset
+
+# The init script is intended to run via the superset-init one-shot container.
+# The main superset service just starts gunicorn (default entrypoint).
+ENTRYPOINT ["/usr/bin/env", "superset", "run"]

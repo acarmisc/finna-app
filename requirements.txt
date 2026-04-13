@@ -8,3 +8,5 @@ azure-identity>=1.14
 pyyaml>=6.0
 tenacity>=8.2
 python-dotenv>=1.0
+questionary>=2.0
+rich>=13.0

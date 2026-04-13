@@ -76,11 +76,6 @@ variable "grafana_image" {
   type        = string
 }
 
-variable "bifrost_image" {
-  description = "Docker image for Bifrost Cloud Run service"
-  type        = string
-}
-
 variable "extractor_image" {
   description = "Docker image for all extractor Cloud Run jobs"
   type        = string
@@ -135,18 +130,6 @@ variable "grafana_max_instances" {
   description = "Maximum number of Grafana instances"
   type        = number
   default     = 3
-}
-
-variable "bifrost_min_instances" {
-  description = "Minimum number of Bifrost instances"
-  type        = number
-  default     = 1
-}
-
-variable "bifrost_max_instances" {
-  description = "Maximum number of Bifrost instances"
-  type        = number
-  default     = 5
 }
 
 # ---- Schedules ----

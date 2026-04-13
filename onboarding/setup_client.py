@@ -108,6 +108,7 @@ def _generate_extractor_config(
         }
 
     if "bifrost" in providers:
+        # External Bifrost (already running) — extractor reads from its database
         config["bifrost_llm"] = {
             "BIFROST_PG_DSN": "${BIFROST_PG_DSN}",
             "PG_DSN": "${PG_DSN}",
@@ -258,19 +259,13 @@ def onboard(
     client_dir.mkdir(parents=True, exist_ok=True)
     logger.info("Client directory: %s", client_dir)
 
-    # Auto-enable bifrost if any project looks LLM-related
     effective_providers = list(providers)
-    if "bifrost" not in effective_providers and any(
-        "ml" in p or "llm" in p for p in projects
-    ):
-        effective_providers.append("bifrost")
-        logger.info("Auto-enabled bifrost provider (LLM-related project detected)")
 
     # 1. Extractor config
     extractor_config = _generate_extractor_config(client_id, effective_providers, projects)
     _write_yaml(client_dir / "extractor_config.yaml", extractor_config)
 
-    # 2. Bifrost config (only when bifrost is enabled)
+    # 2. Bifrost config (only when bifrost is enabled — connects to external Bifrost instance)
     if "bifrost" in effective_providers:
         bifrost_config = _generate_bifrost_config(client_id, projects)
         _write_yaml(client_dir / "bifrost_config.yaml", bifrost_config)

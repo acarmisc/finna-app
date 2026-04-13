@@ -1,37 +1,43 @@
 # FinOps Alert Activation Guide
 
 This guide covers how to activate and customize the prepared alert rules for a
-new client deployment.  All rules ship in **paused** state so nothing fires
+new client deployment.  All rules ship in a **disabled** state so nothing fires
 until you explicitly enable it.
 
 ---
 
 ## 1. Activating Alerts for a New Client
 
-1. **Configure contact points** — Edit
-   `grafana/provisioning/alerting/contact-points.yml` and replace the
-   placeholder values (see section 3 below).  Restart Grafana or reload
-   provisioning:
+1. **Configure notification channels** — In Superset, navigate to
+   **Alerts & Reports > Alerts** and set up notification integrations:
+   - **Email**: Configure the SMTP settings in `superset/superset_config.py`
+     (add `SMTP_*` variables) or via environment variables.
+   - **Slack**: Add a Slack webhook URL when creating the alert.
+   - **Webhook**: Supply a custom endpoint URL when creating the alert.
+
+   Restart the Superset container to pick up config changes:
    ```bash
-   docker compose restart grafana
+   docker compose restart superset
    ```
 
-2. **Unpause rules** — In the Grafana UI:
-   - Navigate to **Alerting > Alert rules**.
-   - Select the **FinOps** folder, group **finops-cost-alerts**.
-   - For each rule you want active, click the pause toggle to **unpause** it.
+2. **Enable alerts** — In the Superset UI:
+   - Navigate to **Alerts & Reports**.
+   - Select the alert you want to activate.
+   - Click the toggle to **enable** it.
+   - Set the evaluation schedule (cron expression or interval).
 
-   Or via the HTTP API:
+   Or via the REST API:
    ```bash
-   curl -X POST \
-     -H "Authorization: Bearer <API_KEY>" \
+   curl -X PUT \
+     -H "Authorization: Bearer <ACCESS_TOKEN>" \
      -H "Content-Type: application/json" \
-     -d '{"isPaused": false}' \
-     "http://localhost:3000/api/v1/provisioning/alert-rules/<UID>/pause"
+     -H "X-CSRFToken: <CSRF_TOKEN>" \
+     -d '{"active": true}' \
+     "http://localhost:8088/api/v1/alert/<ALERT_ID>"
    ```
 
-3. **Verify** — Check the **State history** column on the Alert rules page.  A
-   green checkmark means the rule evaluated without error.
+3. **Verify** — Check the **Last run** column on the Alerts page.  A recent
+   timestamp and "success" status means the alert evaluated without error.
 
 ---
 
@@ -41,21 +47,16 @@ Two mechanisms control budget thresholds:
 
 ### Uniform budget (simplest)
 
-Edit the `params` CTE inside the budget_threshold rule in
-`grafana/provisioning/alerting/rules.yml`:
-
-```yaml
-annotations:
-  budget_override_usd: "10000"   # <-- change this
-```
-
-And update the matching SQL inline query's `params` CTE:
+Edit the SQL inline query inside the Superset alert definition.  The budget
+threshold lives in the `params` CTE:
 
 ```sql
 WITH params AS (
     SELECT 25000.00 AS budget_override_usd  -- new value
 ), ...
 ```
+
+In the Superset UI: edit the alert, update the SQL, and save.
 
 ### Per-project budget (recommended for production)
 
@@ -80,52 +81,75 @@ WITH params AS (
 
 ---
 
-## 3. Configuring Contact Points
+## 3. Configuring Notification Channels
 
-Edit `grafana/provisioning/alerting/contact-points.yml` and replace each
-placeholder:
+Superset alerts deliver notifications via **email**, **Slack**, or a **webhook
+endpoint**.  Configure each channel when creating or editing an alert:
 
-| Contact Point | Placeholder                  | Replace With                        |
-|---------------|------------------------------|-------------------------------------|
-| finops-slack  | `REPLACE_ME_SLACK_WEBHOOK`   | Slack incoming webhook URL          |
-| finops-email  | `alerts@example.com`         | Real alert recipient email address  |
-| finops-webhook| `https:// REPLACE_ME_WEBHOOK_URL` | Your incident management endpoint |
+| Channel | Configuration                                                                 |
+|---------|-------------------------------------------------------------------------------|
+| Email   | Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` in               |
+|         | `superset/superset_config.py` or environment variables.                      |
+|         | Specify the recipient address in the alert definition.                       |
+| Slack   | Provide a Slack incoming webhook URL in the alert's notification settings.   |
+| Webhook | Supply a custom endpoint URL in the alert's notification settings.           |
 
-After editing, restart or reload Grafana provisioning.  To assign a contact
-point to a notification policy, go to **Alerting > Notification policies** and
-map the desired label (e.g. `alert_type=cost_spike`) to the contact point.
+To assign a channel, edit the alert and fill in the **Recipients** field
+(email) or the **Slack channel / Webhook URL** field.
+
+### SMTP configuration example
+
+Add to `superset/superset_config.py` or set as environment variables:
+
+```python
+SMTP_HOST = "smtp.example.com"
+SMTP_PORT = 587
+SMTP_USER = "superset@example.com"
+SMTP_PASSWORD = "REPLACE_ME_SMTP_PASSWORD"
+SMTP_MAIL_FROM = "superset@example.com"
+```
 
 ---
 
 ## 4. Testing Alerts
 
-### Test a single rule manually
+### Test a single alert manually
 
-1. Open **Alerting > Alert rules**, find the rule, and click **Test rule**.
-2. Grafana evaluates the query immediately and shows whether the condition is
-   met.  If the result set is non-empty and crosses the threshold, the rule
-   would fire.
+1. Open **Alerts & Reports**, find the alert, and click **Run** (play icon).
+2. Superset evaluates the SQL trigger immediately.  If the query returns any
+   rows (i.e. the condition is met), the alert fires and sends the
+   notification.
 
 ### Trigger a real alert end-to-end
 
 1. Temporarily lower a threshold so the current data triggers it.
    For example, set `spike_pct` to `1` in the cost_spike query.
-2. Unpause the rule.
-3. Wait for the next evaluation cycle (or click **Test rule**).
-4. Confirm the notification arrives at the contact point.
-5. Restore the original threshold and re-pause the rule.
+2. Enable the alert.
+3. Click **Run** or wait for the next scheduled evaluation.
+4. Confirm the notification arrives at the configured channel.
+5. Restore the original threshold and disable the alert.
 
-### Test contact points independently
+### Test notification channels independently
 
-In the Grafana UI: **Alerting > Contact points**, click **Test** on a contact
-point to send a synthetic notification without needing a real alert.
+Send a test email by running a Python snippet inside the Superset container:
+
+```bash
+docker compose exec superset python -c "
+from superset.utils.email import send_email_smtp
+send_email_smtp(
+    'alerts@example.com',
+    'FinOps Alert Test',
+    'This is a test notification from Superset.',
+)
+"
+```
 
 ---
 
 ## 5. Customizing Spike Detection Sensitivity
 
-The cost spike rule has three tunable parameters, all located in the `params`
-CTE at the top of the query:
+The cost spike alert has three tunable parameters, all located in the `params`
+CTE at the top of the SQL trigger query:
 
 | Parameter            | Default | Effect                                      |
 |----------------------|---------|---------------------------------------------|
@@ -135,13 +159,12 @@ CTE at the top of the query:
 | `lookback_days`      | 7       | Days in the rolling baseline window.        |
 |                      |         | Longer = smoother baseline, fewer blips.    |
 | `min_baseline_cost`  | 10.00   | Minimum average daily cost (USD) to check.  |
-|                      |         | Filters out low-spend noise.                 |
+|                      |         | Filters out low-spend noise.                |
 
-To adjust, edit both the annotation in `rules.yml` (for documentation) and the
-`params` CTE in the inline SQL (for actual behavior):
+To adjust, edit the alert's SQL trigger query in the Superset UI:
 
 ```sql
--- In the cost_spike rule's inline SQL:
+-- In the cost_spike alert's SQL trigger:
 WITH params AS (
     SELECT
         20   AS spike_pct,         -- was 30, now more sensitive
@@ -150,14 +173,5 @@ WITH params AS (
 ), ...
 ```
 
-And update the annotations to match:
-
-```yaml
-annotations:
-  spike_pct: "20"
-  lookback_days: "14"
-  min_baseline_cost_usd: "25"
-```
-
-After changing values, restart Grafana or reload provisioning for the changes
-to take effect.
+After changing values, save the alert for the changes to take effect at the
+next scheduled evaluation.

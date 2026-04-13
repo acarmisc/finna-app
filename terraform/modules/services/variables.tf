@@ -13,11 +13,6 @@ variable "grafana_image" {
   type        = string
 }
 
-variable "bifrost_image" {
-  description = "Docker image for Bifrost"
-  type        = string
-}
-
 variable "vpc_connector_id" {
   description = "ID of the VPC connector for private Cloud SQL access"
   type        = string
@@ -55,14 +50,3 @@ variable "grafana_max_instances" {
   default     = 3
 }
 
-variable "bifrost_min_instances" {
-  description = "Minimum number of Bifrost instances"
-  type        = number
-  default     = 1
-}
-
-variable "bifrost_max_instances" {
-  description = "Maximum number of Bifrost instances"
-  type        = number
-  default     = 5
-}

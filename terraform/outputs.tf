@@ -22,11 +22,6 @@ output "grafana_url" {
   value       = module.services.grafana_url
 }
 
-output "bifrost_url" {
-  description = "URL of the Bifrost Cloud Run service"
-  value       = module.services.bifrost_url
-}
-
 # ---- Registry ----
 
 output "artifact_registry_url" {

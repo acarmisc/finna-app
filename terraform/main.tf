@@ -119,7 +119,6 @@ module "services" {
   name              = var.name
   region            = var.region
   grafana_image     = var.grafana_image
-  bifrost_image     = var.bifrost_image
   vpc_connector_id  = module.network.vpc_connector_id
   db_private_ip     = module.database.private_ip
   db_name           = module.database.database_name
@@ -127,8 +126,6 @@ module "services" {
   secret_names      = module.secrets.secret_names
   grafana_min_instances = var.grafana_min_instances
   grafana_max_instances = var.grafana_max_instances
-  bifrost_min_instances = var.bifrost_min_instances
-  bifrost_max_instances = var.bifrost_max_instances
 
   depends_on = [module.network, module.database, module.secrets, google_project_service.apis]
 }
