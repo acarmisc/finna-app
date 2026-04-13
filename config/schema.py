@@ -1,7 +1,7 @@
 """Pydantic models for multi-subscription, multi-project FinOps configuration.
 
 Supports:
-  GCP  → billing account → multiple projects
+  GCP  → billing account → multiple projects (ingestion via BigQuery or CSV)
   Azure → multiple subscriptions → multiple resource groups per subscription
   Bifrost → external instance (already running)
 """
@@ -16,16 +16,37 @@ from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
+# GCP ingestion mode
+# ---------------------------------------------------------------------------
+
+class GCPIngestionMode(str, Enum):
+    """How GCP billing data is ingested."""
+    bigquery = "bigquery"
+    csv = "csv"
+
+
+# ---------------------------------------------------------------------------
 # GCP configuration
 # ---------------------------------------------------------------------------
 
 class GCPProjectConfig(BaseModel):
-    """A single GCP project with its BigQuery billing export."""
+    """A single GCP project with its billing configuration."""
 
     project_id: str = Field(..., description="GCP project ID (e.g. my-project-prod)")
     project_name: Optional[str] = Field(None, description="Human-readable name")
-    bigquery_dataset: str = Field("billing_export", description="BigQuery dataset for billing export")
-    bigquery_table: str = Field("gcp_billing_export_v1", description="BigQuery table name")
+    ingestion_mode: GCPIngestionMode = Field(
+        GCPIngestionMode.bigquery,
+        description="Ingestion mode: bigquery or csv",
+    )
+    bigquery_dataset: Optional[str] = Field(
+        None, description="BigQuery dataset for billing export (required when ingestion_mode=bigquery)"
+    )
+    bigquery_table: Optional[str] = Field(
+        None, description="BigQuery table name (required when ingestion_mode=bigquery)"
+    )
+    csv_path: Optional[str] = Field(
+        None, description="Path to CSV billing export file (required when ingestion_mode=csv)"
+    )
     environment: Optional[str] = Field(None, description="prod / staging / dev")
     team: Optional[str] = Field(None, description="Owning team")
 
@@ -42,9 +63,22 @@ class GCPConfig(BaseModel):
 
     @field_validator("projects")
     @classmethod
-    def at_least_one_project(cls, v: list[GCPProjectConfig]) -> list[GCPProjectConfig]:
+    def validate_projects(cls, v: list[GCPProjectConfig]) -> list[GCPProjectConfig]:
         if not v:
             raise ValueError("At least one GCP project is required when GCP is enabled")
+        for project in v:
+            if project.ingestion_mode == GCPIngestionMode.bigquery:
+                if not project.bigquery_dataset:
+                    raise ValueError(
+                        f"bigquery_dataset is required for project '{project.project_id}' "
+                        f"when ingestion_mode is 'bigquery'"
+                    )
+            if project.ingestion_mode == GCPIngestionMode.csv:
+                if not project.csv_path:
+                    raise ValueError(
+                        f"csv_path is required for project '{project.project_id}' "
+                        f"when ingestion_mode is 'csv'"
+                    )
         return v
 
 
@@ -200,8 +234,13 @@ class ClientConfig(BaseModel):
             for project in self.gcp.projects:
                 prefix = f"GCP_{project.project_id.upper().replace('-', '_')}"
                 env[f"{prefix}_PROJECT"] = project.project_id
-                env[f"{prefix}_BQ_DATASET"] = project.bigquery_dataset
-                env[f"{prefix}_BQ_TABLE"] = project.bigquery_table
+                env[f"{prefix}_INGESTION_MODE"] = project.ingestion_mode.value
+                if project.bigquery_dataset:
+                    env[f"{prefix}_BQ_DATASET"] = project.bigquery_dataset
+                if project.bigquery_table:
+                    env[f"{prefix}_BQ_TABLE"] = project.bigquery_table
+                if project.csv_path:
+                    env[f"{prefix}_CSV_PATH"] = project.csv_path
 
         if self.azure and self.azure.enabled:
             for sub in self.azure.subscriptions:

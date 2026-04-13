@@ -5,6 +5,7 @@ corresponding extractor's main() function.
 
 Supported values:
   gcp_billing    - GCP BigQuery billing extractor
+  gcp_csv        - GCP CSV billing file extractor
   azure_cost     - Azure Cost Management extractor
   bifrost_llm    - Bifrost LLM cost extractor
   exchange_rates - ECB exchange rate extractor
@@ -17,6 +18,7 @@ import sys
 
 EXTRACTOR_MAP = {
     "gcp_billing": "extractors.gcp_billing",
+    "gcp_csv": "extractors.gcp_csv",
     "azure_cost": "extractors.azure_cost",
     "bifrost_llm": "extractors.bifrost_llm",
     "exchange_rates": "extractors.exchange_rates",

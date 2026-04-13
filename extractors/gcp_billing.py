@@ -8,11 +8,9 @@ Can run as a Cloud Run Job via ``python -m extractors.gcp_billing``.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 import sys
-from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Sequence
 
@@ -20,6 +18,7 @@ from google.cloud import bigquery
 from google.cloud.bigquery import QueryJobConfig
 from psycopg.sql import SQL
 from psycopg.rows import dict_row
+from psycopg.types.json import Json
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -29,6 +28,13 @@ from tenacity import (
 )
 import psycopg
 
+from extractors.gcp_shared import (
+    extract_project_label,
+    generate_record_id,
+    labels_to_tags,
+    parse_datetime,
+    resolve_service_category,
+)
 from models import NormalizedCostRecord, Provider, ServiceCategory
 
 logger = logging.getLogger("extractors.gcp_billing")
@@ -47,82 +53,6 @@ DATE_TO: str = os.getenv("DATE_TO", "")
 BATCH_SIZE: int = int(os.getenv("BATCH_SIZE", "500"))
 
 EXTRACTOR_NAME = "gcp_billing"
-
-# ---------------------------------------------------------------------------
-# Service-category mapping  (GCP service.description → ServiceCategory)
-# ---------------------------------------------------------------------------
-
-DEFAULT_SERVICE_CATEGORY_MAP: dict[str, ServiceCategory] = {
-    "Compute Engine": ServiceCategory.COMPUTE,
-    "Kubernetes Engine": ServiceCategory.COMPUTE,
-    "Cloud Functions": ServiceCategory.COMPUTE,
-    "Cloud Run": ServiceCategory.COMPUTE,
-    "App Engine": ServiceCategory.COMPUTE,
-    "Cloud Storage": ServiceCategory.STORAGE,
-    "Persistent Disk": ServiceCategory.STORAGE,
-    "Filestore": ServiceCategory.STORAGE,
-    "Cloud SQL": ServiceCategory.DATABASE,
-    "Cloud Spanner": ServiceCategory.DATABASE,
-    "Cloud Bigtable": ServiceCategory.DATABASE,
-    "Firestore": ServiceCategory.DATABASE,
-    "Cloud Memorystore": ServiceCategory.DATABASE,
-    "Cloud VPN": ServiceCategory.NETWORK,
-    "Cloud Interconnect": ServiceCategory.NETWORK,
-    "Cloud Load Balancing": ServiceCategory.NETWORK,
-    "Cloud CDN": ServiceCategory.NETWORK,
-    "Cloud DNS": ServiceCategory.NETWORK,
-    "Cloud Networking": ServiceCategory.NETWORK,
-    "Vertex AI": ServiceCategory.ML,
-    "AI Platform": ServiceCategory.ML,
-    "Cloud Machine Learning": ServiceCategory.ML,
-    "Dialogflow": ServiceCategory.ML,
-    "Cloud Vision": ServiceCategory.ML,
-    "Cloud Natural Language": ServiceCategory.ML,
-    "Speech-to-Text": ServiceCategory.ML,
-}
-
-
-def _resolve_service_category(
-    service_description: str,
-    mapping: dict[str, ServiceCategory] | None = None,
-) -> ServiceCategory:
-    """Look up a GCP service description in the mapping table.
-
-    Falls back to substring matching and ultimately ``ServiceCategory.OTHER``.
-    """
-    lookup = mapping if mapping is not None else DEFAULT_SERVICE_CATEGORY_MAP
-
-    # Exact match first
-    if service_description in lookup:
-        return lookup[service_description]
-
-    # Substring match — e.g. "Compute Engine API" → Compute Engine
-    for key, category in lookup.items():
-        if key.lower() in service_description.lower():
-            return category
-
-    return ServiceCategory.OTHER
-
-
-# ---------------------------------------------------------------------------
-# Deterministic record ID
-# ---------------------------------------------------------------------------
-
-def _generate_record_id(
-    provider: str,
-    project_id: str,
-    usage_start: str,
-    service_name: str,
-) -> str:
-    """Generate a deterministic record_id from key fields.
-
-    Uses SHA-256 over a concatenation of provider + project + usage_start +
-    service_name so the same billing row always produces the same ID,
-    enabling idempotent re-runs.
-    """
-    raw = f"{provider}|{project_id}|{usage_start}|{service_name}"
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
-
 
 # ---------------------------------------------------------------------------
 # BigQuery query builder
@@ -168,61 +98,20 @@ def _build_query(
 # Row normalisation
 # ---------------------------------------------------------------------------
 
-def _extract_project_label(row: dict[str, Any]) -> str:
-    """Pull the ``project`` label from the GCP labels array.
-
-    GCP billing exports encode labels as ``REPEATED<STRUCT<key STRING, value STRING>>``.
-    The BigQuery SDK returns these as a list of dicts with ``key``/``value`` keys.
-    """
-    labels = row.get("labels") or []
-    if isinstance(labels, list):
-        for entry in labels:
-            if isinstance(entry, dict) and entry.get("key") == "project":
-                return entry.get("value", "")
-    return ""
-
-
-def _labels_to_tags(row: dict[str, Any]) -> dict[str, str]:
-    """Convert GCP billing labels list to a plain ``{key: value}`` dict."""
-    labels = row.get("labels") or []
-    if isinstance(labels, list):
-        return {
-            entry["key"]: entry.get("value", "")
-            for entry in labels
-            if isinstance(entry, dict) and "key" in entry
-        }
-    if isinstance(labels, dict):
-        # Some export formats already ship labels as a flat dict
-        return {k: str(v) for k, v in labels.items() if v is not None}
-    return {}
-
-
-def _parse_datetime(value: Any) -> datetime:
-    """Coerce a datetime / str / None into an aware UTC datetime."""
-    if isinstance(value, datetime):
-        if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value
-    if isinstance(value, str):
-        parsed = datetime.fromisoformat(value)
-        if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
-        return parsed
-    # Fallback
-    return datetime.now(timezone.utc)
-
-
 def normalise_row(
     row: dict[str, Any],
     service_category_map: dict[str, ServiceCategory] | None = None,
 ) -> NormalizedCostRecord:
-    """Map a single BigQuery billing row to a :class:`NormalizedCostRecord`."""
+    """Map a single BigQuery billing row to a :class:`NormalizedCostRecord`.
+
+    Delegates to :mod:`extractors.gcp_shared` for shared normalisation logic.
+    """
     project_id = row.get("project_id", "") or ""
-    label_project = _extract_project_label(row)
+    label_project = extract_project_label(row)
     service_description = row.get("service_description", "") or ""
     sku_description = row.get("sku_description", "") or ""
-    usage_start = _parse_datetime(row.get("usage_start_time"))
-    usage_end = _parse_datetime(row.get("usage_end_time"))
+    usage_start = parse_datetime(row.get("usage_start_time"))
+    usage_end = parse_datetime(row.get("usage_end_time"))
     cost = row.get("cost")
     usage_amount = row.get("usage_amount")
     usage_unit = row.get("usage_unit") or ""
@@ -239,7 +128,7 @@ def normalise_row(
     except Exception:
         usage_decimal = None
 
-    record_id = _generate_record_id(
+    record_id = generate_record_id(
         provider=Provider.GCP.value,
         project_id=project_id,
         usage_start=usage_start.isoformat(),
@@ -253,11 +142,11 @@ def normalise_row(
         usage_end=usage_end,
         account_id=project_id,
         project_id=label_project or project_id,
-        service_category=_resolve_service_category(service_description, service_category_map),
+        service_category=resolve_service_category(service_description, service_category_map),
         service_name=sku_description,
         cost_usd=cost_decimal,
         net_cost_usd=cost_decimal,  # GCP export cost is already net for standard export
-        tags=_labels_to_tags(row),
+        tags=labels_to_tags(row),
         usage_quantity=usage_decimal,
         usage_unit=usage_unit if usage_unit else None,
     )
@@ -318,7 +207,7 @@ def _batch_insert(
             rec.net_cost_usd,
             rec.usage_quantity,
             rec.usage_unit,
-            psycopg.sql.Json(rec.tags) if rec.tags else psycopg.sql.Json({}),
+            Json(rec.tags) if rec.tags else Json({}),
         )
         for rec in records
     ]

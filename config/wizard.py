@@ -29,6 +29,7 @@ from config.schema import (
     BifrostConfig,
     ClientConfig,
     GCPConfig,
+    GCPIngestionMode,
     GCPProjectConfig,
     PostgreSQLConfig,
     SupersetConfig,
@@ -252,38 +253,56 @@ def ask_providers() -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def ask_gcp_project() -> dict[str, Any]:
-    """Ask for a single GCP project configuration."""
+def ask_gcp_project(ingestion_mode: str = "bigquery") -> dict[str, Any]:
+    """Ask for a single GCP project configuration.
+
+    The prompts for BigQuery dataset/table are shown only when
+    ingestion_mode is 'bigquery'. A CSV path prompt is shown only
+    when ingestion_mode is 'csv'.
+    """
     project_id = questionary.text(
         "Project ID (required):",
         validate=_validate_required,
     ).ask()
     project_name = questionary.text("Project name:").ask()
-    bigquery_dataset = questionary.text(
-        "BigQuery dataset:",
-        default="billing_export",
-    ).ask()
-    bigquery_table = questionary.text(
-        "BigQuery table:",
-        default="gcp_billing_export_v1",
-    ).ask()
+
+    result: dict[str, Any] = {
+        "project_id": project_id.strip(),
+        "project_name": project_name.strip() if project_name else None,
+        "ingestion_mode": ingestion_mode,
+    }
+
+    if ingestion_mode == "bigquery":
+        bigquery_dataset = questionary.text(
+            "BigQuery dataset:",
+            default="billing_export",
+        ).ask()
+        bigquery_table = questionary.text(
+            "BigQuery table:",
+            default="gcp_billing_export_v1",
+        ).ask()
+        result["bigquery_dataset"] = bigquery_dataset or "billing_export"
+        result["bigquery_table"] = bigquery_table or "gcp_billing_export_v1"
+
+    if ingestion_mode == "csv":
+        csv_path = questionary.text(
+            "Path to CSV billing export file:",
+            validate=_validate_required,
+        ).ask()
+        result["csv_path"] = csv_path.strip() if csv_path else None
+
     environment = questionary.select(
         "Environment:",
         choices=ENV_CHOICES_ENV,
     ).ask()
     team = questionary.text("Team:").ask()
 
+    result["environment"] = environment
+    result["team"] = team.strip() if team else None
+
     if project_id is None:
         raise KeyboardInterrupt
 
-    result: dict[str, Any] = {
-        "project_id": project_id.strip(),
-        "project_name": project_name.strip() if project_name else None,
-        "bigquery_dataset": bigquery_dataset or "billing_export",
-        "bigquery_table": bigquery_table or "gcp_billing_export_v1",
-        "environment": environment,
-        "team": team.strip() if team else None,
-    }
     return result
 
 
@@ -296,13 +315,22 @@ def ask_gcp() -> dict[str, Any]:
         "Service account key path:",
     ).ask()
 
-    if billing_account_id is None:
+    ingestion_mode = questionary.select(
+        "Ingestion mode:",
+        choices=["bigquery", "csv"],
+        default="bigquery",
+    ).ask()
+
+    if ingestion_mode is None or billing_account_id is None:
         raise KeyboardInterrupt
+
+    mode_desc = "BigQuery export" if ingestion_mode == "bigquery" else "CSV file import"
+    console.print(f"  Using ingestion mode: [cyan]{mode_desc}[/cyan]")
 
     projects: list[dict[str, Any]] = []
     while True:
         console.print("\n[bold]Add GCP Project[/bold]")
-        project = ask_gcp_project()
+        project = ask_gcp_project(ingestion_mode=ingestion_mode)
         projects.append(project)
 
         add_another = questionary.confirm(
@@ -317,19 +345,32 @@ def ask_gcp() -> dict[str, Any]:
         table = Table(title="GCP Projects", show_lines=True)
         table.add_column("Project ID", style="cyan")
         table.add_column("Name")
-        table.add_column("Dataset")
-        table.add_column("Table")
+        table.add_column("Mode", style="magenta")
+        if ingestion_mode == "bigquery":
+            table.add_column("Dataset")
+            table.add_column("Table")
+        else:
+            table.add_column("CSV Path")
         table.add_column("Environment")
         table.add_column("Team")
         for p in projects:
-            table.add_row(
+            row_data = [
                 p["project_id"],
                 p.get("project_name") or "-",
-                p["bigquery_dataset"],
-                p["bigquery_table"],
+                p.get("ingestion_mode", "bigquery"),
+            ]
+            if ingestion_mode == "bigquery":
+                row_data.extend([
+                    p.get("bigquery_dataset", "-"),
+                    p.get("bigquery_table", "-"),
+                ])
+            else:
+                row_data.append(p.get("csv_path", "-"))
+            row_data.extend([
                 p.get("environment") or "-",
                 p.get("team") or "-",
-            )
+            ])
+            table.add_row(*row_data)
         console.print(table)
 
     return {
@@ -624,19 +665,34 @@ def display_summary(config: ClientConfig) -> None:
         proj_table = Table(show_lines=True)
         proj_table.add_column("Project ID", style="cyan")
         proj_table.add_column("Name")
-        proj_table.add_column("Dataset")
-        proj_table.add_column("Table")
+        proj_table.add_column("Mode", style="magenta")
+        has_csv_mode = any(p.ingestion_mode == GCPIngestionMode.csv for p in config.gcp.projects)
+        has_bq_mode = any(p.ingestion_mode == GCPIngestionMode.bigquery for p in config.gcp.projects)
+        if has_bq_mode:
+            proj_table.add_column("Dataset")
+            proj_table.add_column("Table")
+        if has_csv_mode:
+            proj_table.add_column("CSV Path")
         proj_table.add_column("Env")
         proj_table.add_column("Team")
         for p in config.gcp.projects:
-            proj_table.add_row(
+            row_data = [
                 p.project_id,
                 p.project_name or "-",
-                p.bigquery_dataset,
-                p.bigquery_table,
+                p.ingestion_mode.value,
+            ]
+            if has_bq_mode:
+                if p.ingestion_mode == GCPIngestionMode.bigquery:
+                    row_data.extend([p.bigquery_dataset or "-", p.bigquery_table or "-"])
+                else:
+                    row_data.extend(["-", "-"])
+            if has_csv_mode:
+                row_data.append(p.csv_path or "-" if p.ingestion_mode == GCPIngestionMode.csv else "-")
+            row_data.extend([
                 p.environment or "-",
                 p.team or "-",
-            )
+            ])
+            proj_table.add_row(*row_data)
         console.print(proj_table)
 
     # -- Azure --
