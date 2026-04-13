@@ -4,30 +4,40 @@ Multi-cloud FinOps platform — normalize, aggregate, and visualize cost data fr
 
 ## Architecture
 
-```
-┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐
-│  GCP Billing │  │ Azure Cost  │  │ Bifrost LLM │  │ Exchange Rates│
-│  (BigQuery)  │  │ Management  │  │  Gateway    │  │    (ECB)     │
-└──────┬───────┘  └──────┬──────┘  └──────┬───────┘  └──────┬───────┘
-       │                 │                │                  │
-       ▼                 ▼                ▼                  ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                      Extractors (Docker)                         │
-│  gcp_billing · azure_cost · bifrost_llm · exchange_rates         │
-└──────────────────────────┬───────────────────────────────────────┘
-                           │ normalize + write
-                           ▼
-┌──────────────────────────────────────────────────────────────────┐
-│              PostgreSQL 16 (pg_partman + pg_cron)                 │
-│  cost_records (monthly partitions) · daily_costs (MV)           │
-│  exchange_rates · extractor_health · infra_metrics_agg          │
-└──────────┬──────────────────────────────┬────────────────────────┘
-           │                              │
-           ▼                              ▼
-┌─────────────────────┐    ┌──────────────────────────┐
-│   Apache Superset   │    │   Grafana + Alerts        │
-│   Dashboards & SQL │    │   Health + Cost Anomalies │
-└─────────────────────┘    └──────────────────────────┘
+```mermaid
+graph TD
+    GCP["GCP Billing<br/>(BigQuery)"]
+    AZURE["Azure Cost<br/>Management"]
+    BIFROST["Bifrost LLM<br/>Gateway"]
+    ECB["Exchange Rates<br/>(ECB)"]
+
+    GCP --> E
+    AZURE --> E
+    BIFROST --> E
+    ECB --> E
+
+    subgraph E ["Extractors (Docker)"]
+        E1[gcp_billing]
+        E2[azure_cost]
+        E3[bifrost_llm]
+        E4[exchange_rates]
+    end
+
+    E -->|"normalize + write"| PG
+
+    subgraph PG ["PostgreSQL 16<br/>pg_partman + pg_cron"]
+        T1[cost_records<br/>monthly partitions]
+        T2[daily_costs<br/>materialized view]
+        T3[exchange_rates]
+        T4[extractor_health]
+        T5[infra_metrics_agg]
+    end
+
+    PG --> SUP
+    PG --> GRAF
+
+    SUP["Apache Superset<br/>Dashboards & SQL"]
+    GRAF["Grafana + Alerts<br/>Health + Cost Anomalies"]
 ```
 
 ## Quick Start
