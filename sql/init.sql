@@ -32,7 +32,7 @@ CREATE TABLE cost_records (
     cost_original   NUMERIC(18,6) NOT NULL,
     discount_usd    NUMERIC(18,6) DEFAULT 0,
     net_cost_usd    NUMERIC(18,6) NOT NULL,
-    usage_quantity  NUMERIC(18,6),
+    usage_quantity  NUMERIC(28,6),
     usage_unit      TEXT,
     model_name      TEXT,
     input_tokens    BIGINT,

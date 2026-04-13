@@ -265,6 +265,7 @@ def _mark_health_success(conn: psycopg.Connection, record_count: int) -> None:
 def _mark_health_failure(conn: psycopg.Connection, error_message: str) -> None:
     """Mark the extractor as *failed* in ``extractor_health``."""
     try:
+        conn.rollback()  # clear any aborted transaction before writing
         with conn.cursor() as cur:
             cur.execute(
                 """
