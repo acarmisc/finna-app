@@ -142,6 +142,20 @@ This README doubles as LLM context. When contributing:
 - **No secrets in code** — all credentials via env vars or `${VAR}` placeholders in YAML. The `.gitignore` blocks `*credentials*`, `*service-account*`, `*.pem`, `*.key`, `.env*`.
 - **Terraform** uses variable files (`*.tfvars`) — never commit real `.tfvars`, only the `.example` template.
 
+## Service Accounts
+
+This platform is designed around **dedicated service accounts** with least-privilege IAM — never use personal credentials or shared keys.
+
+| Provider | Account Type | Minimum Roles | Configured via |
+|----------|-------------|---------------|----------------|
+| **GCP** | Service Account (JSON key) | `roles/bigquery.dataViewer`, `roles/cloudsql.client`, `roles/secretmanager.secretAccessor` | TUI wizard → `service_account_key_path`, or `GOOGLE_APPLICATION_CREDENTIALS` env var |
+| **Azure** | Service Principal (App Registration) | `Cost Management Reader` on target subscription | TUI wizard → `tenant_id`, `client_id`, `client_secret` per subscription |
+| **AWS** | IAM User / Role | `ce:GetCostAndUsage`, `cur:GetReport` | TUI wizard (planned — see tracking note) |
+
+> **Tip:** The TUI wizard (`python -m config.wizard`) walks you through credential setup for each provider with masked input for secrets. All credentials are stored in per-client `.env` files — never in the YAML config directly.
+
+For the full service account creation guide and implementation checklist, see the tracking note in the project documentation.
+
 ## Security Notes
 
 - Docker images run as non-root (`appuser` / `superset`)
@@ -151,4 +165,4 @@ This README doubles as LLM context. When contributing:
 
 ## License
 
-Proprietary — internal use only.
+[Apache License 2.0](LICENSE)
