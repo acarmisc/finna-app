@@ -1,0 +1,297 @@
+# =============================================================================
+# FinOps Multi-Cloud Monitoring — Grafana Alert Rule Provisioning
+# =============================================================================
+# Grafana OSS 11.2  |  apiVersion: 1
+#
+# IMPORTANT: All rules are created in PAUSED state so that Phase 1 does not
+# fire alerts automatically.  Activate individually via the Grafana UI or the
+# HTTP API once the client is ready.
+#
+# Datasource: "finops-pg" (PostgreSQL — see datasources/postgres.yml)
+# =============================================================================
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: finops-cost-alerts
+    folder: FinOps
+    interval: 6h                # default evaluation interval for the group
+
+    rules:
+      # -----------------------------------------------------------------------
+      # cost_spike  — Daily cost spike detection
+      # -----------------------------------------------------------------------
+      # Evaluates the "Daily Cost Spike" query from sql/alert_queries.sql.
+      # Fires when ANY provider/project row is returned (i.e. a spike exists).
+      # Check interval: every 6 hours
+      # -----------------------------------------------------------------------
+      - uid: cost_spike
+        title: "FinOps — Daily Cost Spike Detected"
+        condition: C                            # query ref that holds the result
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 86400                      # last 24 h lookback
+              to: 0
+            datasourceUid: finops-pg
+            model:
+              sql:
+                # This is the full query from sql/alert_queries.sql section 1.
+                # The params CTE at the top controls the spike_pct (30 %),
+                # lookback_days (7), and min_baseline_cost ($10).
+                inline: >
+                  WITH params AS (
+                      SELECT
+                          30   AS spike_pct,
+                          7    AS lookback_days,
+                          10.0 AS min_baseline_cost
+                  ),
+                  today AS (
+                      SELECT dc.provider, dc.project_id, SUM(dc.total_cost) AS today_cost
+                      FROM daily_costs dc
+                      WHERE dc.day = CURRENT_DATE
+                      GROUP BY dc.provider, dc.project_id
+                  ),
+                  baseline AS (
+                      SELECT dc.provider, dc.project_id, AVG(dc.daily_total) AS baseline_avg
+                      FROM (
+                          SELECT provider, project_id, day, SUM(total_cost) AS daily_total
+                          FROM daily_costs
+                          WHERE day >= CURRENT_DATE - (SELECT lookback_days FROM params)
+                            AND day <  CURRENT_DATE
+                          GROUP BY provider, project_id, day
+                      ) dc
+                      GROUP BY dc.provider, dc.project_id
+                      HAVING AVG(dc.daily_total) >= (SELECT min_baseline_cost FROM params)
+                  )
+                  SELECT
+                      t.provider, t.project_id,
+                      ROUND(t.today_cost, 2) AS today_cost,
+                      ROUND(b.baseline_avg, 2) AS baseline_avg,
+                      ROUND(((t.today_cost - b.baseline_avg) / b.baseline_avg) * 100, 1) AS spike_pct,
+                      p.spike_pct AS threshold_pct
+                  FROM today t
+                  JOIN baseline b ON t.provider = b.provider AND t.project_id = b.project_id
+                  CROSS JOIN params p
+                  WHERE t.today_cost > b.baseline_avg * (1 + p.spike_pct / 100.0)
+              format: table
+          - refId: B
+            relativeTimeRange:
+              from: 86400
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            relativeTimeRange:
+              from: 86400
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [B]
+                  type: query
+        noDataState: NoData
+        execErrState: Alerting
+        for: 30m                               # wait 30 min before firing
+        annotations:
+          summary: "Cost spike: {{ .Labels.provider }} / {{ .Labels.project_id }}"
+          description: >
+            Today's cost (${{ .Labels.today_cost }}) is {{ .Labels.spike_pct }}%
+            above the 7-day average (${{ .Labels.baseline_avg }}).
+            Threshold: {{ .Labels.threshold_pct }}%.
+          runbook_url: "https://docs.example.com/finops/alerts/cost-spike"
+          spike_pct: "30"
+          lookback_days: "7"
+          min_baseline_cost_usd: "10"
+        labels:
+          severity: warning
+          team: finops
+          alert_type: cost_spike
+        isPaused: true                          # PHASE 1: paused
+
+      # -----------------------------------------------------------------------
+      # budget_threshold  — Monthly budget breach (80 / 90 / 100 %)
+      # -----------------------------------------------------------------------
+      # Evaluates the "Monthly Budget Threshold" query from sql/alert_queries.sql.
+      # Fires when ANY project crosses at least the 80 % tier.
+      # Check interval: every 12 hours
+      # -----------------------------------------------------------------------
+      - uid: budget_threshold
+        title: "FinOps — Monthly Budget Threshold Breached"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 7776000                     # ~90 days lookback for MTD calc
+              to: 0
+            datasourceUid: finops-pg
+            model:
+              sql:
+                inline: >
+                  WITH params AS (
+                      SELECT 10000.00 AS budget_override_usd
+                  ),
+                  mtd AS (
+                      SELECT dc.provider, dc.project_id, SUM(dc.total_cost) AS mtd_spend
+                      FROM daily_costs dc
+                      WHERE dc.day >= DATE_TRUNC('month', CURRENT_DATE)::date
+                        AND dc.day <  CURRENT_DATE
+                      GROUP BY dc.provider, dc.project_id
+                  ),
+                  budgets AS (
+                      SELECT m.provider, m.project_id, m.mtd_spend,
+                          COALESCE(pb.monthly_budget, (SELECT budget_override_usd FROM params)) AS monthly_budget
+                      FROM mtd m
+                      LEFT JOIN project_budgets pb ON pb.project_id = m.project_id
+                  )
+                  SELECT b.provider, b.project_id,
+                      ROUND(b.mtd_spend, 2) AS mtd_spend,
+                      ROUND(b.monthly_budget, 2) AS monthly_budget,
+                      ROUND((b.mtd_spend / b.monthly_budget) * 100, 1) AS pct_used,
+                      CASE
+                          WHEN b.mtd_spend >= b.monthly_budget      THEN '100%'
+                          WHEN b.mtd_spend >= b.monthly_budget * 0.9 THEN '90%'
+                          WHEN b.mtd_spend >= b.monthly_budget * 0.8 THEN '80%'
+                      END AS tier
+                  FROM budgets b
+                  WHERE b.mtd_spend >= b.monthly_budget * 0.8
+                  ORDER BY b.mtd_spend / b.monthly_budget DESC
+              format: table
+          - refId: B
+            relativeTimeRange:
+              from: 7776000
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            relativeTimeRange:
+              from: 7776000
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [B]
+                  type: query
+        noDataState: NoData
+        execErrState: Alerting
+        for: 1h
+        annotations:
+          summary: "Budget breach: {{ .Labels.provider }} / {{ .Labels.project_id }} at {{ .Labels.tier }}"
+          description: >
+            Month-to-date spend is ${{ .Labels.mtd_spend }} of ${{ .Labels.monthly_budget }}
+            budget ({{ .Labels.pct_used }}%). Tier: {{ .Labels.tier }}.
+          runbook_url: "https://docs.example.com/finops/alerts/budget-threshold"
+          budget_override_usd: "10000"
+          tier_80_label: "warning"
+          tier_90_label: "high"
+          tier_100_label: "critical"
+        labels:
+          severity: warning
+          team: finops
+          alert_type: budget_threshold
+        isPaused: true                          # PHASE 1: paused
+
+      # -----------------------------------------------------------------------
+      # llm_cost_anomaly  — LLM spend per project exceeds daily threshold
+      # -----------------------------------------------------------------------
+      # Evaluates the "LLM Cost Per Project" query from sql/alert_queries.sql.
+      # Fires when ANY project's rolling 24 h LLM spend exceeds the threshold.
+      # Check interval: every 1 hour
+      # -----------------------------------------------------------------------
+      - uid: llm_cost_anomaly
+        title: "FinOps — LLM Cost Anomaly Per Project"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 86400                      # last 24 h
+              to: 0
+            datasourceUid: finops-pg
+            model:
+              sql:
+                inline: >
+                  WITH params AS (
+                      SELECT 50.00 AS llm_daily_threshold_usd, 24 AS lookback_hours
+                  ),
+                  llm_spend AS (
+                      SELECT cr.project_id, SUM(cr.net_cost_usd) AS llm_spend
+                      FROM cost_records cr
+                      WHERE cr.service_category = 'llm'
+                        AND cr.usage_start >= NOW() - (SELECT lookback_hours FROM params) * INTERVAL '1 hour'
+                      GROUP BY cr.project_id
+                  )
+                  SELECT ls.project_id,
+                      ROUND(ls.llm_spend, 2) AS llm_spend_24h,
+                      p.llm_daily_threshold_usd AS threshold,
+                      ROUND(ls.llm_spend - p.llm_daily_threshold_usd, 2) AS over_by
+                  FROM llm_spend ls
+                  CROSS JOIN params p
+                  WHERE ls.llm_spend > p.llm_daily_threshold_usd
+                  ORDER BY ls.llm_spend DESC
+              format: table
+          - refId: B
+            relativeTimeRange:
+              from: 86400
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            relativeTimeRange:
+              from: 86400
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: [B]
+                  type: query
+        noDataState: NoData
+        execErrState: Alerting
+        for: 15m
+        annotations:
+          summary: "LLM cost anomaly: {{ .Labels.project_id }} spent ${{ .Labels.llm_spend_24h }}"
+          description: >
+            Project {{ .Labels.project_id }} LLM spend in the last 24 h is
+            ${{ .Labels.llm_spend_24h }}, exceeding the ${{ .Labels.threshold }}
+            threshold by ${{ .Labels.over_by }}.
+          runbook_url: "https://docs.example.com/finops/alerts/llm-cost-anomaly"
+          llm_daily_threshold_usd: "50"
+          lookback_hours: "24"
+        labels:
+          severity: warning
+          team: finops
+          alert_type: llm_cost_anomaly
+        isPaused: true                          # PHASE 1: paused

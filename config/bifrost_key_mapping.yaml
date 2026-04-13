@@ -1,0 +1,19 @@
+# Bifrost virtual_key → FinOps project/team mapping
+# Used by extractors/bifrost_llm.py to normalize LLM request logs
+
+mappings:
+  vk-ml-platform:
+    project_id: ml-platform
+    project_name: ML Platform
+    team: ml
+    environment: prod
+  vk-finops-prod:
+    project_id: finops-prod
+    project_name: FinOps Production
+    team: platform
+    environment: prod
+  vk-dev-sandbox:
+    project_id: dev-sandbox
+    project_name: Dev Sandbox
+    team: devops
+    environment: dev
