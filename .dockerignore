@@ -1,0 +1,56 @@
+# Version control
+.git
+.gitignore
+
+# Documentation
+docs/
+*.md
+LICENSE
+
+# Terraform state
+terraform/
+*.tf
+*.tfstate
+*.tfstate.backup
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Docker artifacts (prevent recursive builds)
+docker-compose*.yml
+Dockerfile*
+
+# Test artifacts
+tests/
+htmlcov/
+.coverage
+coverage.xml
+
+# Onboarding scripts (not needed in container)
+onboarding/
+
+# Local env files
+.env
+.env.*

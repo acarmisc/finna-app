@@ -1,0 +1,18 @@
+# ---------------------------------------------------------------------------
+# FinOps Grafana — Custom image with provisioning baked in
+#
+# Build:  docker build -f Dockerfile.grafana -t finops-grafana .
+# ---------------------------------------------------------------------------
+
+FROM grafana/grafana-oss:11.2.0
+
+# Build args for admin credentials with safe defaults
+ARG GF_ADMIN_USER=admin
+ARG GF_ADMIN_PASSWORD=admin
+
+# Bake provisioning config into the image
+COPY grafana/provisioning/ /etc/grafana/provisioning/
+
+# Set admin credentials as environment variables
+ENV GF_SECURITY_ADMIN_USER=${GF_ADMIN_USER}
+ENV GF_SECURITY_ADMIN_PASSWORD=${GF_ADMIN_PASSWORD}

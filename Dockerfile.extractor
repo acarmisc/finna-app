@@ -1,0 +1,45 @@
+# ---------------------------------------------------------------------------
+# FinOps Extractor — Multi-stage Dockerfile
+#
+# Build:  docker build -f Dockerfile.extractor -t finops-extractor .
+# Run:    docker run --rm -e EXTRACTOR_TYPE=gcp_billing finops-extractor
+#
+# EXTRACTOR_TYPE selects which extractor to run:
+#   gcp_billing | azure_cost | bifrost_llm | exchange_rates
+# ---------------------------------------------------------------------------
+
+# ---- Stage 1: Builder ----
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
+
+# Install build dependencies in a virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# ---- Stage 2: Runtime ----
+FROM python:3.12-slim
+
+# Security: run as non-root user
+RUN groupadd --gid 1000 appuser && \
+    useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser
+
+WORKDIR /app
+
+# Copy installed packages from builder
+COPY --from=builder /install /usr/local
+
+# Copy application source
+COPY models/ ./models/
+COPY extractors/ ./extractors/
+COPY config/ ./config/
+
+# Select extractor via environment variable
+ENV EXTRACTOR_TYPE=""
+
+USER appuser
+
+ENTRYPOINT ["python", "-m", "extractors.entrypoint"]
