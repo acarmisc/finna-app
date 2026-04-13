@@ -7,8 +7,7 @@ docs/
 *.md
 LICENSE
 
-# Terraform state
-terraform/
+# Terraform (not in repo, but ignore if present locally)
 *.tf
 *.tfstate
 *.tfstate.backup

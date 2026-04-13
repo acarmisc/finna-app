@@ -1,9 +1,16 @@
 #!/usr/bin/env python3
 # =============================================================================
-# FinOps Multi-Cloud Monitoring -- Superset Bootstrap via REST API
+# FinOps Multi-Cloud Monitoring -- Superset Dashboard Bootstrap
 # =============================================================================
 # Creates the FinOps database connection, datasets, and dashboards by calling
-# the Superset REST API.  Designed to be run once after `superset init`.
+# the Superset REST API.  Run this against an existing Superset instance.
+#
+# Usage:
+#   export SUPERSET_BASE_URL=http://your-superset:8088
+#   export SUPERSET_ADMIN_USERNAME=admin
+#   export ADMIN_PASSWORD=your-password
+#   export FINOPS_PG_URI=postgresql://finops:finops_dev@postgres:5432/finops
+#   python3 superset/bootstrap.py
 #
 # Idempotent: every resource is looked up by name before creation so the
 # script can be re-run safely.
@@ -218,7 +225,7 @@ def ensure_dashboard(api, dashboard_title, dashboard_json):
 
 
 # ---------------------------------------------------------------------------
-# Dashboard definitions (port of Grafana dashboards)
+# Dashboard definitions
 # ---------------------------------------------------------------------------
 
 FINOPS_OVERVIEW_DASHBOARD = {

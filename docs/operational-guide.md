@@ -28,7 +28,7 @@ This guide covers common operational tasks for the FinOps multi-cloud monitoring
    docker build -f Dockerfile.extractor -t finops-extractor .
    ```
 
-5. **Create a Cloud Run Job** (or update the Terraform module in `terraform/modules/`) that sets `EXTRACTOR_TYPE=<name>` and the required environment variables.
+5. **Create a Cloud Run Job** that sets `EXTRACTOR_TYPE=<name>` and the required environment variables.
 
 6. **Verify** by running the job manually and checking `extractor_health`:
    ```sql
@@ -37,33 +37,36 @@ This guide covers common operational tasks for the FinOps multi-cloud monitoring
 
 ---
 
-## Updating Grafana Dashboards
+## Updating Dashboards
 
-Dashboards are provisioned from JSON files in `grafana/provisioning/dashboards/`:
+Dashboards are provisioned in Apache Superset via the `superset/bootstrap.py` script:
 
-- `finops-overview.json` -- High-level cost overview
-- `llm-costs.json` -- LLM-specific cost and token metrics
-- `project-drilldown.json` -- Per-project cost drilldown
+- **FinOps Overview** — High-level cost overview
+- **LLM Costs** — LLM-specific cost and token metrics
+- **Project Drill-down** — Per-project cost drilldown
 
 ### To update a dashboard
 
-1. Edit the JSON file directly, or use the Grafana UI to make changes and then export the JSON (Grafana > Dashboard > Settings > JSON Model).
-2. Replace the file in `grafana/provisioning/dashboards/` with the updated JSON.
-3. Restart Grafana or trigger a dashboard re-provision:
+1. Edit the chart definitions in `superset/bootstrap.py`.
+2. Re-run the bootstrap script against your Superset instance:
    ```bash
-   docker compose restart grafana
+   export SUPERSET_BASE_URL=http://your-superset:8088
+   export SUPERSET_ADMIN_USERNAME=admin
+   export ADMIN_PASSWORD=your-password
+   export FINOPS_PG_URI=postgresql://finops:finops_dev@postgres:5432/finops
+   python3 superset/bootstrap.py
    ```
-   For production, Grafana picks up changes on next startup. Live edits in the UI are ephemeral unless saved back to the provisioning files.
+   The script is idempotent — it checks by name before creating resources.
 
 ### To add a new dashboard
 
-1. Create a new JSON file in `grafana/provisioning/dashboards/`.
-2. It will be auto-discovered by the provisioning config in `grafana/provisioning/dashboards/dashboard.yml`.
-3. Deploy the updated provisioning directory.
+1. Add a new dashboard definition dict in `superset/bootstrap.py`.
+2. Add chart creation calls and the `ensure_dashboard()` call in `main()`.
+3. Re-run the bootstrap script.
 
 ### Datasource
 
-The PostgreSQL datasource is configured in `grafana/provisioning/datasources/postgres.yml`. If the connection string changes, update that file and restart Grafana.
+The FinOps PostgreSQL connection is created automatically by the bootstrap script. If the connection string changes, update `FINOPS_PG_URI` and re-run.
 
 ---
 
@@ -237,7 +240,7 @@ Budget limits in the client's `bifrost_config.yaml` are informational. To enforc
 
 1. Update the budget limit in `config/bifrost_key_mapping.yaml`.
 2. Configure Bifrost gateway rate limiting (see Bifrost documentation for per-key budget controls).
-3. Set up Grafana alerts on the `llm-costs` dashboard to notify when spend exceeds the budget threshold.
+3. Set up Superset alerts on the `LLM Costs` dashboard to notify when spend exceeds the budget threshold.
 
 ### Bifrost DSN
 

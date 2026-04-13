@@ -60,7 +60,7 @@ CREATE INDEX idx_cost_tags
     ON cost_records USING gin (tags);
 
 -- =============================================================================
--- daily_costs — materialized view for Grafana queries
+-- daily_costs — materialized view for dashboard queries
 -- =============================================================================
 
 CREATE MATERIALIZED VIEW daily_costs AS

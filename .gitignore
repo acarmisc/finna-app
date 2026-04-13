@@ -24,7 +24,7 @@ Thumbs.db
 
 # Docker
 pg_data/
-grafana_data/
+superset_data/
 
 # Environment
 .env
@@ -32,12 +32,12 @@ grafana_data/
 !.env.example
 
 # Terraform
-terraform/*.tfstate
-terraform/*.tfstate.backup
-terraform/.terraform/
-terraform/.terraform.lock.hcl
-terraform/*.tfvars
-!terraform/*.tfvars.example
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+*.tfvars
+!*.tfvars.example
 
 # Secrets
 *credentials*

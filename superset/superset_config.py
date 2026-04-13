@@ -1,9 +1,12 @@
 # =============================================================================
 # FinOps Multi-Cloud Monitoring -- Apache Superset Configuration
 # =============================================================================
-# This file is mounted into the Superset container at /app/pythonpath/
-# Override SECRET_KEY via the SUPERSET_SECRET_KEY environment variable in
-# docker-compose.yml before deploying to production.
+# Reference configuration for an existing Superset deployment.
+# Mount this file at /app/pythonpath/superset_config.py or set
+# SUPERSET_CONFIG_PATH to point to it.
+#
+# Override SECRET_KEY via the SUPERSET_SECRET_KEY environment variable
+# before deploying to production.
 # =============================================================================
 
 import os

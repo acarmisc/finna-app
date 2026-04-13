@@ -114,13 +114,13 @@ In production, the pg_cron job refreshes this every 15 minutes. For urgent updat
 
 ---
 
-## Grafana Not Loading
+## Dashboard Issues
 
-### Datasource Issues
+### Superset Datasource Problems
 
-1. **Check datasource status** in Grafana: Navigate to Configuration > Data Sources > PostgreSQL. Click "Test". If it fails:
-   - Verify the PostgreSQL host, port, database, user, and password in `grafana/provisioning/datasources/postgres.yml`.
-   - For Cloud SQL, ensure the Grafana instance can reach the database (VPC connector, authorized networks, or Cloud SQL Auth Proxy).
+1. **Check datasource status** in Superset: Navigate to Data > Databases. Click "Test Connection" on the finops-pg database. If it fails:
+   - Verify the PostgreSQL host, port, database, user, and password in the connection URI.
+   - For Cloud SQL, ensure the Superset instance can reach the database (VPC connector, authorized networks, or Cloud SQL Auth Proxy).
    - For local development, ensure `docker compose up` has started the postgres service and it is healthy: `docker compose ps postgres`.
 
 2. **Connection refused**: The PostgreSQL instance may not be running. Check:
@@ -129,23 +129,23 @@ In production, the pg_cron job refreshes this every 15 minutes. For urgent updat
    gcloud sql instances describe finops-prod  # production
    ```
 
-3. **SSL errors**: Cloud SQL requires SSL by default. Ensure the datasource config includes `sslmode: require` or the correct CA certificate.
+3. **SSL errors**: Cloud SQL requires SSL by default. Ensure the connection URI includes `?sslmode=require` or the correct CA certificate.
 
 ### Dashboard Provisioning Problems
 
-1. **Dashboard not appearing**: Verify the JSON file exists in `grafana/provisioning/dashboards/` and is valid JSON:
+1. **Dashboard not appearing**: Re-run the bootstrap script to create or update dashboards:
    ```bash
-   python -c "import json; json.load(open('grafana/provisioning/dashboards/finops-overview.json'))"
+   export SUPERSET_BASE_URL=http://your-superset:8088
+   export SUPERSET_ADMIN_USERNAME=admin
+   export ADMIN_PASSWORD=your-password
+   export FINOPS_PG_URI=postgresql://finops:finops_dev@postgres:5432/finops
+   python3 superset/bootstrap.py
    ```
+   The script is idempotent — it checks by name before creating resources.
 
-2. **Stale dashboard after edit**: Grafana reads provisioning files on startup. Restart:
-   ```bash
-   docker compose restart grafana
-   ```
+2. **Dashboard shows "No data"**: The underlying query may reference a table or column that does not exist. Open the panel editor in Superset, click "Query", and verify the SQL runs directly against PostgreSQL.
 
-3. **Dashboard shows "No data"**: The underlying query may reference a table or column that does not exist. Open the panel editor in Grafana, click "Query", and verify the SQL runs directly against PostgreSQL.
-
-4. **Provisioning config**: Check `grafana/provisioning/dashboards/dashboard.yml` to ensure the path matches the directory containing the dashboard JSON files.
+3. **Bootstrap script fails to connect**: Ensure `SUPERSET_BASE_URL` points to a running Superset instance and that the admin credentials are correct.
 
 ---
 

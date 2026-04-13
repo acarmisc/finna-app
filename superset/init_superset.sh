@@ -1,8 +1,19 @@
 #!/usr/bin/env bash
 # =============================================================================
-# FinOps Multi-Cloud Monitoring -- Superset Bootstrap Script
+# FinOps Multi-Cloud Monitoring -- Superset Init Script
 # =============================================================================
-# Runs inside the superset-init one-shot container (or on first start).
+# Run this on a fresh Superset instance to set up the database, roles, and
+# admin user, then call bootstrap.py to create dashboards.
+#
+# Usage (on a running Superset instance):
+#   bash superset/init_superset.sh
+#
+# Environment variables:
+#   SUPERSET_ADMIN_USERNAME  (default: admin)
+#   SUPERSET_ADMIN_PASSWORD  (default: admin)
+#   SUPERSET_ADMIN_EMAIL     (default: admin@finops.local)
+#   FINOPS_PG_URI            (default: postgresql://finops:finops_dev@postgres:5432/finops)
+#
 # Idempotent: safe to run multiple times.
 # =============================================================================
 

@@ -1,19 +1,16 @@
 -- =============================================================================
 -- FinOps Multi-Cloud Monitoring — Alerting Queries
 -- =============================================================================
--- These queries power Grafana alert rules provisioned in
--- grafana/provisioning/alerting/rules.yml.
+-- These queries power alert rules for cost monitoring.
 --
 -- All queries target the PostgreSQL datasource "finops-pg" and are designed to
--- be used as Grafana SQL expressions (PostgreSQL datasource type).
+-- be used as SQL expressions (PostgreSQL datasource type).
 --
 -- PARAMETERIZATION
 -- ----------------
 -- Thresholds are expressed as SQL variables via a CTE at the top of each query
 -- called `params`.  To adjust a threshold at provisioning time, change the
--- value in the `params` CTE.  At runtime in Grafana, you can also use
--- dashboard template variables or Grafana alert-rule annotations to document
--- the chosen value.
+-- value in the `params` CTE.
 --
 -- SCHEMA DEPENDENCIES
 -- -------------------
