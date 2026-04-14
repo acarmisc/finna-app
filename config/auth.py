@@ -454,7 +454,14 @@ def get_azure_credential(
     explicit_tenant = tenant_id or os.getenv("AZURE_TENANT_ID")
     explicit_client_id = client_id or os.getenv("AZURE_CLIENT_ID")
     explicit_secret = client_secret or os.getenv("AZURE_CLIENT_SECRET")
+    auth_method = os.getenv("AZURE_AUTH_METHOD", "").lower()
 
+    # Check for CLI auth method first (takes precedence over explicit params)
+    if auth_method == "cli":
+        logger.info("Using AzureCliCredential (AZURE_AUTH_METHOD=cli)")
+        return AzureCliCredential()
+
+    # Use explicit params only if no CLI auth method specified
     if explicit_tenant and explicit_client_id and explicit_secret:
         logger.info("Using ClientSecretCredential (explicit/env vars)")
         return ClientSecretCredential(
@@ -663,6 +670,115 @@ def clear_credentials(provider: str = "all") -> None:
 # CLI entrypoint
 # ---------------------------------------------------------------------------
 
+# API integration helpers
+
+
+def push_config_to_api(meta: dict[str, Any], api_url: str) -> dict[str, Any]:
+    """Push config to API endpoint.
+
+    Args:
+        meta: Configuration metadata from auth flow
+        api_url: Base URL of the API (e.g., http://localhost:8000)
+
+    Returns:
+        API response with config_id
+    """
+    import requests
+
+    provider = meta.get("provider", "azure")
+
+    # Map auth method to credential type
+    auth_method = meta.get("auth_method", "service_principal")
+    cred_type_map = {
+        "azure_cli": "cli",
+        "azure_auth": "cli",
+        "device_code": "device_code",
+    }
+    credential_type = cred_type_map.get(auth_method, "service_principal")
+
+    # Build config payload
+    if provider == "azure":
+        config_payload = {
+            "provider": "azure",
+            "name": meta.get("display_name", "Azure Config"),
+            "credential_type": credential_type,
+            "config": {
+                "tenant_id": meta.get("tenant_id", ""),
+                "client_id": meta.get("client_id", ""),
+                "client_secret": meta.get("client_secret", ""),
+                "subscription_id": "",
+                "resource_groups": [],
+                "scope": "resourcegroup",
+            },
+        }
+
+        # Add subscriptions if present
+        if "subscriptions" in meta and meta["subscriptions"]:
+            subs = meta["subscriptions"]
+            if subs:
+                sub = subs[0]
+                config_payload["config"]["subscription_id"] = sub.get(
+                    "subscription_id", ""
+                )
+                config_payload["config"]["resource_groups"] = sub.get(
+                    "resource_groups", []
+                )
+
+    elif provider == "gcp":
+        config_payload = {
+            "provider": "gcp",
+            "name": meta.get("project_name", "GCP Config"),
+            "credential_type": "service_account",
+            "config": {
+                "project_id": meta.get("project_id", ""),
+            },
+        }
+    else:
+        raise ValueError(f"Unknown provider: {provider}")
+
+    url = f"{api_url.rstrip('/')}/api/v1/config"
+    console.print(f"[dim]Pushing config to {url}...[/dim]")
+
+    response = requests.post(url, json=config_payload, timeout=30)
+    response.raise_for_status()
+
+    result = response.json()
+    console.print(
+        f"[green]Config pushed successfully! config_id={result.get('id')}[/green]"
+    )
+
+    return result
+
+
+def run_extractor_via_api(provider: str, api_url: str) -> dict[str, Any]:
+    """Trigger extractor run via API.
+
+    Args:
+        provider: Cloud provider (azure, gcp)
+        api_url: Base URL of the API
+
+    Returns:
+        API response with run_id
+    """
+    import requests
+
+    url = f"{api_url.rstrip('/')}/api/v1/extractors/run"
+    console.print(f"[dim]Triggering extractor for {provider}...[/dim]")
+
+    response = requests.post(
+        url,
+        json={"provider": provider},
+        timeout=30,
+    )
+    response.raise_for_status()
+
+    result = response.json()
+    console.print(
+        f"[green]Extractor started! run_id={result.get('id')}, status={result.get('status')}[/green]"
+    )
+
+    return result
+
 
 def main() -> None:
     """CLI entrypoint for config.auth module."""
@@ -683,6 +799,16 @@ def main() -> None:
         "--auto-select", action="store_true", help="Auto-select all subscriptions"
     )
     parser.add_argument("--clear", action="store_true", help="Clear saved credentials")
+    parser.add_argument(
+        "--api-url",
+        default=None,
+        help="Push config to API after auth (e.g., http://localhost:8000)",
+    )
+    parser.add_argument(
+        "--run",
+        action="store_true",
+        help="Trigger extractor run after auth (requires --api-url)",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -694,6 +820,11 @@ def main() -> None:
         console.print(f"[green]Cleared {args.provider} credentials.[/green]")
         return
 
+    api_url = args.api_url
+    if args.run and not api_url:
+        console.print("[red]--run requires --api-url[/red]")
+        return
+
     if args.provider == "azure":
         method = "azure_cli" if args.auto_select else None
         result = azure_auth_interactive(
@@ -703,9 +834,46 @@ def main() -> None:
             method=method,
         )
         console.print(f"\nResult: {json.dumps(result, indent=2, default=str)}")
+
+        # Push to API if requested
+        if api_url:
+            result["provider"] = "azure"
+            try:
+                config_result = push_config_to_api(result, api_url)
+                console.print(
+                    f"[green]Config pushed to API: {config_result.get('id')}[/green]"
+                )
+
+                # Trigger run if requested
+                if args.run:
+                    run_result = run_extractor_via_api("azure", api_url)
+                    console.print(
+                        f"[green]Extractor triggered: {run_result.get('id')}[/green]"
+                    )
+            except Exception as e:
+                console.print(f"[red]API error: {e}[/red]")
+
     elif args.provider == "gcp":
         result = gcp_auth_interactive()
         console.print(f"\nResult: {json.dumps(result, indent=2, default=str)}")
+
+        # Push to API if requested
+        if api_url:
+            result["provider"] = "gcp"
+            try:
+                config_result = push_config_to_api(result, api_url)
+                console.print(
+                    f"[green]Config pushed to API: {config_result.get('id')}[/green]"
+                )
+
+                # Trigger run if requested
+                if args.run:
+                    run_result = run_extractor_via_api("gcp", api_url)
+                    console.print(
+                        f"[green]Extractor triggered: {run_result.get('id')}[/green]"
+                    )
+            except Exception as e:
+                console.print(f"[red]API error: {e}[/red]")
 
 
 if __name__ == "__main__":

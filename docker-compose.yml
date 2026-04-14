@@ -1,4 +1,18 @@
 services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      PG_DSN: ${PG_DSN:-postgres://finops:finops_dev@postgres:5432/finops}
+      HOST: "0.0.0.0"
+      PORT: "8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   extractor:
     build:
       context: .
@@ -20,7 +34,8 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    ports: ["5432:5432"]
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-finops}
       POSTGRES_USER: ${POSTGRES_USER:-finops}
