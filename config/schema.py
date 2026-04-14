@@ -3,7 +3,6 @@
 Supports:
   GCP  → billing account → multiple projects (ingestion via BigQuery or CSV)
   Azure → multiple subscriptions → multiple resource groups per subscription
-  Bifrost → external instance (already running)
 """
 
 from __future__ import annotations
@@ -19,8 +18,10 @@ from pydantic import BaseModel, Field, field_validator
 # GCP ingestion mode
 # ---------------------------------------------------------------------------
 
+
 class GCPIngestionMode(str, Enum):
     """How GCP billing data is ingested."""
+
     bigquery = "bigquery"
     csv = "csv"
 
@@ -28,6 +29,7 @@ class GCPIngestionMode(str, Enum):
 # ---------------------------------------------------------------------------
 # GCP configuration
 # ---------------------------------------------------------------------------
+
 
 class GCPProjectConfig(BaseModel):
     """A single GCP project with its billing configuration."""
@@ -39,13 +41,15 @@ class GCPProjectConfig(BaseModel):
         description="Ingestion mode: bigquery or csv",
     )
     bigquery_dataset: Optional[str] = Field(
-        None, description="BigQuery dataset for billing export (required when ingestion_mode=bigquery)"
+        None,
+        description="BigQuery dataset for billing export (required when ingestion_mode=bigquery)",
     )
     bigquery_table: Optional[str] = Field(
         None, description="BigQuery table name (required when ingestion_mode=bigquery)"
     )
     csv_path: Optional[str] = Field(
-        None, description="Path to CSV billing export file (required when ingestion_mode=csv)"
+        None,
+        description="Path to CSV billing export file (required when ingestion_mode=csv)",
     )
     environment: Optional[str] = Field(None, description="prod / staging / dev")
     team: Optional[str] = Field(None, description="Owning team")
@@ -55,7 +59,13 @@ class GCPConfig(BaseModel):
     """GCP provider configuration — one billing account, multiple projects."""
 
     enabled: bool = True
-    billing_account_id: Optional[str] = Field(None, description="GCP billing account ID")
+    auth_method: str = Field(
+        "adc",
+        description="Authentication method: 'adc', 'service_account', or 'skipped'",
+    )
+    billing_account_id: Optional[str] = Field(
+        None, description="GCP billing account ID"
+    )
     service_account_key_path: Optional[str] = Field(
         None, description="Path to service account JSON key file"
     )
@@ -86,20 +96,30 @@ class GCPConfig(BaseModel):
 # Azure configuration
 # ---------------------------------------------------------------------------
 
+
 class AzureSubscriptionConfig(BaseModel):
     """A single Azure subscription with its credentials and resource groups."""
 
     subscription_id: str = Field(..., description="Azure subscription ID (UUID)")
     subscription_name: Optional[str] = Field(None, description="Human-readable name")
     tenant_id: str = Field(..., description="Azure AD tenant ID")
-    client_id: str = Field(..., description="Service principal application ID")
-    client_secret: str = Field(..., description="Service principal secret (or ${ENV_VAR} reference)")
+    client_id: str = Field("", description="Service principal application ID")
+    client_secret: str = Field(
+        "",
+        description="Service principal secret (or ${ENV_VAR} reference). Empty when auth_method=device_code.",
+    )
+    auth_method: str = Field(
+        "client_secret",
+        description="Authentication method: 'client_secret' or 'device_code'",
+    )
     resource_groups: list[str] = Field(
         default_factory=list, description="Resource groups to track (empty = all)"
     )
     environment: Optional[str] = Field(None, description="prod / staging / dev")
     team: Optional[str] = Field(None, description="Owning team")
-    scope: str = Field("subscription", description="Query scope: subscription or managementgroup")
+    scope: str = Field(
+        "subscription", description="Query scope: subscription or managementgroup"
+    )
     management_group_id: Optional[str] = Field(
         None, description="Required when scope=managementgroup"
     )
@@ -113,29 +133,20 @@ class AzureConfig(BaseModel):
 
     @field_validator("subscriptions")
     @classmethod
-    def at_least_one_subscription(cls, v: list[AzureSubscriptionConfig]) -> list[AzureSubscriptionConfig]:
+    def at_least_one_subscription(
+        cls, v: list[AzureSubscriptionConfig]
+    ) -> list[AzureSubscriptionConfig]:
         if not v:
-            raise ValueError("At least one Azure subscription is required when Azure is enabled")
+            raise ValueError(
+                "At least one Azure subscription is required when Azure is enabled"
+            )
         return v
-
-
-# ---------------------------------------------------------------------------
-# Bifrost (external, already running)
-# ---------------------------------------------------------------------------
-
-class BifrostConfig(BaseModel):
-    """Connection to an already-running Bifrost LLM gateway instance."""
-
-    enabled: bool = True
-    pg_dsn: str = Field(..., description="PostgreSQL DSN of the Bifrost database")
-    key_mapping_path: str = Field(
-        "config/bifrost_key_mapping.yaml", description="Path to virtual-key mapping file"
-    )
 
 
 # ---------------------------------------------------------------------------
 # Aggregation settings
 # ---------------------------------------------------------------------------
+
 
 class AggregationSettings(BaseModel):
     """Per-metric-type aggregation window and retention."""
@@ -148,19 +159,26 @@ class AggregationConfig(BaseModel):
     """Full aggregation configuration for a client."""
 
     infra_metrics: AggregationSettings = Field(
-        default_factory=lambda: AggregationSettings(window_size_minutes=15, retention_days=365)
+        default_factory=lambda: AggregationSettings(
+            window_size_minutes=15, retention_days=365
+        )
     )
     llm_requests: AggregationSettings = Field(
-        default_factory=lambda: AggregationSettings(window_size_minutes=5, retention_days=180)
+        default_factory=lambda: AggregationSettings(
+            window_size_minutes=5, retention_days=180
+        )
     )
     billing: AggregationSettings = Field(
-        default_factory=lambda: AggregationSettings(window_size_minutes=60, retention_days=730)
+        default_factory=lambda: AggregationSettings(
+            window_size_minutes=60, retention_days=730
+        )
     )
 
 
 # ---------------------------------------------------------------------------
 # PostgreSQL target
 # ---------------------------------------------------------------------------
+
 
 class PostgreSQLConfig(BaseModel):
     """Connection to the FinOps PostgreSQL database (Cloud SQL or local)."""
@@ -182,6 +200,7 @@ class PostgreSQLConfig(BaseModel):
 # Superset configuration
 # ---------------------------------------------------------------------------
 
+
 class SupersetConfig(BaseModel):
     """Apache Superset visualization layer."""
 
@@ -191,26 +210,34 @@ class SupersetConfig(BaseModel):
     admin_username: str = Field("admin", description="Initial admin username")
     admin_password: str = Field("admin", description="Initial admin password")
     admin_email: str = Field("admin@finops.local", description="Initial admin email")
-    secret_key: str = Field("CHANGE_ME_TO_A_LONG_RANDOM_STRING", description="Flask secret key")
+    secret_key: str = Field(
+        "CHANGE_ME_TO_A_LONG_RANDOM_STRING", description="Flask secret key"
+    )
 
 
 # ---------------------------------------------------------------------------
 # Root configuration
 # ---------------------------------------------------------------------------
 
+
 class ClientConfig(BaseModel):
     """Complete FinOps client configuration — multiple subscriptions per provider."""
 
-    client_id: str = Field(..., description="Unique client identifier (lowercase, hyphens)")
+    client_id: str = Field(
+        ..., description="Unique client identifier (lowercase, hyphens)"
+    )
     client_name: str = Field(..., description="Human-readable client name")
     created_at: datetime = Field(default_factory=lambda: datetime.now())
 
     postgresql: PostgreSQLConfig = Field(default_factory=PostgreSQLConfig)
     superset: SupersetConfig = Field(default_factory=SupersetConfig)
 
-    gcp: Optional[GCPConfig] = Field(None, description="GCP provider config (set when enabled)")
-    azure: Optional[AzureConfig] = Field(None, description="Azure provider config (set when enabled)")
-    bifrost: Optional[BifrostConfig] = Field(None, description="External Bifrost config (set when enabled)")
+    gcp: Optional[GCPConfig] = Field(
+        None, description="GCP provider config (set when enabled)"
+    )
+    azure: Optional[AzureConfig] = Field(
+        None, description="Azure provider config (set when enabled)"
+    )
 
     aggregation: AggregationConfig = Field(default_factory=AggregationConfig)
 
@@ -222,8 +249,6 @@ class ClientConfig(BaseModel):
             providers.append("gcp")
         if self.azure and self.azure.enabled:
             providers.append("azure")
-        if self.bifrost and self.bifrost.enabled:
-            providers.append("bifrost")
         return providers
 
     def to_env_dict(self) -> dict[str, str]:
@@ -251,9 +276,5 @@ class ClientConfig(BaseModel):
                 env[f"{prefix}_CLIENT_SECRET"] = sub.client_secret
                 if sub.resource_groups:
                     env[f"{prefix}_RESOURCE_GROUPS"] = ",".join(sub.resource_groups)
-
-        if self.bifrost and self.bifrost.enabled:
-            env["BIFROST_PG_DSN"] = self.bifrost.pg_dsn
-            env["BIFROST_KEY_MAPPING_PATH"] = self.bifrost.key_mapping_path
 
         return env

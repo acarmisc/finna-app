@@ -100,7 +100,7 @@ The `NormalizedCostRecord` Pydantic model (in `models/__init__.py`) has dedicate
 
 **Azure**: The `azure_cost` extractor reads the `Tags` column from the Cost Management API. The `Project` tag (case-insensitive lookup) is used as `project_id`. All tags are stored in the `tags` JSONB field.
 
-**Bifrost (LLM)**: Virtual keys map to `project_id`, `project_name`, `environment`, and `team` via `config/bifrost_key_mapping.yaml`. The `virtual_key` and `llm_provider` are stored in `tags`.
+**LLM (OTel Collector)**: LLM telemetry ingested via OTel Collector maps `service.name` to `project_id`, with `model_name`, `trace_id`, and `latency_ms` stored in dedicated columns. OTel resource attributes are stored in `tags`.
 
 ---
 

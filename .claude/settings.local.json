@@ -1,7 +1,21 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(git remote:*)",
+      "Bash(git tag:*)",
+      "WebSearch",
+      "Bash(python -m pytest tests/test_gcp_extractor.py tests/test_gcp_shared.py -v)",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(.venv/bin/python -m pytest tests/ -v)",
+      "Bash(.venv/bin/python -c \"import psycopg; print\\(dir\\(psycopg.sql\\)\\)\")",
+      "Bash(.venv/bin/python:*)",
+      "Bash(git rm:*)",
+      "Bash(gcloud config:*)",
+      "Bash(bq ls:*)",
+      "Bash(gcloud projects list:*)",
+      "Bash(bq query:*)",
+      "Bash(GCP_CSV_PATH=data/gcp_billing_sample.csv PG_DSN=\"postgres://finops:finops_dev@localhost:5432/finops\" .venv/bin/python:*)"
     ]
   }
 }

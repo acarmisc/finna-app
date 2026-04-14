@@ -26,7 +26,6 @@ from config.schema import (
     AggregationSettings,
     AzureConfig,
     AzureSubscriptionConfig,
-    BifrostConfig,
     ClientConfig,
     GCPConfig,
     GCPIngestionMode,
@@ -192,7 +191,9 @@ def ask_superset() -> dict[str, Any]:
     console.rule("[bold green]Superset Configuration[/bold green]")
 
     host = questionary.text("Superset host:", default="localhost").ask()
-    port_str = questionary.text("Superset port:", default="8088", validate=_validate_port).ask()
+    port_str = questionary.text(
+        "Superset port:", default="8088", validate=_validate_port
+    ).ask()
     admin_username = questionary.text("Admin username:", default="admin").ask()
     admin_password = questionary.password("Admin password:", default=None).ask()
     admin_email = questionary.text(
@@ -239,7 +240,7 @@ def ask_providers() -> list[str]:
 
     providers = questionary.checkbox(
         "Select providers to enable:",
-        choices=["gcp", "azure", "bifrost"],
+        choices=["gcp", "azure"],
     ).ask()
 
     if providers is None:
@@ -307,13 +308,24 @@ def ask_gcp_project(ingestion_mode: str = "bigquery") -> dict[str, Any]:
 
 
 def ask_gcp() -> dict[str, Any]:
-    """Ask for full GCP configuration including projects."""
+    """Ask for full GCP configuration including projects and authentication."""
     console.rule("[bold green]GCP Configuration[/bold green]")
 
-    billing_account_id = questionary.text("Billing account ID:").ask()
-    service_account_key_path = questionary.text(
-        "Service account key path:",
-    ).ask()
+    from config.auth import gcp_auth_interactive
+
+    auth_result = gcp_auth_interactive()
+    auth_method = auth_result.get("auth_method", "skipped")
+
+    if auth_method == "skipped":
+        return {"enabled": False}
+
+    billing_account_id = questionary.text("Billing account ID (optional):").ask()
+
+    service_account_key_path = None
+    if auth_method == "service_account":
+        service_account_key_path = questionary.text(
+            "Service account key path:",
+        ).ask()
 
     ingestion_mode = questionary.select(
         "Ingestion mode:",
@@ -360,23 +372,32 @@ def ask_gcp() -> dict[str, Any]:
                 p.get("ingestion_mode", "bigquery"),
             ]
             if ingestion_mode == "bigquery":
-                row_data.extend([
-                    p.get("bigquery_dataset", "-"),
-                    p.get("bigquery_table", "-"),
-                ])
+                row_data.extend(
+                    [
+                        p.get("bigquery_dataset", "-"),
+                        p.get("bigquery_table", "-"),
+                    ]
+                )
             else:
                 row_data.append(p.get("csv_path", "-"))
-            row_data.extend([
-                p.get("environment") or "-",
-                p.get("team") or "-",
-            ])
+            row_data.extend(
+                [
+                    p.get("environment") or "-",
+                    p.get("team") or "-",
+                ]
+            )
             table.add_row(*row_data)
         console.print(table)
 
     return {
         "enabled": True,
-        "billing_account_id": billing_account_id.strip() if billing_account_id else None,
-        "service_account_key_path": service_account_key_path.strip() if service_account_key_path else None,
+        "auth_method": auth_method,
+        "billing_account_id": billing_account_id.strip()
+        if billing_account_id
+        else None,
+        "service_account_key_path": service_account_key_path.strip()
+        if service_account_key_path
+        else None,
         "projects": projects,
     }
 
@@ -386,24 +407,62 @@ def ask_gcp() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def ask_azure_subscription() -> dict[str, Any]:
+def ask_azure_subscription(tenant_id_hint: str | None = None) -> dict[str, Any]:
     """Ask for a single Azure subscription configuration."""
     subscription_id = questionary.text(
         "Subscription ID (required):",
         validate=_validate_required,
     ).ask()
     subscription_name = questionary.text("Subscription name:").ask()
+
     tenant_id = questionary.text(
         "Tenant ID (required):",
+        default=tenant_id_hint or "",
         validate=_validate_required,
     ).ask()
-    client_id = questionary.text(
-        "Client ID / App ID (required):",
-        validate=_validate_required,
+
+    auth_method = questionary.select(
+        "Authentication method for this subscription:",
+        choices=[
+            "OAuth device code (browser login — recommended)",
+            "Service principal (client secret)",
+        ],
     ).ask()
-    client_secret = questionary.password(
-        "Client secret (required):",
-    ).ask()
+
+    client_id = ""
+    client_secret = ""
+    if auth_method and "Service principal" in auth_method:
+        client_id = (
+            questionary.text(
+                "Client ID / App ID (required):",
+                validate=_validate_required,
+            ).ask()
+            or ""
+        )
+        client_secret = (
+            questionary.password(
+                "Client secret (required):",
+            ).ask()
+            or ""
+        )
+    elif auth_method and "OAuth" in auth_method:
+        from config.auth import azure_device_flow
+
+        console.print(
+            f"\n[bold]Authenticating via OAuth for subscription {subscription_id.strip()}[/bold]"
+        )
+        try:
+            meta = azure_device_flow(tenant_id=tenant_id.strip())
+            client_id = meta.get("client_id", "")
+            console.print(
+                "[dim]OAuth token cached — extractors will use it automatically.[/dim]"
+            )
+        except Exception as exc:
+            console.print(f"[red]OAuth failed: {exc}[/red]")
+            console.print("[yellow]Falling back to service principal.[/yellow]")
+            client_id = questionary.text("Client ID / App ID:").ask() or ""
+            client_secret = questionary.password("Client secret:").ask() or ""
+            auth_method = "Service principal (client secret)"
 
     scope = questionary.select(
         "Scope:",
@@ -444,13 +503,18 @@ def ask_azure_subscription() -> dict[str, Any]:
         "subscription_id": subscription_id.strip(),
         "subscription_name": subscription_name.strip() if subscription_name else None,
         "tenant_id": tenant_id.strip(),
-        "client_id": client_id.strip(),
+        "client_id": client_id.strip() if client_id else "",
         "client_secret": client_secret or "",
+        "auth_method": "device_code"
+        if auth_method and "OAuth" in auth_method
+        else "client_secret",
         "resource_groups": resource_groups,
         "environment": environment,
         "team": team.strip() if team else None,
         "scope": scope,
-        "management_group_id": management_group_id.strip() if management_group_id else None,
+        "management_group_id": management_group_id.strip()
+        if management_group_id
+        else None,
     }
     return result
 
@@ -483,7 +547,9 @@ def ask_azure() -> dict[str, Any]:
         table.add_column("Environment")
         table.add_column("Team")
         for s in subscriptions:
-            rg_list = ", ".join(s["resource_groups"]) if s["resource_groups"] else "(all)"
+            rg_list = (
+                ", ".join(s["resource_groups"]) if s["resource_groups"] else "(all)"
+            )
             table.add_row(
                 s["subscription_id"][:12] + "...",
                 s.get("subscription_name") or "-",
@@ -498,34 +564,6 @@ def ask_azure() -> dict[str, Any]:
     return {
         "enabled": True,
         "subscriptions": subscriptions,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Bifrost section
-# ---------------------------------------------------------------------------
-
-
-def ask_bifrost() -> dict[str, Any]:
-    """Ask for Bifrost (external service) configuration."""
-    console.rule("[bold green]Bifrost Configuration[/bold green]")
-
-    pg_dsn = questionary.text(
-        "Bifrost PostgreSQL DSN (required):",
-        validate=_validate_required,
-    ).ask()
-    key_mapping_path = questionary.text(
-        "Key mapping path:",
-        default="config/bifrost_key_mapping.yaml",
-    ).ask()
-
-    if pg_dsn is None:
-        raise KeyboardInterrupt
-
-    return {
-        "enabled": True,
-        "pg_dsn": pg_dsn.strip(),
-        "key_mapping_path": key_mapping_path or "config/bifrost_key_mapping.yaml",
     }
 
 
@@ -555,7 +593,9 @@ def ask_aggregation() -> dict[str, Any]:
 
     console.print("[dim]Customize each metric type:[/dim]\n")
 
-    def _ask_metric(name: str, default_window: int, default_retention: int) -> dict[str, int]:
+    def _ask_metric(
+        name: str, default_window: int, default_retention: int
+    ) -> dict[str, int]:
         console.print(f"[bold]{name}[/bold]")
         ws = questionary.text(
             f"  Window size (minutes):",
@@ -594,14 +634,12 @@ def build_config(
     providers: list[str],
     gcp: Optional[dict[str, Any]],
     azure: Optional[dict[str, Any]],
-    bifrost: Optional[dict[str, Any]],
     aggregation: dict[str, Any],
 ) -> ClientConfig:
     """Build and validate the ClientConfig Pydantic model from wizard answers."""
 
     gcp_model = GCPConfig(**gcp) if gcp else None
     azure_model = AzureConfig(**azure) if azure else None
-    bifrost_model = BifrostConfig(**bifrost) if bifrost else None
 
     # Build aggregation sub-models
     agg = AggregationConfig(
@@ -617,7 +655,6 @@ def build_config(
         superset=SupersetConfig(**superset),
         gcp=gcp_model,
         azure=azure_model,
-        bifrost=bifrost_model,
         aggregation=agg,
     )
 
@@ -666,8 +703,12 @@ def display_summary(config: ClientConfig) -> None:
         proj_table.add_column("Project ID", style="cyan")
         proj_table.add_column("Name")
         proj_table.add_column("Mode", style="magenta")
-        has_csv_mode = any(p.ingestion_mode == GCPIngestionMode.csv for p in config.gcp.projects)
-        has_bq_mode = any(p.ingestion_mode == GCPIngestionMode.bigquery for p in config.gcp.projects)
+        has_csv_mode = any(
+            p.ingestion_mode == GCPIngestionMode.csv for p in config.gcp.projects
+        )
+        has_bq_mode = any(
+            p.ingestion_mode == GCPIngestionMode.bigquery for p in config.gcp.projects
+        )
         if has_bq_mode:
             proj_table.add_column("Dataset")
             proj_table.add_column("Table")
@@ -683,15 +724,23 @@ def display_summary(config: ClientConfig) -> None:
             ]
             if has_bq_mode:
                 if p.ingestion_mode == GCPIngestionMode.bigquery:
-                    row_data.extend([p.bigquery_dataset or "-", p.bigquery_table or "-"])
+                    row_data.extend(
+                        [p.bigquery_dataset or "-", p.bigquery_table or "-"]
+                    )
                 else:
                     row_data.extend(["-", "-"])
             if has_csv_mode:
-                row_data.append(p.csv_path or "-" if p.ingestion_mode == GCPIngestionMode.csv else "-")
-            row_data.extend([
-                p.environment or "-",
-                p.team or "-",
-            ])
+                row_data.append(
+                    p.csv_path or "-"
+                    if p.ingestion_mode == GCPIngestionMode.csv
+                    else "-"
+                )
+            row_data.extend(
+                [
+                    p.environment or "-",
+                    p.team or "-",
+                ]
+            )
             proj_table.add_row(*row_data)
         console.print(proj_table)
 
@@ -720,13 +769,6 @@ def display_summary(config: ClientConfig) -> None:
                 s.team or "-",
             )
         console.print(sub_table)
-
-    # -- Bifrost --
-    if config.bifrost and config.bifrost.enabled:
-        bf_table = Table.grid(padding=(0, 2))
-        bf_table.add_row("PG DSN", "***")
-        bf_table.add_row("Key Mapping", config.bifrost.key_mapping_path)
-        console.print(Panel(bf_table, title="Bifrost", border_style="green"))
 
     # -- Aggregation --
     agg_table = Table(show_lines=True)
@@ -806,10 +848,6 @@ def _mask_secrets(d: dict[str, Any]) -> dict[str, Any]:
             if "client_secret" in sub:
                 sub["client_secret"] = "${AZURE_CLIENT_SECRET}"
 
-    # Bifrost DSN
-    if "bifrost" in d and "pg_dsn" in d.get("bifrost", {}):
-        d["bifrost"]["pg_dsn"] = "${BIFROST_PG_DSN}"
-
     return d
 
 
@@ -873,14 +911,11 @@ def run_wizard() -> None:
         # 5. Provider-specific sections
         gcp: Optional[dict[str, Any]] = None
         azure: Optional[dict[str, Any]] = None
-        bifrost: Optional[dict[str, Any]] = None
 
         if "gcp" in providers:
             gcp = ask_gcp()
         if "azure" in providers:
             azure = ask_azure()
-        if "bifrost" in providers:
-            bifrost = ask_bifrost()
 
         # 6. Aggregation
         aggregation = ask_aggregation()
@@ -889,7 +924,7 @@ def run_wizard() -> None:
         console.rule("[bold green]Validation[/bold green]")
         try:
             config = build_config(
-                client_info, pg, superset, providers, gcp, azure, bifrost, aggregation
+                client_info, pg, superset, providers, gcp, azure, aggregation
             )
             console.print("[bold green]Configuration is valid![/bold green]")
         except Exception as exc:
@@ -913,7 +948,9 @@ def run_wizard() -> None:
             save_config(config)
             client_dir = CLIENTS_DIR / config.client_id
             success = Text()
-            success.append("\nConfiguration saved successfully!\n\n", style="bold green")
+            success.append(
+                "\nConfiguration saved successfully!\n\n", style="bold green"
+            )
             success.append(f"  Config:  {client_dir / 'config.yaml'}\n", style="cyan")
             success.append(f"  Secrets: {client_dir / '.env'}\n", style="cyan")
             success.append(f"  Registry: {REGISTRY_PATH}\n", style="cyan")

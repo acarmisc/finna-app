@@ -32,14 +32,12 @@ Status values: `running` | `success` | `failed`
 - **Symptoms**: `error_message` contains "401", "403", "Unauthorized", or "credential".
 - **GCP**: Verify the service account key or Workload Identity is properly configured. Check that `GOOGLE_APPLICATION_CREDENTIALS` is set or the Cloud Run Job's service account has `roles/bigquery.dataViewer`.
 - **Azure**: Verify `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, and `AZURE_CLIENT_SECRET`. Secrets may have rotated. Check that the service principal has `Cost Management Reader` on the target subscription.
-- **Bifrost**: Verify `BIFROST_PG_DSN` contains valid credentials for the Bifrost PostgreSQL database.
 
 **Network connectivity failure**
 
 - **Symptoms**: "Connection refused", "timeout", "could not connect", or `psycopg.OperationalError`.
 - **GCP**: Ensure the Cloud Run Job is in a VPC connector with access to BigQuery and Cloud SQL. Check VPC connector egress rules.
 - **Azure**: Ensure the Cloud Run container has outbound internet access. Azure Cost Management API is a public endpoint; verify no egress firewall rules block it.
-- **Bifrost**: Verify the Bifrost PostgreSQL database is reachable from the Cloud Run Job's network. Check firewall rules on the Bifrost database.
 
 **API quota exceeded**
 
@@ -146,60 +144,6 @@ In production, the pg_cron job refreshes this every 15 minutes. For urgent updat
 2. **Dashboard shows "No data"**: The underlying query may reference a table or column that does not exist. Open the panel editor in Superset, click "Query", and verify the SQL runs directly against PostgreSQL.
 
 3. **Bootstrap script fails to connect**: Ensure `SUPERSET_BASE_URL` points to a running Superset instance and that the admin credentials are correct.
-
----
-
-## Bifrost Connection Issues
-
-### DSN Verification
-
-The Bifrost extractor connects to a separate PostgreSQL database. Verify the DSN:
-
-```bash
-# Test connectivity using psql
-psql "${BIFROST_PG_DSN}" -c "SELECT 1"
-
-# Or using Python
-python -c "
-import psycopg, os
-conn = psycopg.connect(os.environ['BIFROST_PG_DSN'])
-with conn.cursor() as cur:
-    cur.execute('SELECT 1')
-    print('Bifrost DB reachable:', cur.fetchone())
-conn.close()
-"
-```
-
-Common DSN issues:
-- Wrong hostname or port
-- Database name mismatch (Bifrost may use a different DB name than FinOps)
-- Credentials rotated but `BIFROST_PG_DSN` env var not updated
-- SSL requirements not met (add `?sslmode=require` to DSN)
-
-### Virtual Key Validation
-
-If the Bifrost extractor logs "Unmapped virtual_key" warnings:
-
-1. Check which keys are unmapped:
-   ```sql
-   -- Run against the Bifrost database
-   SELECT DISTINCT virtual_key FROM log
-   WHERE virtual_key NOT IN (
-       SELECT unnest(ARRAY['vk-ml-platform', 'vk-finops-prod', 'vk-dev-sandbox'])
-   );
-   ```
-
-2. Add missing keys to `config/bifrost_key_mapping.yaml`:
-   ```yaml
-   mappings:
-     vk-missing-key:
-       project_id: corresponding-project
-       project_name: Corresponding Project
-       team: team-name
-       environment: prod
-   ```
-
-3. Redeploy the extractor to pick up the updated mapping.
 
 ---
 

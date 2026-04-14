@@ -6,8 +6,7 @@ services:
     environment:
       EXTRACTOR_TYPE: ${EXTRACTOR_TYPE:-exchange_rates}
       PG_DSN: ${PG_DSN:-postgres://finops:finops_dev@postgres:5432/finops}
-      BIFROST_PG_DSN: ${BIFROST_PG_DSN:-postgres://finops:finops_dev@postgres:5432/finops}
-      BIFROST_KEY_MAPPING_PATH: /app/config/bifrost_key_mapping.yaml
+
       BATCH_SIZE: "500"
       GCP_CSV_PATH: ${GCP_CSV_PATH:-}
       GCP_INGESTION_MODE: ${GCP_INGESTION_MODE:-bigquery}
@@ -35,14 +34,6 @@ services:
       timeout: 5s
       retries: 5
 
-  bifrost:
-    image: maximhq/bifrost
-    ports: ["8080:8080"]
-    volumes:
-      - ./bifrost/data:/app/data
-    depends_on:
-      postgres:
-        condition: service_healthy
 
 volumes:
   pg_data:

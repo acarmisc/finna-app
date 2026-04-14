@@ -396,7 +396,16 @@ def extract(
             "DATE_FROM and DATE_TO are required (set env vars or pass date_from/date_to)"
         )
 
-    client = bq_client if bq_client is not None else bigquery.Client(project=project)
+    if bq_client is not None:
+        client = bq_client
+    else:
+        try:
+            from config.auth import get_gcp_credentials
+
+            creds, _ = get_gcp_credentials()
+            client = bigquery.Client(project=project, credentials=creds)
+        except Exception:
+            client = bigquery.Client(project=project)
 
     query, query_params = _build_query(project, dataset, table, from_date, to_date)
     rows: bigquery.RowIterator = _run_bq_query(client, query, query_params, project)

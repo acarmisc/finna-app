@@ -1,6 +1,6 @@
 # finna-app
 
-Multi-cloud FinOps platform — normalize, aggregate, and visualize cost data from GCP, Azure, and LLM gateways.
+Multi-cloud FinOps platform — normalize, aggregate, and visualize cost data from GCP, Azure, and LLM gateways (via OTel Collector).
 
 ## Architecture
 
@@ -8,18 +8,18 @@ Multi-cloud FinOps platform — normalize, aggregate, and visualize cost data fr
 graph TD
     GCP["GCP Billing<br/>BigQuery"]
     AZURE["Azure Cost<br/>Management"]
-    BIFROST["Bifrost LLM<br/>Gateway"]
+    OTEL["OTel Collector<br/>LLM Gateway"]
     ECB["Exchange Rates<br/>ECB"]
 
     GCP --> E
     AZURE --> E
-    BIFROST --> E
+    OTEL --> E
     ECB --> E
 
     subgraph E ["Extractors"]
         E1[gcp_billing]
         E2[azure_cost]
-        E3[bifrost_llm]
+        E3[otel_llm]
         E4[exchange_rates]
     end
 
@@ -40,30 +40,53 @@ graph TD
 ## Quick Start
 
 ```bash
-# 1. Start Postgres + Bifrost
-docker compose up -d postgres bifrost
+# 0. Install dependencies (requires uv — https://docs.astral.sh/uv/)
+uv sync
 
-# 2. Run an extractor
+# 1. Start Postgres
+docker compose up -d postgres
+
+# 2. Authenticate with your cloud provider (no service account needed!)
+uv run python -m config.auth azure   # Azure: browser-based device code login
+uv run python -m config.auth gcp     # GCP: delegates to gcloud auth login
+
+# 3. Run an extractor (credentials are auto-discovered)
 EXTRACTOR_TYPE=exchange_rates docker compose --profile extractors up extractor
 
-# 3. Provision dashboards on an existing Superset instance
+# 4. Provision dashboards on an existing Superset instance
 export SUPERSET_BASE_URL=http://your-superset:8088
 export SUPERSET_ADMIN_USERNAME=admin
 export ADMIN_PASSWORD=your-password
 export FINOPS_PG_URI=postgresql://finops:finops_dev@postgres:5432/finops
-python3 superset/bootstrap.py
+uv run python superset/bootstrap.py
 ```
 
 ## Extractors
 
-| Type | Source | Env vars needed |
-|------|--------|-----------------|
-| `gcp_billing` | BigQuery billing export | `GCP_PROJECT`, `BQ_DATASET`, `BQ_TABLE`, `PG_DSN` + ADC credentials |
-| `azure_cost` | Cost Management API | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_SUBSCRIPTION_ID`, `PG_DSN` |
-| `bifrost_llm` | Bifrost PostgreSQL | `BIFROST_PG_DSN`, `PG_DSN`, `BIFROST_KEY_MAPPING_PATH` |
-| `exchange_rates` | ECB daily feed | `PG_DSN` only |
+| Type | Source | Auth methods | Env vars needed |
+|------|--------|-------------|-----------------|
+| `gcp_billing` | BigQuery billing export | ADC (`gcloud auth login`), service account key | `GCP_PROJECT`, `BQ_DATASET`, `BQ_TABLE`, `PG_DSN` |
+| `azure_cost` | Cost Management API | OAuth device code (browser), service principal, Azure CLI | `AZURE_SUBSCRIPTION_ID`, `PG_DSN` |
+| `otel_llm` | OTel Collector (planned) | — | `PG_DSN` + OTel pipeline config |
+| `exchange_rates` | ECB daily feed | — | `PG_DSN` only |
 
 All extractors write normalized rows into `cost_records` via `PG_DSN`. Run via `EXTRACTOR_TYPE` env var or the TUI wizard.
+
+### Authentication
+
+**No service account required for local development!** Use OAuth device-code flow:
+
+```bash
+# Azure: authenticates via browser, caches token in OS keyring
+python -m config.auth azure --tenant-id <your-tenant>
+
+# GCP: delegates to gcloud CLI, sets up ADC
+python -m config.auth gcp
+```
+
+Credential resolution order for extractors:
+- **Azure**: explicit env vars → keyring cached token → Azure CLI (`az login`) → `DefaultAzureCredential`
+- **GCP**: `GOOGLE_APPLICATION_CREDENTIALS` → `gcloud auth login` ADC → compute metadata
 
 ## Superset Dashboards
 
@@ -78,13 +101,18 @@ Alert queries for cost spikes and budget thresholds are in `sql/alert_queries.sq
 
 ## Configuration
 
-### TUI Wizard (interactive)
+### Authentication (TUI or CLI)
 
 ```bash
+# Interactive TUI with OAuth device code
+python -m config.auth azure
+python -m config.auth gcp
+
+# Or use the full TUI wizard
 python -m config.wizard
 ```
 
-Walks you through: client ID → PostgreSQL → cloud providers (GCP/Azure/Bifrost) → aggregation. Outputs `clients/{id}/config.yaml` + `.env`.
+Walks you through: authentication → client ID → PostgreSQL → cloud providers (GCP/Azure) → aggregation. OAuth tokens are cached in OS keyring; extractors auto-discover them. Outputs `clients/{id}/config.yaml` + `.env`.
 
 ### Multi-subscription YAML
 
@@ -126,7 +154,7 @@ Image: `ghcr.io/acarmisc/finops-extractor`
 
 ## LLM Data Sources
 
-The `bifrost_llm` extractor reads from Bifrost's PostgreSQL `log` table. An **OTel Collector extractor** would be a more general alternative — it could ingest LLM telemetry from any OpenTelemetry-compatible source via the OTLP protocol, leveraging the existing `trace_id`, `model_name`, `latency_ms` fields in `cost_records`. See the data model in `models/__init__.py` for the LLM-specific columns already supported.
+LLM cost data is ingested via an **OTel Collector extractor** (planned). This provides a vendor-neutral approach that can ingest LLM telemetry from any OpenTelemetry-compatible source via the OTLP protocol, leveraging the existing `trace_id`, `model_name`, `latency_ms` fields in `cost_records`. See the data model in `models/__init__.py` for the LLM-specific columns already supported.
 
 ## Project Structure
 

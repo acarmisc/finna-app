@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Idempotent client onboarding script for FinOps multi-cloud monitoring.
 
-Creates client directory, generates extractor/bifrost/aggregation configs,
+Creates client directory, generates extractor/aggregation configs,
 a connectivity test script, and registers the client in the shared registry.
 
 Usage:
@@ -31,7 +31,7 @@ CLIENTS_DIR = BASE_DIR / "clients"
 REGISTRY_PATH = CLIENTS_DIR / "registry.yaml"
 
 DEFAULT_PROVIDERS = ["gcp", "azure"]
-SUPPORTED_PROVIDERS = {"gcp", "azure", "bifrost"}
+SUPPORTED_PROVIDERS = {"gcp", "azure"}
 
 # Default aggregation settings (mirrors aggregation/config.py defaults)
 DEFAULT_AGGREGATION = {
@@ -107,37 +107,7 @@ def _generate_extractor_config(
             "EXTRACTOR_TYPE": "azure_cost",
         }
 
-    if "bifrost" in providers:
-        # External Bifrost (already running) — extractor reads from its database
-        config["bifrost_llm"] = {
-            "BIFROST_PG_DSN": "${BIFROST_PG_DSN}",
-            "PG_DSN": "${PG_DSN}",
-            "BIFROST_KEY_MAPPING_PATH": "config/bifrost_key_mapping.yaml",
-            "EXTRACTOR_TYPE": "bifrost_llm",
-        }
-
     return config
-
-
-def _generate_bifrost_config(
-    client_id: str,
-    projects: list[str],
-) -> dict:
-    """Build Bifrost virtual-key mapping entries for each project.
-
-    Budget limits default to a reasonable per-month cap. Override per-client.
-    """
-    mappings: dict = {}
-    for project in projects:
-        vk_name = f"vk-{project}"
-        mappings[vk_name] = {
-            "project_id": project,
-            "project_name": project.replace("-", " ").title(),
-            "team": client_id,
-            "environment": "prod",
-            "budget_limit_usd": 5000,
-        }
-    return {"mappings": mappings}
 
 
 def _generate_aggregation_config(client_id: str) -> dict:
@@ -262,25 +232,22 @@ def onboard(
     effective_providers = list(providers)
 
     # 1. Extractor config
-    extractor_config = _generate_extractor_config(client_id, effective_providers, projects)
+    extractor_config = _generate_extractor_config(
+        client_id, effective_providers, projects
+    )
     _write_yaml(client_dir / "extractor_config.yaml", extractor_config)
 
-    # 2. Bifrost config (only when bifrost is enabled — connects to external Bifrost instance)
-    if "bifrost" in effective_providers:
-        bifrost_config = _generate_bifrost_config(client_id, projects)
-        _write_yaml(client_dir / "bifrost_config.yaml", bifrost_config)
-
-    # 3. Aggregation config
+    # 2. Aggregation config
     agg_config = _generate_aggregation_config(client_id)
     _write_yaml(client_dir / "aggregation_config.yaml", agg_config)
 
-    # 4. Connectivity test script
+    # 3. Connectivity test script
     test_script = client_dir / "test_connectivity.py"
     test_script.write_text(_generate_connectivity_test(client_id))
     test_script.chmod(0o755)
     logger.info("Wrote %s", test_script)
 
-    # 5. Registry
+    # 4. Registry
     _register_client(client_id, effective_providers, projects)
 
     logger.info("Onboarding complete for client: %s", client_id)

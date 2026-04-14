@@ -38,7 +38,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
 
 import psycopg
-from azure.identity import ClientSecretCredential
+from azure.identity import ClientSecretCredential, DefaultAzureCredential
 from azure.mgmt.costmanagement import CostManagementClient
 from azure.mgmt.costmanagement.models import (
     QueryDefinition,
@@ -121,7 +121,6 @@ AZURE_QUERY_COLUMNS = [
     "Product",
     "CostInBillingCurrency",
     "Currency",
-    "Tags",
 ]
 
 
@@ -163,7 +162,8 @@ def discover_azure_subscriptions_from_env() -> dict[str, dict[str, str]]:
             "tenant_id": os.environ.get(f"AZURE_{prefix}_TENANT_ID", ""),
             "client_id": os.environ.get(f"AZURE_{prefix}_CLIENT_ID", ""),
             "client_secret": os.environ.get(f"AZURE_{prefix}_CLIENT_SECRET", ""),
-            "scope": os.environ.get(f"AZURE_{prefix}_SCOPE", "subscription"),
+            "scope": os.environ.get(f"AZURE_{prefix}_SCOPE", "resourcegroup"),
+            "resource_group": os.environ.get(f"AZURE_{prefix}_RESOURCE_GROUP", ""),
             "mgmt_group_id": os.environ.get(f"AZURE_{prefix}_MGMT_GROUP_ID", ""),
         }
     return subs
@@ -253,7 +253,7 @@ def _load_exchange_rates(
     rates: dict[str, Decimal] = {"USD": Decimal("1")}
     try:
         with conn.cursor() as cur:
-            cur.execute(f"SELECT currency_code, rate_to_usd FROM {table}")  # noqa: S608 — table name is config, not user input
+            cur.execute(f"SELECT currency as currency_code, rate_to_usd FROM {table}")  # noqa: S608 — table name is config, not user input
             for row in cur.fetchall():
                 rates[row[0]] = Decimal(str(row[1]))
     except psycopg.Error:
@@ -280,9 +280,18 @@ def convert_to_usd(cost: Decimal, currency: str, rates: dict[str, Decimal]) -> D
 
 
 def _build_scope(
-    subscription_id: str, scope: str, mgmt_group_id: str | None = None
+    subscription_id: str,
+    scope: str,
+    mgmt_group_id: str | None = None,
+    resource_group: str | None = None,
 ) -> str:
     """Build the Azure resource scope string."""
+    if scope == "resourcegroup":
+        if not resource_group:
+            raise ValueError(
+                "resource_group name required when AZURE_SCOPE=resourcegroup"
+            )
+        return f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}"
     if scope == "managementgroup":
         if not mgmt_group_id:
             raise ValueError(
@@ -340,7 +349,7 @@ def fetch_cost_rows(
                 skip_token=continuation_token,
             )
         else:
-            result = client.query.usage_by_scope(
+            result = client.query.usage(
                 scope=scope,
                 parameters=query_def,
             )
@@ -444,7 +453,7 @@ def transform_row(
 # ---------------------------------------------------------------------------
 
 INSERT_SQL = """
-INSERT INTO normalized_costs (
+INSERT INTO cost_records (
     record_id, provider, usage_start, usage_end, ingestion_ts,
     account_id, account_name, project_id, project_name, environment, team,
     service_category, service_name, resource_id,
@@ -476,9 +485,21 @@ def _insert_batch(conn: psycopg.Connection, records: list[NormalizedCostRecord])
     if not records:
         return 0
 
-    rows = [r.model_dump() for r in records]
-    with conn.cursor() as cur:
-        cur.executemany(INSERT_SQL, rows)
+    import json
+
+    for r in records:
+        row = r.model_dump()
+        row["provider"] = (
+            r.provider.value if hasattr(r.provider, "value") else str(r.provider)
+        )
+        row["service_category"] = (
+            r.service_category.value
+            if hasattr(r.service_category, "value")
+            else str(r.service_category)
+        )
+        row["tags"] = json.dumps(row.get("tags", {}))
+        with conn.cursor() as cur:
+            cur.execute(INSERT_SQL, row)
     conn.commit()
     return len(records)
 
@@ -515,16 +536,15 @@ def mark_extractor_healthy(
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO extractor_health (provider, last_run_ts, date_from, date_to, rows_extracted, status)
-            VALUES (%s, %s, %s, %s, %s, 'ok')
-            ON CONFLICT (provider) DO UPDATE
+            INSERT INTO extractor_health (extractor_name, last_run_ts, status, records_extracted, updated_at)
+            VALUES (%s, %s, 'success', %s, %s)
+            ON CONFLICT (extractor_name) DO UPDATE
             SET last_run_ts = EXCLUDED.last_run_ts,
-                date_from = EXCLUDED.date_from,
-                date_to = EXCLUDED.date_to,
-                rows_extracted = EXCLUDED.rows_extracted,
-                status = EXCLUDED.status
+                status = EXCLUDED.status,
+                records_extracted = EXCLUDED.records_extracted,
+                updated_at = EXCLUDED.updated_at
             """,
-            (provider, now, date_from, date_to, rows_extracted),
+            (provider, now, rows_extracted, now),
         )
     conn.commit()
 
@@ -540,14 +560,15 @@ def mark_extractor_unhealthy(
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO extractor_health (provider, last_run_ts, status, error_message)
-                VALUES (%s, %s, 'error', %s)
-                ON CONFLICT (provider) DO UPDATE
+                INSERT INTO extractor_health (extractor_name, last_run_ts, status, error_message, updated_at)
+                VALUES (%s, %s, 'failed', %s, %s)
+                ON CONFLICT (extractor_name) DO UPDATE
                 SET last_run_ts = EXCLUDED.last_run_ts,
                     status = EXCLUDED.status,
-                    error_message = EXCLUDED.error_message
+                    error_message = EXCLUDED.error_message,
+                    updated_at = EXCLUDED.updated_at
                 """,
-                (provider, now, error_message),
+                (provider, now, error_message, now),
             )
         conn.commit()
     except psycopg.Error:
@@ -572,16 +593,32 @@ def _create_azure_client(
     client_secret: str | None = None,
     subscription_id: str | None = None,
 ) -> CostManagementClient:
-    """Authenticate and return a CostManagementClient."""
-    tid = tenant_id or _env("AZURE_TENANT_ID")
-    cid = client_id or _env("AZURE_CLIENT_ID")
-    csec = client_secret or _env("AZURE_CLIENT_SECRET")
+    """Authenticate and return a CostManagementClient.
+
+    Credential resolution order:
+    1. Explicit client_secret params (service principal)
+    2. config.auth.get_azure_credential (keyring/azcli/DefaultAzureCredential)
+    3. Fallback to AZURE_TENANT_ID/AZURE_CLIENT_ID/AZURE_CLIENT_SECRET env vars
+    """
     sid = subscription_id or _env("AZURE_SUBSCRIPTION_ID")
-    credential = ClientSecretCredential(
-        tenant_id=tid,
-        client_id=cid,
-        client_secret=csec,
-    )
+
+    from config.auth import get_azure_credential
+
+    if tenant_id and client_id and client_secret:
+        from azure.identity import ClientSecretCredential
+
+        credential = ClientSecretCredential(
+            tenant_id=tenant_id,
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+    else:
+        credential = get_azure_credential(
+            tenant_id=tenant_id,
+            client_id=client_id,
+            client_secret=client_secret,
+        )
+
     return CostManagementClient(credential=credential, subscription_id=sid)
 
 
@@ -599,14 +636,17 @@ def run_extractor(
     client_id: str | None = None,
     client_secret: str | None = None,
     health_provider: str | None = None,
+    resource_groups: list[str] | None = None,
+    resource_group: str | None = None,
 ) -> int:
     """Run the Azure cost extractor end-to-end.
 
     Returns the total number of records inserted.
     """
     sub_id = subscription_id or _env("AZURE_SUBSCRIPTION_ID")
-    scope_type = scope_type or _env_optional("AZURE_SCOPE", "subscription")
+    scope_type = scope_type or _env_optional("AZURE_SCOPE", "resourcegroup")
     mgmt_group_id = mgmt_group_id or _env_optional("AZURE_MGMT_GROUP_ID")
+    resource_group = resource_group or _env_optional("AZURE_RESOURCE_GROUP")
     batch_size = batch_size or int(_env_optional("BATCH_SIZE", "500"))
     exchange_rate_table = exchange_rate_table or _env_optional(
         "EXCHANGE_RATE_TABLE", "exchange_rates"
@@ -638,9 +678,20 @@ def run_extractor(
         client_secret=client_secret,
         subscription_id=sub_id,
     )
-    scope = _build_scope(sub_id, scope_type, mgmt_group_id)
+    scope = _build_scope(sub_id, scope_type, mgmt_group_id, resource_group)
 
     raw_rows = fetch_cost_rows(client, scope, date_from, date_to)
+
+    if resource_groups:
+        rg_set = {rg.lower() for rg in resource_groups}
+        raw_rows = [
+            r for r in raw_rows if str(r.get("ResourceGroup", "")).lower() in rg_set
+        ]
+        logger.info(
+            "Filtered to %d resource groups: %d rows remaining",
+            len(resource_groups),
+            len(raw_rows),
+        )
 
     if not raw_rows:
         logger.info("No cost rows returned from Azure API — nothing to insert.")
@@ -695,12 +746,34 @@ def main() -> None:
 
     multi_subs = discover_azure_subscriptions_from_env()
 
+    if not multi_subs:
+        from config.auth import get_azure_subscription_selections
+
+        saved_subs = get_azure_subscription_selections()
+        if saved_subs:
+            multi_subs = {}
+            for sub in saved_subs:
+                sid = sub.get("subscription_id", "")
+                prefix = sid.replace("-", "_").upper()[:20]
+                multi_subs[prefix] = {
+                    "subscription_id": sid,
+                    "tenant_id": "",
+                    "client_id": "",
+                    "client_secret": "",
+                    "scope": "subscription",
+                    "resource_groups": sub.get("resource_groups", []),
+                }
+
     if multi_subs:
         logger.info(
             "Multi-subscription mode: %d subscription(s) discovered", len(multi_subs)
         )
         grand_total = 0
         for prefix, cfg in multi_subs.items():
+            rgs = cfg.get("resource_groups", [])
+            if rgs:
+                cfg["scope"] = "resourcegroup"
+                cfg["resource_group"] = rgs[0]
             health_name = f"azure_{prefix.lower()}"
             logger.info(
                 "Processing Azure subscription prefix=%s id=%s",
@@ -716,6 +789,8 @@ def main() -> None:
                     scope_type=cfg.get("scope"),
                     mgmt_group_id=cfg.get("mgmt_group_id") or None,
                     health_provider=health_name,
+                    resource_groups=cfg.get("resource_groups") or None,
+                    resource_group=cfg.get("resource_group") or None,
                 )
                 grand_total += total
                 logger.info(

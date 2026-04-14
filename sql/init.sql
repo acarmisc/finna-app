@@ -228,7 +228,7 @@ FROM (
 ) d,
     generate_series(1, 5);
 
--- LLM seed data (Bifrost-style)
+-- LLM seed data (OTel collector-style)
 INSERT INTO cost_records (record_id, provider, usage_start, usage_end, ingestion_ts,
     account_id, account_name, project_id, project_name, environment, team,
     service_category, service_name, resource_id,
@@ -241,8 +241,8 @@ SELECT
     d.dt + make_interval(secs => (random() * 86400)::int),
     d.dt + make_interval(secs => (random() * 86400)::int + 300),
     now(),
-    'bifrost-gateway',
-    'Bifrost LLM Gateway',
+    'otel-collector',
+    'OTel LLM Collector',
     (ARRAY['ml-platform','finops-prod','dev-sandbox'])[1 + (abs(seq) % 3)],
     (ARRAY['ML Platform','FinOps Production','Dev Sandbox'])[1 + (abs(seq) % 3)],
     (ARRAY['prod','prod','dev'])[1 + (abs(seq) % 3)],
@@ -263,7 +263,7 @@ SELECT
     in_tok + out_tok,
     (random() * 3000 + 200)::float,
     'trace-' || seq,
-    jsonb_build_object('source', 'seed', 'virtual_key', 'vk-' || (abs(seq) % 5))
+    jsonb_build_object('source', 'seed', 'otel_source', 'otel-collector-' || (abs(seq) % 5))
 FROM (
     SELECT
         generate_series(1, 2000) AS seq,

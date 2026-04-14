@@ -5,7 +5,7 @@
 # Run:    docker run --rm -e EXTRACTOR_TYPE=gcp_billing finops-extractor
 #
 # EXTRACTOR_TYPE selects which extractor to run:
-#   gcp_billing | azure_cost | bifrost_llm | exchange_rates
+#   gcp_billing | azure_cost | exchange_rates
 # ---------------------------------------------------------------------------
 
 # ---- Stage 1: Builder ----
@@ -13,31 +13,26 @@ FROM python:3.12-slim AS builder
 
 WORKDIR /build
 
-# Install build dependencies in a virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+COPY pyproject.toml .
+RUN uv pip install --system --no-cache -r pyproject.toml
 
 # ---- Stage 2: Runtime ----
 FROM python:3.12-slim
 
-# Security: run as non-root user
 RUN groupadd --gid 1000 appuser && \
     useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser
 
 WORKDIR /app
 
-# Copy installed packages from builder
-COPY --from=builder /install /usr/local
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application source
 COPY models/ ./models/
 COPY extractors/ ./extractors/
 COPY config/ ./config/
 
-# Select extractor via environment variable
 ENV EXTRACTOR_TYPE=""
 
 USER appuser

@@ -82,15 +82,13 @@ python -m onboarding.setup_client <client_id> \
 
 This generates:
 - `clients/<client_id>/extractor_config.yaml` -- Env var config per extractor
-- `clients/<client_id>/bifrost_config.yaml` -- Bifrost virtual-key mapping (if bifrost is enabled)
 - `clients/<client_id>/aggregation_config.yaml` -- Per-client aggregation settings
 - `clients/<client_id>/test_connectivity.py` -- Connectivity test script
 - `clients/registry.yaml` -- Updated registry entry
 
 After running the script:
 1. Fill in real values for placeholders (subscription IDs, tenant IDs, secrets) in the generated config files.
-2. If Bifrost is enabled, merge `bifrost_config.yaml` entries into `config/bifrost_key_mapping.yaml`.
-3. Deploy Cloud Run Jobs for each enabled extractor type.
+2. Deploy Cloud Run Jobs for each enabled extractor type.
 4. Run the connectivity test:
    ```bash
    PG_DSN="postgresql://finops:...@host/finops" python clients/<client_id>/test_connectivity.py
@@ -208,40 +206,3 @@ Each Cloud Run Job executes in a single container. To process data faster:
 - BigQuery and Azure Cost Management APIs have their own rate limits. Increasing parallelism beyond those limits will result in throttling.
 - PostgreSQL connection count is limited by the Cloud SQL instance size. Monitor `pg_stat_activity` for connection saturation.
 - The `ON CONFLICT DO NOTHING` pattern ensures idempotency when running overlapping date ranges.
-
----
-
-## Updating Bifrost Configuration
-
-Bifrost virtual-key mappings are stored in `config/bifrost_key_mapping.yaml`.
-
-### To add a new virtual key
-
-1. Edit `config/bifrost_key_mapping.yaml` and add a new entry under `mappings`:
-   ```yaml
-   mappings:
-     vk-new-project:
-       project_id: new-project
-       project_name: New Project
-       team: data
-       environment: prod
-   ```
-
-2. When onboarding a new client with Bifrost, merge the client's `bifrost_config.yaml` entries into this file. The onboarding script generates per-project virtual keys with budget limits.
-
-3. Redeploy the Bifrost extractor to pick up the new mapping:
-   ```bash
-   gcloud run jobs execute bifrost-llm-extractor
-   ```
-
-### To update budget limits
-
-Budget limits in the client's `bifrost_config.yaml` are informational. To enforce them:
-
-1. Update the budget limit in `config/bifrost_key_mapping.yaml`.
-2. Configure Bifrost gateway rate limiting (see Bifrost documentation for per-key budget controls).
-3. Set up Superset alerts on the `LLM Costs` dashboard to notify when spend exceeds the budget threshold.
-
-### Bifrost DSN
-
-The Bifrost gateway uses its own PostgreSQL database. The DSN is configured via the `BIFROST_PG_DSN` environment variable on the extractor. Update it when the Bifrost database is migrated or recreated.
