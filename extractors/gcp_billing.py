@@ -4,12 +4,21 @@ Queries GCP billing export in BigQuery, normalizes rows into NormalizedCostRecor
 and batch-inserts them into PostgreSQL.
 
 Can run as a Cloud Run Job via ``python -m extractors.gcp_billing``.
+
+Multi-project configuration (takes priority over single-project vars):
+  GCP_{PREFIX}_PROJECT          – Per-project ID
+  GCP_{PREFIX}_BQ_DATASET      – Per-project BigQuery dataset
+  GCP_{PREFIX}_BQ_TABLE        – Per-project BigQuery table
+  GCP_{PREFIX}_INGESTION_MODE  – Per-project ingestion mode
+  GCP_{PREFIX}_CSV_PATH        – Per-project CSV path
+  where PREFIX is the project ID uppercased with dashes→underscores
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import re
 import sys
 from decimal import Decimal
 from typing import Any, Sequence
@@ -54,9 +63,39 @@ BATCH_SIZE: int = int(os.getenv("BATCH_SIZE", "500"))
 
 EXTRACTOR_NAME = "gcp_billing"
 
+_GCP_PREFIX_RE = re.compile(r"^GCP_(.+)_PROJECT$")
+
+
+def discover_gcp_projects_from_env() -> dict[str, dict[str, str]]:
+    """Scan env vars for GCP_{PREFIX}_PROJECT patterns.
+
+    Returns a dict mapping prefix → {project_id, ingestion_mode, bq_dataset,
+    bq_table, csv_path} for each discovered project.
+    """
+    projects: dict[str, dict[str, str]] = {}
+    for key, value in os.environ.items():
+        m = _GCP_PREFIX_RE.match(key)
+        if not m or not value:
+            continue
+        prefix = m.group(1)
+        projects[prefix] = {
+            "project_id": value,
+            "ingestion_mode": os.environ.get(
+                f"GCP_{prefix}_INGESTION_MODE", "bigquery"
+            ),
+            "bq_dataset": os.environ.get(f"GCP_{prefix}_BQ_DATASET", "billing_export"),
+            "bq_table": os.environ.get(
+                f"GCP_{prefix}_BQ_TABLE", "gcp_billing_export_v1"
+            ),
+            "csv_path": os.environ.get(f"GCP_{prefix}_CSV_PATH", ""),
+        }
+    return projects
+
+
 # ---------------------------------------------------------------------------
 # BigQuery query builder
 # ---------------------------------------------------------------------------
+
 
 def _build_query(
     project: str,
@@ -97,6 +136,7 @@ def _build_query(
 # ---------------------------------------------------------------------------
 # Row normalisation
 # ---------------------------------------------------------------------------
+
 
 def normalise_row(
     row: dict[str, Any],
@@ -142,7 +182,9 @@ def normalise_row(
         usage_end=usage_end,
         account_id=project_id,
         project_id=label_project or project_id,
-        service_category=resolve_service_category(service_description, service_category_map),
+        service_category=resolve_service_category(
+            service_description, service_category_map
+        ),
         service_name=sku_description,
         cost_usd=cost_decimal,
         net_cost_usd=cost_decimal,  # GCP export cost is already net for standard export
@@ -216,7 +258,9 @@ def _batch_insert(
         cur.executemany(_INSERT_SQL, rows)
     conn.commit()
 
-    inserted = len(records)  # ON CONFLICT DO NOTHING doesn't give rowcount via executemany
+    inserted = len(
+        records
+    )  # ON CONFLICT DO NOTHING doesn't give rowcount via executemany
     logger.debug("Batch inserted up to %d records", inserted)
     return inserted
 
@@ -225,7 +269,10 @@ def _batch_insert(
 # Extractor health tracking
 # ---------------------------------------------------------------------------
 
-def _mark_health_start(conn: psycopg.Connection) -> None:
+
+def _mark_health_start(
+    conn: psycopg.Connection, extractor_name: str = EXTRACTOR_NAME
+) -> None:
     """Mark the extractor as *running* in ``extractor_health``."""
     with conn.cursor() as cur:
         cur.execute(
@@ -240,12 +287,14 @@ def _mark_health_start(conn: psycopg.Connection) -> None:
                     error_message = NULL,
                     updated_at = now()
             """,
-            (EXTRACTOR_NAME,),
+            (extractor_name,),
         )
     conn.commit()
 
 
-def _mark_health_success(conn: psycopg.Connection, record_count: int) -> None:
+def _mark_health_success(
+    conn: psycopg.Connection, record_count: int, extractor_name: str = EXTRACTOR_NAME
+) -> None:
     """Mark the extractor as *success* in ``extractor_health``."""
     with conn.cursor() as cur:
         cur.execute(
@@ -257,15 +306,17 @@ def _mark_health_success(conn: psycopg.Connection, record_count: int) -> None:
                 updated_at = now()
             WHERE extractor_name = %s
             """,
-            (record_count, EXTRACTOR_NAME),
+            (record_count, extractor_name),
         )
     conn.commit()
 
 
-def _mark_health_failure(conn: psycopg.Connection, error_message: str) -> None:
+def _mark_health_failure(
+    conn: psycopg.Connection, error_message: str, extractor_name: str = EXTRACTOR_NAME
+) -> None:
     """Mark the extractor as *failed* in ``extractor_health``."""
     try:
-        conn.rollback()  # clear any aborted transaction before writing
+        conn.rollback()
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -276,7 +327,7 @@ def _mark_health_failure(conn: psycopg.Connection, error_message: str) -> None:
                     updated_at = now()
                 WHERE extractor_name = %s
                 """,
-                (error_message[:2000], EXTRACTOR_NAME),
+                (error_message[:2000], extractor_name),
             )
         conn.commit()
     except Exception:
@@ -286,6 +337,7 @@ def _mark_health_failure(conn: psycopg.Connection, error_message: str) -> None:
 # ---------------------------------------------------------------------------
 # Core extractor logic
 # ---------------------------------------------------------------------------
+
 
 @retry(
     retry=retry_if_exception_type((Exception,)),
@@ -320,12 +372,12 @@ def extract(
     date_to: str | None = None,
     batch_size: int | None = None,
     service_category_map: dict[str, ServiceCategory] | None = None,
+    health_name: str | None = None,
 ) -> int:
     """Run the full GCP billing extraction pipeline.
 
     Returns the total number of records inserted into PostgreSQL.
     """
-    # Resolve configuration — explicit params > env vars > defaults
     project = gcp_project or GCP_PROJECT
     dataset = bq_dataset or BQ_DATASET
     table = bq_table or BQ_TABLE
@@ -333,24 +385,24 @@ def extract(
     from_date = date_from or DATE_FROM
     to_date = date_to or DATE_TO
     batch_sz = batch_size or BATCH_SIZE
+    extractor_name = health_name or EXTRACTOR_NAME
 
     if not project:
         raise ValueError("GCP_PROJECT is required (set env var or pass gcp_project)")
     if not dsn:
         raise ValueError("PG_DSN is required (set env var or pass pg_dsn)")
     if not from_date or not to_date:
-        raise ValueError("DATE_FROM and DATE_TO are required (set env vars or pass date_from/date_to)")
+        raise ValueError(
+            "DATE_FROM and DATE_TO are required (set env vars or pass date_from/date_to)"
+        )
 
-    # BigQuery client
     client = bq_client if bq_client is not None else bigquery.Client(project=project)
 
-    # Build and run query
     query, query_params = _build_query(project, dataset, table, from_date, to_date)
     rows: bigquery.RowIterator = _run_bq_query(client, query, query_params, project)
 
-    # PostgreSQL connection
     pg_conn = _get_pg_connection(dsn)
-    _mark_health_start(pg_conn)
+    _mark_health_start(pg_conn, extractor_name=extractor_name)
 
     total_inserted = 0
     batch: list[NormalizedCostRecord] = []
@@ -365,7 +417,6 @@ def extract(
                 total_inserted += inserted
                 batch = []
 
-        # Flush remaining records
         if batch:
             inserted = _batch_insert(pg_conn, batch)
             total_inserted += inserted
@@ -373,12 +424,12 @@ def extract(
         if total_inserted == 0:
             logger.info("No billing records found for the given date range")
 
-        _mark_health_success(pg_conn, total_inserted)
+        _mark_health_success(pg_conn, total_inserted, extractor_name=extractor_name)
         logger.info("Extraction complete: %d records inserted", total_inserted)
 
     except Exception as exc:
         logger.exception("Extraction failed: %s", exc)
-        _mark_health_failure(pg_conn, str(exc))
+        _mark_health_failure(pg_conn, str(exc), extractor_name=extractor_name)
         raise
     finally:
         pg_conn.close()
@@ -390,8 +441,14 @@ def extract(
 # CLI entrypoint (Cloud Run Job)
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
-    """Entrypoint for running the extractor as a Cloud Run Job."""
+    """Entrypoint for running the extractor as a Cloud Run Job.
+
+    Supports multi-project mode: when GCP_{PREFIX}_PROJECT env vars are present,
+    iterates over all discovered projects. Falls back to single-project mode
+    (GCP_PROJECT) when no prefixed vars exist.
+    """
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
@@ -400,12 +457,37 @@ def main() -> None:
 
     logger.info("Starting GCP billing extractor")
 
-    try:
-        total = extract()
-        logger.info("GCP billing extractor finished: %d records", total)
-    except Exception:
-        logger.exception("GCP billing extractor failed")
-        sys.exit(1)
+    multi_projects = discover_gcp_projects_from_env()
+
+    if multi_projects:
+        logger.info("Multi-project mode: %d project(s) discovered", len(multi_projects))
+        for prefix, cfg in multi_projects.items():
+            health_name = f"gcp_billing_{prefix.lower()}"
+            logger.info(
+                "Processing GCP project prefix=%s id=%s", prefix, cfg["project_id"]
+            )
+            try:
+                total = extract(
+                    gcp_project=cfg["project_id"],
+                    bq_dataset=cfg.get("bq_dataset"),
+                    bq_table=cfg.get("bq_table"),
+                    health_name=health_name,
+                )
+                logger.info(
+                    "Project %s (%s): %d records", prefix, cfg["project_id"], total
+                )
+            except Exception:
+                logger.exception(
+                    "GCP project %s (%s) failed", prefix, cfg["project_id"]
+                )
+                sys.exit(1)
+    else:
+        try:
+            total = extract()
+            logger.info("GCP billing extractor finished: %d records", total)
+        except Exception:
+            logger.exception("GCP billing extractor failed")
+            sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -5,10 +5,10 @@ azure-mgmt-costmanagement SDK, normalizes rows into NormalizedCostRecord
 instances, and batch-inserts them into PostgreSQL.
 
 Configuration via environment variables:
-  AZURE_SUBSCRIPTION_ID  – Target subscription ID
-  AZURE_TENANT_ID        – Azure AD tenant
-  AZURE_CLIENT_ID        – Service principal app ID
-  AZURE_CLIENT_SECRET    – Service principal secret
+  AZURE_SUBSCRIPTION_ID  – Target subscription ID (single-sub mode)
+  AZURE_TENANT_ID        – Azure AD tenant (single-sub mode)
+  AZURE_CLIENT_ID        – Service principal app ID (single-sub mode)
+  AZURE_CLIENT_SECRET    – Service principal secret (single-sub mode)
   PG_DSN                 – PostgreSQL connection string
   DATE_FROM              – Start date (YYYY-MM-DD), defaults to 30 days ago
   DATE_TO                – End date (YYYY-MM-DD), defaults to today
@@ -16,6 +16,15 @@ Configuration via environment variables:
   AZURE_MGMT_GROUP_ID    – Required when AZURE_SCOPE=managementgroup
   BATCH_SIZE             – DB insert batch size (default 500)
   EXCHANGE_RATE_TABLE    – Table for currency conversion (default exchange_rates)
+
+Multi-subscription configuration (takes priority over single-sub vars):
+  AZURE_{PREFIX}_SUBSCRIPTION_ID – Per-subscription ID
+  AZURE_{PREFIX}_TENANT_ID      – Per-subscription tenant
+  AZURE_{PREFIX}_CLIENT_ID      – Per-subscription client
+  AZURE_{PREFIX}_CLIENT_SECRET  – Per-subscription secret
+  AZURE_{PREFIX}_SCOPE          – Per-subscription scope
+  AZURE_{PREFIX}_MGMT_GROUP_ID  – Per-subscription management group
+  where PREFIX is the subscription ID uppercased with dashes→underscores
 """
 
 from __future__ import annotations
@@ -23,6 +32,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
@@ -132,24 +142,61 @@ def _env_optional(key: str, default: str | None = None) -> str | None:
     return os.environ.get(key, default)
 
 
+_AZURE_PREFIX_RE = re.compile(r"^AZURE_(.+)_SUBSCRIPTION_ID$")
+
+
+def discover_azure_subscriptions_from_env() -> dict[str, dict[str, str]]:
+    """Scan env vars for AZURE_{PREFIX}_SUBSCRIPTION_ID patterns.
+
+    Returns a dict mapping prefix → {subscription_id, tenant_id, client_id,
+    client_secret, scope, mgmt_group_id} for each discovered subscription.
+    """
+    subs: dict[str, dict[str, str]] = {}
+    for key, value in os.environ.items():
+        m = _AZURE_PREFIX_RE.match(key)
+        if not m or not value:
+            continue
+        prefix = m.group(1)
+        sub_id = value
+        subs[prefix] = {
+            "subscription_id": sub_id,
+            "tenant_id": os.environ.get(f"AZURE_{prefix}_TENANT_ID", ""),
+            "client_id": os.environ.get(f"AZURE_{prefix}_CLIENT_ID", ""),
+            "client_secret": os.environ.get(f"AZURE_{prefix}_CLIENT_SECRET", ""),
+            "scope": os.environ.get(f"AZURE_{prefix}_SCOPE", "subscription"),
+            "mgmt_group_id": os.environ.get(f"AZURE_{prefix}_MGMT_GROUP_ID", ""),
+        }
+    return subs
+
+
 def _parse_date(val: str) -> datetime:
     return datetime.strptime(val, "%Y-%m-%d").replace(tzinfo=timezone.utc)
 
 
 def _default_date_range() -> tuple[datetime, datetime]:
     """Return (from, to) defaulting to last 30 days."""
-    to_dt = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    to_dt = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
     from_dt = to_dt - timedelta(days=30)
     return from_dt, to_dt
 
 
-def generate_record_id(subscription_id: str, usage_date: str, meter_category: str, meter_sub_category: str, product: str) -> str:
+def generate_record_id(
+    subscription_id: str,
+    usage_date: str,
+    meter_category: str,
+    meter_sub_category: str,
+    product: str,
+) -> str:
     """Deterministic record_id from provider+subscription+date+meter hash."""
     raw = f"azure:{subscription_id}:{usage_date}:{meter_category}:{meter_sub_category}:{product}"
     return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
 
-def map_service_category(meter_category: str, mapping: dict[str, ServiceCategory] | None = None) -> ServiceCategory:
+def map_service_category(
+    meter_category: str, mapping: dict[str, ServiceCategory] | None = None
+) -> ServiceCategory:
     """Map an Azure MeterCategory to a ServiceCategory enum value.
 
     Falls back to OTHER if no mapping found.
@@ -161,11 +208,15 @@ def map_service_category(meter_category: str, mapping: dict[str, ServiceCategory
 def _azure_date_to_datetime(usage_date_val: Any) -> datetime:
     """Convert Azure UsageDate (int like 20240115 or ISO string) to datetime."""
     if isinstance(usage_date_val, int):
-        return datetime.strptime(str(usage_date_val), "%Y%m%d").replace(tzinfo=timezone.utc)
+        return datetime.strptime(str(usage_date_val), "%Y%m%d").replace(
+            tzinfo=timezone.utc
+        )
     if isinstance(usage_date_val, str):
         for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%Y%m%d"):
             try:
-                return datetime.strptime(usage_date_val, fmt).replace(tzinfo=timezone.utc)
+                return datetime.strptime(usage_date_val, fmt).replace(
+                    tzinfo=timezone.utc
+                )
             except ValueError:
                 continue
         raise ValueError(f"Cannot parse Azure date: {usage_date_val!r}")
@@ -195,7 +246,9 @@ def _parse_tags(tags_value: Any) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
-def _load_exchange_rates(conn: psycopg.Connection, table: str = "exchange_rates") -> dict[str, Decimal]:
+def _load_exchange_rates(
+    conn: psycopg.Connection, table: str = "exchange_rates"
+) -> dict[str, Decimal]:
     """Load exchange rates from the database. Returns {currency_code: rate_to_usd}."""
     rates: dict[str, Decimal] = {"USD": Decimal("1")}
     try:
@@ -204,7 +257,9 @@ def _load_exchange_rates(conn: psycopg.Connection, table: str = "exchange_rates"
             for row in cur.fetchall():
                 rates[row[0]] = Decimal(str(row[1]))
     except psycopg.Error:
-        logger.exception("Failed to load exchange rates from %s; assuming USD=1 only", table)
+        logger.exception(
+            "Failed to load exchange rates from %s; assuming USD=1 only", table
+        )
     return rates
 
 
@@ -224,11 +279,15 @@ def convert_to_usd(cost: Decimal, currency: str, rates: dict[str, Decimal]) -> D
 # ---------------------------------------------------------------------------
 
 
-def _build_scope(subscription_id: str, scope: str, mgmt_group_id: str | None = None) -> str:
+def _build_scope(
+    subscription_id: str, scope: str, mgmt_group_id: str | None = None
+) -> str:
     """Build the Azure resource scope string."""
     if scope == "managementgroup":
         if not mgmt_group_id:
-            raise ValueError("AZURE_MGMT_GROUP_ID is required when AZURE_SCOPE=managementgroup")
+            raise ValueError(
+                "AZURE_MGMT_GROUP_ID is required when AZURE_SCOPE=managementgroup"
+            )
         return f"/providers/Microsoft.Management/managementGroups/{mgmt_group_id}"
     return f"/subscriptions/{subscription_id}"
 
@@ -286,7 +345,9 @@ def fetch_cost_rows(
                 parameters=query_def,
             )
 
-        columns = [c.name for c in result.columns] if result.columns else AZURE_QUERY_COLUMNS
+        columns = (
+            [c.name for c in result.columns] if result.columns else AZURE_QUERY_COLUMNS
+        )
 
         for row in result.rows:
             row_dict = dict(zip(columns, row))
@@ -302,7 +363,10 @@ def fetch_cost_rows(
         if not continuation_token:
             break
 
-        logger.info("Pagination: fetching next page with token %s…", str(continuation_token)[:40])
+        logger.info(
+            "Pagination: fetching next page with token %s…",
+            str(continuation_token)[:40],
+        )
 
     logger.info("Fetched %d cost rows from Azure API", len(all_rows))
     return all_rows
@@ -342,7 +406,9 @@ def transform_row(
     service_category = map_service_category(meter_category, meter_category_map)
 
     # Project ID from tag, fallback to resource group
-    project_id = tags.get("project", tags.get("Project", resource_group or subscription_id))
+    project_id = tags.get(
+        "project", tags.get("Project", resource_group or subscription_id)
+    )
 
     # Deterministic record_id
     record_id = generate_record_id(
@@ -500,15 +566,23 @@ def mark_extractor_unhealthy(
     before_sleep=before_sleep_log(logger, logging.WARNING),
     reraise=True,
 )
-def _create_azure_client() -> CostManagementClient:
+def _create_azure_client(
+    tenant_id: str | None = None,
+    client_id: str | None = None,
+    client_secret: str | None = None,
+    subscription_id: str | None = None,
+) -> CostManagementClient:
     """Authenticate and return a CostManagementClient."""
+    tid = tenant_id or _env("AZURE_TENANT_ID")
+    cid = client_id or _env("AZURE_CLIENT_ID")
+    csec = client_secret or _env("AZURE_CLIENT_SECRET")
+    sid = subscription_id or _env("AZURE_SUBSCRIPTION_ID")
     credential = ClientSecretCredential(
-        tenant_id=_env("AZURE_TENANT_ID"),
-        client_id=_env("AZURE_CLIENT_ID"),
-        client_secret=_env("AZURE_CLIENT_SECRET"),
+        tenant_id=tid,
+        client_id=cid,
+        client_secret=csec,
     )
-    subscription_id = _env("AZURE_SUBSCRIPTION_ID")
-    return CostManagementClient(credential=credential, subscription_id=subscription_id)
+    return CostManagementClient(credential=credential, subscription_id=sid)
 
 
 def run_extractor(
@@ -521,48 +595,62 @@ def run_extractor(
     batch_size: int | None = None,
     exchange_rate_table: str | None = None,
     meter_category_map: dict[str, ServiceCategory] | None = None,
+    tenant_id: str | None = None,
+    client_id: str | None = None,
+    client_secret: str | None = None,
+    health_provider: str | None = None,
 ) -> int:
     """Run the Azure cost extractor end-to-end.
 
     Returns the total number of records inserted.
     """
-    # ---- Resolve config from env / params ----
     sub_id = subscription_id or _env("AZURE_SUBSCRIPTION_ID")
     scope_type = scope_type or _env_optional("AZURE_SCOPE", "subscription")
     mgmt_group_id = mgmt_group_id or _env_optional("AZURE_MGMT_GROUP_ID")
     batch_size = batch_size or int(_env_optional("BATCH_SIZE", "500"))
-    exchange_rate_table = exchange_rate_table or _env_optional("EXCHANGE_RATE_TABLE", "exchange_rates")
+    exchange_rate_table = exchange_rate_table or _env_optional(
+        "EXCHANGE_RATE_TABLE", "exchange_rates"
+    )
     pg_dsn = pg_dsn or _env("PG_DSN")
 
     if date_from is None or date_to is None:
         default_from, default_to = _default_date_range()
-        date_from = date_from or _parse_date(_env_optional("DATE_FROM", default_from.strftime("%Y-%m-%d")))
-        date_to = date_to or _parse_date(_env_optional("DATE_TO", default_to.strftime("%Y-%m-%d")))
+        date_from = date_from or _parse_date(
+            _env_optional("DATE_FROM", default_from.strftime("%Y-%m-%d"))
+        )
+        date_to = date_to or _parse_date(
+            _env_optional("DATE_TO", default_to.strftime("%Y-%m-%d"))
+        )
+
+    provider_label = health_provider or "azure"
 
     logger.info(
         "Starting Azure cost extractor: scope=%s, subscription=%s, from=%s, to=%s",
-        scope_type, sub_id, date_from.isoformat(), date_to.isoformat(),
+        scope_type,
+        sub_id,
+        date_from.isoformat(),
+        date_to.isoformat(),
     )
 
-    # ---- Azure client ----
-    client = _create_azure_client()
+    client = _create_azure_client(
+        tenant_id=tenant_id,
+        client_id=client_id,
+        client_secret=client_secret,
+        subscription_id=sub_id,
+    )
     scope = _build_scope(sub_id, scope_type, mgmt_group_id)
 
-    # ---- Fetch cost rows ----
     raw_rows = fetch_cost_rows(client, scope, date_from, date_to)
 
     if not raw_rows:
         logger.info("No cost rows returned from Azure API — nothing to insert.")
-        # Still mark healthy: a successful empty run is fine.
         with psycopg.connect(pg_dsn) as conn:
-            mark_extractor_healthy(conn, "azure", date_from, date_to, 0)
+            mark_extractor_healthy(conn, provider_label, date_from, date_to, 0)
         return 0
 
-    # ---- PostgreSQL connection ----
     with psycopg.connect(pg_dsn) as conn:
         exchange_rates = _load_exchange_rates(conn, exchange_rate_table)
 
-        # ---- Transform rows ----
         records: list[NormalizedCostRecord] = []
         errors: list[str] = []
         for i, row in enumerate(raw_rows):
@@ -579,40 +667,99 @@ def run_extractor(
 
         if not records:
             logger.info("All rows failed transformation — nothing to insert.")
-            mark_extractor_healthy(conn, "azure", date_from, date_to, 0)
+            mark_extractor_healthy(conn, provider_label, date_from, date_to, 0)
             return 0
 
-        # ---- Batch insert ----
         total_inserted = insert_records(conn, records, batch_size)
-        logger.info("Inserted %d of %d records into PostgreSQL", total_inserted, len(records))
+        logger.info(
+            "Inserted %d of %d records into PostgreSQL", total_inserted, len(records)
+        )
 
-        # ---- Health marker ----
-        mark_extractor_healthy(conn, "azure", date_from, date_to, total_inserted)
+        mark_extractor_healthy(conn, provider_label, date_from, date_to, total_inserted)
 
     return total_inserted
 
 
 def main() -> None:
-    """Entrypoint for Cloud Run Job execution."""
+    """Entrypoint for Cloud Run Job execution.
+
+    Supports multi-subscription mode: when AZURE_{PREFIX}_SUBSCRIPTION_ID env vars
+    are present, iterates over all discovered subscriptions. Falls back to
+    single-subscription mode (AZURE_SUBSCRIPTION_ID) when no prefixed vars exist.
+    """
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
     logger.info("Azure Cost Extractor starting…")
 
-    try:
-        total = run_extractor()
-        logger.info("Azure Cost Extractor completed: %d records inserted", total)
-    except Exception:
-        logger.exception("Azure Cost Extractor failed")
-        # Attempt to mark unhealthy — best effort
+    multi_subs = discover_azure_subscriptions_from_env()
+
+    if multi_subs:
+        logger.info(
+            "Multi-subscription mode: %d subscription(s) discovered", len(multi_subs)
+        )
+        grand_total = 0
+        for prefix, cfg in multi_subs.items():
+            health_name = f"azure_{prefix.lower()}"
+            logger.info(
+                "Processing Azure subscription prefix=%s id=%s",
+                prefix,
+                cfg["subscription_id"],
+            )
+            try:
+                total = run_extractor(
+                    subscription_id=cfg["subscription_id"],
+                    tenant_id=cfg["tenant_id"],
+                    client_id=cfg["client_id"],
+                    client_secret=cfg["client_secret"],
+                    scope_type=cfg.get("scope"),
+                    mgmt_group_id=cfg.get("mgmt_group_id") or None,
+                    health_provider=health_name,
+                )
+                grand_total += total
+                logger.info(
+                    "Subscription %s (%s): %d records inserted",
+                    prefix,
+                    cfg["subscription_id"],
+                    total,
+                )
+            except Exception:
+                logger.exception(
+                    "Azure subscription %s (%s) failed",
+                    prefix,
+                    cfg["subscription_id"],
+                )
+                try:
+                    pg_dsn = _env("PG_DSN")
+                    with psycopg.connect(pg_dsn) as conn:
+                        mark_extractor_unhealthy(
+                            conn,
+                            health_name,
+                            f"Extractor failed for subscription {cfg['subscription_id']} — see logs",
+                        )
+                except Exception:
+                    logger.exception(
+                        "Also failed to mark extractor as unhealthy for %s", health_name
+                    )
+        logger.info(
+            "Azure Cost Extractor completed: %d total records inserted", grand_total
+        )
+    else:
         try:
-            pg_dsn = _env("PG_DSN")
-            with psycopg.connect(pg_dsn) as conn:
-                mark_extractor_unhealthy(conn, "azure", "Extractor failed — see logs")
+            total = run_extractor()
+            logger.info("Azure Cost Extractor completed: %d records inserted", total)
         except Exception:
-            logger.exception("Also failed to mark extractor as unhealthy")
-        raise
+            logger.exception("Azure Cost Extractor failed")
+            try:
+                pg_dsn = _env("PG_DSN")
+                with psycopg.connect(pg_dsn) as conn:
+                    mark_extractor_unhealthy(
+                        conn, "azure", "Extractor failed — see logs"
+                    )
+            except Exception:
+                logger.exception("Also failed to mark extractor as unhealthy")
+            raise
 
 
 if __name__ == "__main__":
