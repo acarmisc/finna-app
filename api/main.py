@@ -16,10 +16,20 @@ logger = logging.getLogger("api.main")
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> None:
     """Application lifecycle: startup and shutdown."""
-    # Startup: initialize database tables
+    # Startup: initialize connection pool
     from api.db import get_pg_dsn
 
     if get_pg_dsn():
+        try:
+            from api.db import init_sync_pool
+
+            init_sync_pool()
+            logger.info("Connection pool initialized")
+        except Exception as e:
+            logger.warning(
+                f"Could not initialize connection pool: {e}. Will retry on first request."
+            )
+
         try:
             from api.db import init_db
 
@@ -32,12 +42,11 @@ async def lifespan(app: FastAPI) -> None:
 
     yield
 
-    # Shutdown: cleanup
-    from api.db import _sync_pool
+    # Shutdown: close connection pools
+    from api.db import close_pools
 
-    if _sync_pool and _sync_pool.get("conn"):
-        _sync_pool["conn"].close()
-        logger.info("Database connection closed")
+    close_pools()
+    logger.info("Connection pools closed")
 
 
 app = FastAPI(
@@ -61,7 +70,7 @@ app.add_middleware(
 @app.get("/healthz")
 async def healthz() -> JSONResponse:
     """Health check endpoint."""
-    from api.db import get_pg_dsn
+    from api.db import get_pg_dsn, get_connection, release_connection
 
     status = {
         "status": "ok",
@@ -69,9 +78,8 @@ async def healthz() -> JSONResponse:
     }
 
     # Check database
+    conn = None
     try:
-        from api.db import get_connection
-
         conn = get_connection()
         with conn.cursor() as cur:
             cur.execute("SELECT 1")
@@ -79,8 +87,19 @@ async def healthz() -> JSONResponse:
     except Exception as e:
         status["database"] = f"error: {e}"
         status["status"] = "degraded"
+    finally:
+        if conn is not None:
+            release_connection(conn)
 
     return JSONResponse(status, status_code=200 if status["status"] == "ok" else 503)
+
+
+@app.get("/api/v1/db/stats")
+async def db_stats() -> JSONResponse:
+    """Get database connection pool stats."""
+    from api.db import get_pool_stats
+
+    return JSONResponse(get_pool_stats())
 
 
 # Mount routers
