@@ -23,6 +23,7 @@ import time
 import urllib.request
 import urllib.error
 import urllib.parse
+import warnings
 
 # ---------------------------------------------------------------------------
 # Configuration (override via environment variables)
@@ -33,6 +34,31 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
 FINOPS_PG_URI = os.getenv(
     "FINOPS_PG_URI", "postgresql://finops:finops_dev@postgres:5432/finops"
 )
+
+# ---------------------------------------------------------------------------
+# Password validation
+# ---------------------------------------------------------------------------
+COMMON_PASSWORDS = frozenset(["admin", "password", "superset"])
+
+
+def _validate_password(password):
+    """Validate password meets security requirements."""
+    if len(password) < 12:
+        print(f"ERROR: ADMIN_PASSWORD must be at least 12 characters (got {len(password)}).", file=sys.stderr)
+        return False
+    if password.lower() in COMMON_PASSWORDS:
+        print(f"ERROR: ADMIN_PASSWORD cannot be a common password.", file=sys.stderr)
+        return False
+    return True
+
+
+# Check if ADMIN_PASSWORD is set via environment variable (warn)
+if "ADMIN_PASSWORD" in os.environ:
+    warnings.warn("ADMIN_PASSWORD is set via environment variable — ensure the environment is secure.")
+
+# Validate password
+if not _validate_password(ADMIN_PASSWORD):
+    sys.exit(1)
 
 # ---------------------------------------------------------------------------
 # HTTP helpers

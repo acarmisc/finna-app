@@ -10,13 +10,46 @@
 # =============================================================================
 
 import os
+import sys
 
 # ---------------------------------------------------------------------------
 # Secret key -- MUST be changed in production
 # ---------------------------------------------------------------------------
-# A placeholder is used here; the real value is injected via the
-# SUPERSET_SECRET_KEY environment variable.
-SECRET_KEY = os.getenv("SUPERSET_SECRET_KEY", "CHANGE_ME_TO_A_RANDOM_SECRET")
+SUPERSET_SECRET_KEY = os.getenv("SUPERSET_SECRET_KEY")
+
+if not SUPERSET_SECRET_KEY:
+    print(
+        "ERROR: SUPERSET_SECRET_KEY environment variable is not set.", file=sys.stderr
+    )
+    print(
+        "       Set a secure secret key before deploying to production.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+if SUPERSET_SECRET_KEY == "CHANGE_ME_TO_A_RANDOM_SECRET":
+    print(
+        "ERROR: SUPERSET_SECRET_KEY cannot be the default insecure value.",
+        file=sys.stderr,
+    )
+    print(
+        "       Set a secure secret key before deploying to production.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+if len(SUPERSET_SECRET_KEY) < 32:
+    print(
+        f"ERROR: SUPERSET_SECRET_KEY must be at least 32 characters (got {len(SUPERSET_SECRET_KEY)}).",
+        file=sys.stderr,
+    )
+    print(
+        "       Generate a secure random key: python -c 'import secrets; print(secrets.token_hex(32))'",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+SECRET_KEY = SUPERSET_SECRET_KEY
 
 # ---------------------------------------------------------------------------
 # Metadata database (Superset's own state)
