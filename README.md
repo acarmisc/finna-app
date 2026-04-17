@@ -92,6 +92,23 @@ Credential resolution order for extractors:
 
 Dashboards are provisioned via the REST API using `superset/bootstrap.py` — an idempotent script that creates the database connection, datasets, charts, and dashboards. Configuration is in `superset/superset_config.py`.
 
+### Required Environment Variables
+
+| Variable | Description | Required |
+|----------|------------|----------|
+| `SUPERSET_SECRET_KEY` | Secret key for session encryption (min 32 chars) | Yes |
+| `SUPERSET_BASE_URL` | Superset instance URL | For bootstrap |
+| `SUPERSET_ADMIN_USERNAME` | Admin username | For bootstrap |
+| `ADMIN_PASSWORD` | Admin password (min 12 chars, not common) | For bootstrap |
+| `FINOPS_PG_URI` | PostgreSQL connection string | For bootstrap |
+| `SUPERSET_DATABASE_URI` | Superset metadata DB | No (default provided) |
+| `REDIS_URL` | Redis cache URL | No (default provided) |
+
+Generate a secure secret key:
+```bash
+python -c 'import secrets; print(secrets.token_hex(32))'
+```
+
 Three dashboards are created:
 - **FinOps Overview** — total cost, cost per provider, daily trends, top projects
 - **LLM Costs** — model cost efficiency, daily LLM spend, LLM share of total
