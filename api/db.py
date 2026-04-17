@@ -10,7 +10,7 @@ from typing import Any, AsyncIterator, Optional
 import psycopg
 from psycopg import AsyncConnection
 from psycopg.rows import dict_row
-from psycopg_pool import AsyncConnectionPool, ConnectionPool
+from psycopg_pool import AsyncConnectionPool, ConnectionPool, PoolTimeout
 
 logger = logging.getLogger("api.db")
 
@@ -144,10 +144,19 @@ def release_connection(conn: psycopg.Connection) -> None:
 
 def close_pools() -> None:
     """Close both async and sync connection pools."""
+    import asyncio
+
     global _async_pool, _sync_pool
     if _async_pool is not None:
         logger.info("Closing async connection pool")
-        _async_pool.close()
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(_async_pool.close())
+            else:
+                loop.run_until_complete(_async_pool.close())
+        except Exception:
+            pass
         _async_pool = None
     if _sync_pool is not None:
         logger.info("Closing sync connection pool")
