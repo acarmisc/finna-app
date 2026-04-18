@@ -20,21 +20,6 @@
   position: relative;
 }
 
-.fn-mark {
-  width: 26px;
-  height: 26px;
-  background: var(--primary);
-  color: var(--primary-fg);
-  border-radius: 7px;
-  display: grid;
-  place-items: center;
-  font-family: var(--font-serif);
-  font-size: 17px;
-  font-weight: 500;
-  font-style: italic;
-  flex-shrink: 0;
-}
-
 .fn-brand-toggle {
   margin-left: auto;
   opacity: 0.6;

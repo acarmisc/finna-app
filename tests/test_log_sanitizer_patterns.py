@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from utils.log_sanitizer import sanitize_log, _SENSITIVE_PATTERNS
+from utils.log_sanitizer import _SENSITIVE_PATTERNS, sanitize_log
 
 
 class TestAllSanitizationPatterns:

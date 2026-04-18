@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import os
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 
 @pytest.fixture(autouse=True)
@@ -71,7 +72,7 @@ class TestDecrypt:
 
     def test_decrypt_valid_token(self):
         """Test decrypting valid encrypted token."""
-        from utils.encryption import encrypt, decrypt
+        from utils.encryption import decrypt, encrypt
 
         original = "test-password-12345"
         encrypted = encrypt(original)
@@ -175,7 +176,7 @@ class TestDecryptConfig:
 
     def test_decrypt_config_sensitive_fields(self):
         """Test decrypting config with encrypted fields."""
-        from utils.encryption import encrypt_config, decrypt_config
+        from utils.encryption import decrypt_config, encrypt_config
 
         config = {
             "id": "test-id",
@@ -221,7 +222,7 @@ class TestDecryptConfig:
 
     def test_decrypt_config_nested(self):
         """Test decrypting nested config."""
-        from utils.encryption import encrypt_config, decrypt_config
+        from utils.encryption import decrypt_config, encrypt_config
 
         config = {
             "outer": "value",
@@ -243,8 +244,9 @@ class TestFernetLazyInitialization:
 
     def test_fernet_lazy_initialization(self, monkeypatch, cleanup_fernet):
         """Test that Fernet is lazy-loaded."""
-        from utils import encryption
         from cryptography.fernet import Fernet
+
+        from utils import encryption
 
         valid_key = Fernet.generate_key().decode()
         monkeypatch.setenv("ENCRYPTION_KEY", valid_key)
@@ -270,8 +272,6 @@ class TestFernetLazyInitialization:
     def test_fernet_key_generation(self, monkeypatch, cleanup_fernet):
         """Test automatic key generation."""
         from utils import encryption
-        from unittest.mock import patch
-        import os
 
         monkeypatch.delenv("ENCRYPTION_KEY", raising=False)
 
@@ -312,7 +312,7 @@ class TestEncryptionRoundtrip:
 
     def test_roundtrip_simple_string(self):
         """Test simple string roundtrip."""
-        from utils.encryption import encrypt, decrypt
+        from utils.encryption import decrypt, encrypt
 
         test_cases = [
             "password123",
@@ -328,7 +328,7 @@ class TestEncryptionRoundtrip:
 
     def test_roundtrip_with_special_chars(self):
         """Test roundtrip with special characters."""
-        from utils.encryption import encrypt, decrypt
+        from utils.encryption import decrypt, encrypt
 
         test_cases = [
             "pass@word#123",
@@ -382,7 +382,7 @@ class TestAdditionalEncryptedDecryptedCases:
 
     def test_decrypt_config_with_nested_dict(self, cleanup_fernet):
         """Test decrypting config with nested dict containing sensitive fields."""
-        from utils.encryption import encrypt_config, decrypt_config
+        from utils.encryption import decrypt_config, encrypt_config
 
         config = {
             "id": "test-id",

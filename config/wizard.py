@@ -25,11 +25,9 @@ from config.schema import (
     AggregationConfig,
     AggregationSettings,
     AzureConfig,
-    AzureSubscriptionConfig,
     ClientConfig,
     GCPConfig,
     GCPIngestionMode,
-    GCPProjectConfig,
     PostgreSQLConfig,
     SupersetConfig,
 )
@@ -598,12 +596,12 @@ def ask_aggregation() -> dict[str, Any]:
     ) -> dict[str, int]:
         console.print(f"[bold]{name}[/bold]")
         ws = questionary.text(
-            f"  Window size (minutes):",
+            "  Window size (minutes):",
             default=str(default_window),
             validate=_validate_positive_int,
         ).ask()
         rd = questionary.text(
-            f"  Retention (days):",
+            "  Retention (days):",
             default=str(default_retention),
             validate=_validate_positive_int,
         ).ask()

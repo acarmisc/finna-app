@@ -14,6 +14,15 @@ export interface Toast {
   icon?: string;
 }
 
+export interface Resource {
+  id: string;
+  name: string;
+  type: string;
+  native: string;
+  mtd: number;
+  tags: Record<string, string>;
+}
+
 export interface Connection {
   id: string;
   prov: Provider;
@@ -26,6 +35,8 @@ export interface Connection {
   expires: string;
   err?: string;
   note?: string;
+  projectId?: string | null;
+  resources?: Resource[];
 }
 
 export interface CostRecord {
@@ -80,6 +91,19 @@ export interface SKU {
   prev: number;
 }
 
+export interface FinProject {
+  id: string;
+  name: string;
+  slug: string;
+  owner: string;
+  costCenter: string;
+  budgetCap: number;
+  mtd: number;
+  tags: Record<string, string>;
+  created: string;
+  note: string;
+}
+
 export interface AppData {
   PROJECTS: Project[];
   COSTS: CostRecord[];
@@ -87,4 +111,20 @@ export interface AppData {
   CONNECTIONS: Connection[];
   ALERTS: Alert[];
   DAYS: DayData[];
+  FIN_PROJECTS: FinProject[];
+  TAG_VOCAB: Record<string, string[]>;
 }
+
+// Route type for hierarchy navigation
+export type Route =
+  | { screen: 'dashboard' }
+  | { screen: 'explorer' }
+  | { screen: 'connections' }
+  | { screen: 'projects' }
+  | { screen: 'project'; projectId: string }
+  | { screen: 'connection'; connectionId: string }
+  | { screen: 'resource'; connectionId: string; resourceId: string }
+  | { screen: 'alerts' }
+  | { screen: 'runs' }
+  | { screen: 'budgets' }
+  | { screen: 'settings' };

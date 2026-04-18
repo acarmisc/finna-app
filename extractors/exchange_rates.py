@@ -17,16 +17,16 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 import psycopg
 from psycopg.rows import dict_row
 from tenacity import (
+    before_sleep_log,
     retry,
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    before_sleep_log,
 )
 
 logger = logging.getLogger("extractors.exchange_rates")

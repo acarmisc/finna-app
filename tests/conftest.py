@@ -10,12 +10,10 @@ os.environ["JWT_SECRET"] = "test-secret-key"
 os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ["JWT_EXPIRATION_MINUTES"] = "60"
 
-import asyncio
 from contextlib import asynccontextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 
@@ -51,8 +49,8 @@ def mock_connection():
 @pytest.fixture
 def client(mock_connection, mock_sync_pool):
     """Create test client with mocked dependencies."""
-    import api.main as main_module
     import api.db as db_module
+    import api.main as main_module
 
     original_lifespan = main_module.app.router.lifespan_context
 
@@ -78,9 +76,8 @@ def client(mock_connection, mock_sync_pool):
 @pytest.fixture
 def auth_client(mock_connection, mock_sync_pool):
     """Create test client with mocked dependencies and authentication."""
-    import api.main as main_module
     import api.db as db_module
-    import api.auth
+    import api.main as main_module
 
     original_lifespan = main_module.app.router.lifespan_context
 
@@ -100,7 +97,7 @@ def auth_client(mock_connection, mock_sync_pool):
                                 from api.auth import create_access_token
                                 token = create_access_token(data={"sub": "testuser"})
                                 auth_headers = {"Authorization": f"Bearer {token}"}
-                                
+
                                 def patched_request(method, url, **kwargs):
                                     headers = kwargs.get("headers") or {}
                                     headers.update(auth_headers)

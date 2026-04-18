@@ -12,11 +12,9 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 import yaml
 
