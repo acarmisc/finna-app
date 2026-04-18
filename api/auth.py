@@ -1,0 +1,116 @@
+"""JWT authentication module for API endpoints."""
+
+from __future__ import annotations
+
+import os
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional
+
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+
+JWT_SECRET = os.getenv("JWT_SECRET")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+JWT_EXPIRATION_MINUTES = int(os.getenv("JWT_EXPIRATION_MINUTES", "60"))
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
+
+USERS_TABLE = {}
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against a hash."""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password: str) -> str:
+    """Hash a password."""
+    return pwd_context.hash(password)
+
+
+def create_access_token(data: dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+    """Create a JWT access token."""
+    if not JWT_SECRET:
+        raise ValueError("JWT_SECRET environment variable is not set")
+
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRATION_MINUTES)
+
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return encoded_jwt
+
+
+def decode_token(token: str) -> dict[str, Any]:
+    """Decode and validate a JWT token."""
+    if not JWT_SECRET:
+        raise ValueError("JWT_SECRET environment variable is not set")
+
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except JWTError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+verify_token = decode_token
+
+
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict[str, Any]:
+    """Dependency to get the current authenticated user."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    try:
+        payload = decode_token(token)
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        return {"username": username, **payload}
+    except HTTPException:
+        raise credentials_exception
+    except Exception:
+        raise credentials_exception
+
+
+def require_auth(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+    """Require authentication dependency."""
+    return user
+
+
+async def token_verification_middleware(request: Request, call_next):
+    """Middleware to verify JWT token on all protected routes."""
+    if request.url.path.startswith("/api/v1/") and request.url.path != "/api/v1/auth/token":
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            try:
+                decode_token(token)
+            except HTTPException:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid or expired token",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        else:
+            if request.url.path != "/api/v1/healthz":
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Not authenticated",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+    return await call_next(request)
