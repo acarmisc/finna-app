@@ -50,6 +50,7 @@ MOCK_ECB_XML = """\
 # Tests: XML parsing
 # ---------------------------------------------------------------------------
 
+
 class TestParseEcbXml:
     """Tests for _parse_ecb_xml."""
 
@@ -99,6 +100,7 @@ class TestParseEcbXml:
 # Tests: EUR -> USD rate conversion
 # ---------------------------------------------------------------------------
 
+
 class TestConvertToUsdRates:
     """Tests for _convert_to_usd_rates."""
 
@@ -117,17 +119,13 @@ class TestConvertToUsdRates:
         rates_vs_eur = {"USD": Decimal("1.0850"), "GBP": Decimal("0.8568")}
         usd_rates = _convert_to_usd_rates(rates_vs_eur)
         # 1 GBP = 1.0850 / 0.8568 USD
-        expected = (Decimal("1.0850") / Decimal("0.8568")).quantize(
-            Decimal("0.00000001")
-        )
+        expected = (Decimal("1.0850") / Decimal("0.8568")).quantize(Decimal("0.00000001"))
         assert usd_rates["GBP"] == expected
 
     def test_jpy_conversion(self) -> None:
         rates_vs_eur = {"USD": Decimal("1.0850"), "JPY": Decimal("164.32")}
         usd_rates = _convert_to_usd_rates(rates_vs_eur)
-        expected = (Decimal("1.0850") / Decimal("164.32")).quantize(
-            Decimal("0.00000001")
-        )
+        expected = (Decimal("1.0850") / Decimal("164.32")).quantize(Decimal("0.00000001"))
         assert usd_rates["JPY"] == expected
 
     def test_raises_without_usd(self) -> None:
@@ -158,6 +156,7 @@ class TestConvertToUsdRates:
 # ---------------------------------------------------------------------------
 # Tests: Database upsert (idempotent)
 # ---------------------------------------------------------------------------
+
 
 class TestUpsertRates:
     """Tests for _upsert_rates using a mock connection."""
@@ -198,6 +197,7 @@ class TestUpsertRates:
 # Tests: End-to-end extract() with mocks
 # ---------------------------------------------------------------------------
 
+
 class TestExtract:
     """Tests for the full extract() pipeline."""
 
@@ -221,9 +221,7 @@ class TestExtract:
 
     @patch("extractors.exchange_rates._get_pg_connection")
     @patch("extractors.exchange_rates._fetch_ecb_xml")
-    def test_extract_marks_failure_on_error(
-        self, mock_fetch: MagicMock, mock_pg: MagicMock
-    ) -> None:
+    def test_extract_marks_failure_on_error(self, mock_fetch: MagicMock, mock_pg: MagicMock) -> None:
         mock_fetch.side_effect = urllib_error("Connection refused")
 
         conn = MagicMock(spec=psycopg.Connection)
@@ -237,17 +235,14 @@ class TestExtract:
 
     @patch("extractors.exchange_rates._get_pg_connection")
     @patch("extractors.exchange_rates._fetch_ecb_xml")
-    def test_extract_raises_without_dsn(
-        self, mock_fetch: MagicMock, mock_pg: MagicMock
-    ) -> None:
+    def test_extract_raises_without_dsn(self, mock_fetch: MagicMock, mock_pg: MagicMock) -> None:
+        mock_fetch.return_value = MOCK_ECB_XML
         with pytest.raises(ValueError, match="PG_DSN is required"):
             extract(pg_dsn="")
 
     @patch("extractors.exchange_rates._get_pg_connection")
     @patch("extractors.exchange_rates._fetch_ecb_xml")
-    def test_extract_uses_custom_url(
-        self, mock_fetch: MagicMock, mock_pg: MagicMock
-    ) -> None:
+    def test_extract_uses_custom_url(self, mock_fetch: MagicMock, mock_pg: MagicMock) -> None:
         mock_fetch.return_value = MOCK_ECB_XML
         conn = MagicMock(spec=psycopg.Connection)
         cursor = MagicMock()
@@ -262,4 +257,5 @@ class TestExtract:
 
 class urllib_error(Exception):
     """Minimal stand-in for urllib.error.URLError to avoid import in tests."""
+
     pass

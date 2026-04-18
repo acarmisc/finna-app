@@ -26,6 +26,7 @@ from models import NormalizedCostRecord, Provider, ServiceCategory
 # Fixtures — realistic BigQuery billing rows
 # ---------------------------------------------------------------------------
 
+
 def _make_bq_row(
     project_id: str = "my-gcp-project",
     service_description: str = "Compute Engine",
@@ -69,6 +70,7 @@ def sample_row() -> dict:
 # ---------------------------------------------------------------------------
 # Tests — BigQuery row normalisation
 # ---------------------------------------------------------------------------
+
 
 class TestNormaliseRow:
     def test_basic_mapping(self, sample_row: dict) -> None:
@@ -141,6 +143,7 @@ class TestNormaliseRow:
 # Tests — BigQuery query building
 # ---------------------------------------------------------------------------
 
+
 class TestBuildQuery:
     def test_query_contains_table(self) -> None:
         query, params = _build_query("my-proj", "my_ds", "my_tbl", "2025-03-01", "2025-04-01")
@@ -161,6 +164,7 @@ class TestBuildQuery:
 # Tests — batch insert
 # ---------------------------------------------------------------------------
 
+
 class TestBatchInsert:
     def test_batch_insert_returns_count(self) -> None:
         mock_conn = MagicMock()
@@ -179,6 +183,7 @@ class TestBatchInsert:
 # ---------------------------------------------------------------------------
 # Tests — extractor health tracking
 # ---------------------------------------------------------------------------
+
 
 class TestExtractorHealth:
     def test_mark_health_start(self) -> None:
@@ -209,6 +214,7 @@ class TestExtractorHealth:
 # ---------------------------------------------------------------------------
 # Tests — full extract pipeline (with mocked BigQuery + PostgreSQL)
 # ---------------------------------------------------------------------------
+
 
 class TestExtract:
     @patch("extractors.gcp_billing._get_pg_connection")
@@ -317,7 +323,10 @@ class TestExtract:
                 date_to="2025-04-01",
             )
 
-    def test_extract_missing_pg_dsn(self) -> None:
+    @patch("extractors.gcp_billing.bigquery.Client")
+    def test_extract_missing_pg_dsn(self, mock_bq_cls: MagicMock) -> None:
+        mock_bq_client = MagicMock()
+        mock_bq_cls.return_value = mock_bq_client
         with pytest.raises(ValueError, match="PG_DSN"):
             extract(
                 gcp_project="test-project",
