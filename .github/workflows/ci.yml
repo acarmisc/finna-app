@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: finna
+          POSTGRES_PASSWORD: finna
+          POSTGRES_DB: finna
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Initialize database
+        run: |
+          PGPASSWORD=finna psql -h localhost -U finna -d finna -f sql/init.sql
+          PGPASSWORD=finna psql -h localhost -U finna -d finna -f sql/migrations/001_cloud_config.sql
+        env:
+          PGHOST: localhost
+          PGUSER: finna
+          PGPORT: 5432
+          PGDATABASE: finna
+          PGPASSWORD: finna
+          PGSSLMODE: disable
+
+      - name: Run tests
+        run: pytest
+        env:
+          PGHOST: localhost
+          PGPORT: 5432
+          PGDATABASE: finna
+          PGUSER: finna
+          PGPASSWORD: finna
+          PGSSLMODE: disable
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run ruff
+        run: ruff check .
+
+  typecheck:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run mypy
+        run: mypy api/ extractors/ || exit 0

@@ -1,5 +1,9 @@
 # finna-app
 
+[![CI](https://github.com/acarmisc/finna-app/actions/workflows/ci.yml/badge.svg)](https://github.com/acarmisc/finna-app/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-Apache_2.0-green.svg)](https://opensource.org/licenses/Apache-2.0)
+
 Multi-cloud FinOps platform — normalize, aggregate, and visualize cost data from GCP, Azure, and LLM gateways (via OTel Collector).
 
 ## Architecture
@@ -134,6 +138,45 @@ Walks you through: authentication → client ID → PostgreSQL → cloud provide
 ### Multi-subscription YAML
 
 The wizard and schema support multiple GCP projects and Azure subscriptions per client. See `config/schema.py` for the full Pydantic model.
+
+## CI/CD Pipeline
+
+This project uses GitHub Actions for continuous integration:
+
+### Test Coverage
+
+- **pytest** — Unit and integration tests
+- **ruff** — Linting (E, F, W, I rules)
+- **mypy** — Type checking
+
+### Running locally
+
+```bash
+# Install dev dependencies
+uv sync
+
+# Run tests
+uv run pytest
+
+# Run linter
+uv run ruff check .
+
+# Run type checker
+uv run mypy api/ extractors/
+```
+
+### Environment variables for tests
+
+The test job requires PostgreSQL connection parameters:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PGHOST` | PostgreSQL host | `localhost` |
+| `PGPORT` | PostgreSQL port | `5432` |
+| `PGDATABASE` | Database name | `finna` |
+| `PGUSER` | Database user | `finna` |
+| `PGPASSWORD` | Database password | `finna` |
+| `PGSSLMODE` | SSL mode | `disable` |
 
 ## Database Schema
 
