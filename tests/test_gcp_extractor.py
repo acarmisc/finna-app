@@ -323,10 +323,9 @@ class TestExtract:
                 date_to="2025-04-01",
             )
 
-    @patch("extractors.gcp_billing.bigquery.Client")
-    def test_extract_missing_pg_dsn(self, mock_bq_cls: MagicMock) -> None:
-        mock_bq_client = MagicMock()
-        mock_bq_cls.return_value = mock_bq_client
+    def test_extract_missing_pg_dsn(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test that ValueError is raised when no DSN is provided."""
+        monkeypatch.setattr("extractors.gcp_billing.PG_DSN", "")
         with pytest.raises(ValueError, match="PG_DSN"):
             extract(
                 gcp_project="test-project",

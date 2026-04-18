@@ -233,10 +233,9 @@ class TestExtract:
         with pytest.raises(Exception):
             extract(pg_dsn="postgresql://test:test@localhost/testdb")
 
-    @patch("extractors.exchange_rates._get_pg_connection")
-    @patch("extractors.exchange_rates._fetch_ecb_xml")
-    def test_extract_raises_without_dsn(self, mock_fetch: MagicMock, mock_pg: MagicMock) -> None:
-        mock_fetch.return_value = MOCK_ECB_XML
+    def test_extract_raises_without_dsn(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test that ValueError is raised when no DSN is provided."""
+        monkeypatch.setattr("extractors.exchange_rates.PG_DSN", "")
         with pytest.raises(ValueError, match="PG_DSN is required"):
             extract(pg_dsn="")
 
