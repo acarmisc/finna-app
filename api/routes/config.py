@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Response
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from api.db import execute, insert_and_return, query_one, query_all
 from api.models import (
@@ -19,6 +22,11 @@ from api.models import (
 
 router = APIRouter()
 
+_limiter = Limiter(key_func=get_remote_address)
+
+_rate_limit_per_minute = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
+_rate_limit_per_hour = int(os.getenv("RATE_LIMIT_PER_HOUR", "1000"))
+
 
 def _mask_secrets(config: dict[str, Any]) -> dict[str, Any]:
     """Mask sensitive fields in config for response."""
@@ -30,7 +38,7 @@ def _mask_secrets(config: dict[str, Any]) -> dict[str, Any]:
     return masked
 
 
-@router.get("/config", response_model=list[CloudConfigResponse])
+@router.get("/config", response_model=list[CloudConfigResponse], dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")])
 async def list_configs() -> list[dict[str, Any]]:
     """List all cloud configurations."""
     sql = """
@@ -53,7 +61,7 @@ async def list_configs() -> list[dict[str, Any]]:
     ]
 
 
-@router.post("/config", response_model=CloudConfigResponse, status_code=201)
+@router.post("/config", response_model=CloudConfigResponse, status_code=201, dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")])
 async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
     """Create a new cloud configuration."""
     config_id = str(uuid.uuid4())
@@ -87,7 +95,7 @@ async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
     }
 
 
-@router.get("/config/{config_id}", response_model=CloudConfigResponse)
+@router.get("/config/{config_id}", response_model=CloudConfigResponse, dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")])
 async def get_config(config_id: str) -> dict[str, Any]:
     """Get a cloud configuration by ID."""
     sql = """
@@ -110,7 +118,7 @@ async def get_config(config_id: str) -> dict[str, Any]:
     }
 
 
-@router.put("/config/{config_id}", response_model=CloudConfigResponse)
+@router.put("/config/{config_id}", response_model=CloudConfigResponse, dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")])
 async def update_config(config_id: str, data: CloudConfigUpdate) -> dict[str, Any]:
     """Update a cloud configuration."""
     # Build dynamic update
@@ -156,14 +164,14 @@ async def update_config(config_id: str, data: CloudConfigUpdate) -> dict[str, An
     }
 
 
-@router.delete("/config/{config_id}", status_code=204)
+@router.delete("/config/{config_id}", status_code=204, dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")])
 async def delete_config(config_id: str) -> None:
     """Delete a cloud configuration."""
     sql = "DELETE FROM cloud_config WHERE id = %s"
     execute(sql, (config_id,))
 
 
-@router.get("/config/provider/{provider}", response_model=list[CloudConfigResponse])
+@router.get("/config/provider/{provider}", response_model=list[CloudConfigResponse], dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")])
 async def list_configs_by_provider(provider: str) -> list[dict[str, Any]]:
     """List configurations for a specific provider."""
     sql = """

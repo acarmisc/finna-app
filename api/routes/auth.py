@@ -3,17 +3,27 @@
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from api.db import execute, insert_and_return, query_one
 from api.models import Provider
 
 logger = logging.getLogger("api.auth")
+
+router = APIRouter()
+
+_limiter = Limiter(key_func=get_remote_address)
+
+_auth_limit_per_minute = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
+_auth_limit_per_hour = int(os.getenv("RATE_LIMIT_PER_HOUR", "1000"))
 
 router = APIRouter()
 
@@ -50,7 +60,7 @@ class DeviceCodePollResponse(BaseModel):
 AZURE_DEVICE_CODE_CLIENT = "04b07795-a71b-4e6a-8f4e-d9e78e1a5c0e"
 
 
-@router.post("/auth/azure/device-code", response_model=DeviceCodeStartResponse)
+@router.post("/auth/azure/device-code", response_model=DeviceCodeStartResponse, dependencies=[_limiter.limit(f"{_auth_limit_per_minute}/{_auth_limit_per_hour}")])
 async def start_device_code(request: DeviceCodeStartRequest) -> dict[str, Any]:
     """Start Azure device code flow."""
     from azure.identity import DeviceCodeCredential
@@ -106,7 +116,7 @@ async def start_device_code(request: DeviceCodeStartRequest) -> dict[str, Any]:
         )
 
 
-@router.post("/auth/azure/device-code/poll", response_model=DeviceCodePollResponse)
+@router.post("/auth/azure/device-code/poll", response_model=DeviceCodePollResponse, dependencies=[_limiter.limit(f"{_auth_limit_per_minute}/{_auth_limit_per_hour}")])
 async def poll_device_code(request: DeviceCodePollRequest) -> dict[str, Any]:
     """Poll for device code completion."""
     from azure.identity import DeviceCodeCredential
@@ -192,7 +202,7 @@ class GCPRegisterRequest(BaseModel):
     key_file_content: Optional[str] = None
 
 
-@router.post("/auth/gcp/register")
+@router.post("/auth/gcp/register", dependencies=[_limiter.limit(f"{_auth_limit_per_minute}/{_auth_limit_per_hour}")])
 async def register_gcp(request: GCPRegisterRequest) -> dict[str, Any]:
     """Register GCP credentials."""
     import uuid
