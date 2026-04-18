@@ -30,9 +30,8 @@ class TestConnectionPoolConfig:
 
     def test_pool_config_defaults(self):
         """Test default pool configuration."""
-        os.environ["POOL_MIN_CONNS"] = ""
-        os.environ["POOL_MAX_CONNS"] = ""
-
+        # Values are read once at module import time from environment
+        # Just verify the default values exist in the module
         from api.db import POOL_MIN_CONNS, POOL_MAX_CONNS
 
         assert POOL_MIN_CONNS == 2
@@ -81,6 +80,7 @@ class TestConnectionReuse:
 
     def test_connection_reuse_enabled(self):
         """Test that connection reuse is configured."""
+        # POOL_RECYCLE should be defined as a module constant
         from api.db import POOL_RECYCLE
 
         assert POOL_RECYCLE is not None
@@ -88,11 +88,21 @@ class TestConnectionReuse:
 
     def test_pool_recycle_config(self):
         """Test pool recycle configuration."""
-        os.environ["POOL_RECYCLE"] = "3600"
+        # Remove env var to use default
+        old_value = os.environ.get("POOL_RECYCLE")
+        os.environ.pop("POOL_RECYCLE", None)
 
-        from api.db import POOL_RECYCLE
+        try:
+            import importlib
+            import api.db
 
-        assert POOL_RECYCLE == 3600
+            importlib.reload(api.db)
+            from api.db import POOL_RECYCLE as RECYCLE
+
+            assert RECYCLE == 3600
+        finally:
+            if old_value is not None:
+                os.environ["POOL_RECYCLE"] = old_value
 
 
 class TestConnectionAcquisition:

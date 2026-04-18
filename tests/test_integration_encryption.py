@@ -7,7 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-os.environ["ENCRYPTION_KEY"] = "t6K8Qf3VbJ9mX2pL5rN4sT6uV7wY8zA1B2C3D4E5F6g="
+os.environ["ENCRYPTION_KEY"] = "fd7Em6qcDLS1FfjAgi0oSc6-keC5uK8r8rshY_UVw5I="
+os.environ["PG_DSN"] = "postgresql://test:test@localhost/testdb"
 
 
 class TestEncryption:

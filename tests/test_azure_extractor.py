@@ -30,6 +30,7 @@ from extractors.azure_cost import (
 # Fixtures — realistic Azure cost rows
 # ---------------------------------------------------------------------------
 
+
 def _make_azure_row(
     usage_date: int = 20240315,
     subscription_id: str = "sub-001",
@@ -59,6 +60,7 @@ def _make_azure_row(
 # Test: generate_record_id
 # ---------------------------------------------------------------------------
 
+
 class TestGenerateRecordId:
     def test_deterministic(self):
         """Same inputs always produce the same record_id."""
@@ -79,6 +81,7 @@ class TestGenerateRecordId:
 # ---------------------------------------------------------------------------
 # Test: map_service_category
 # ---------------------------------------------------------------------------
+
 
 class TestMapServiceCategory:
     def test_known_compute(self):
@@ -123,6 +126,7 @@ class TestMapServiceCategory:
 # Test: currency conversion
 # ---------------------------------------------------------------------------
 
+
 class TestConvertToUsd:
     def test_usd_passthrough(self):
         assert convert_to_usd(Decimal("100.00"), "USD", {"USD": Decimal("1")}) == Decimal("100.00")
@@ -151,6 +155,7 @@ class TestConvertToUsd:
 # ---------------------------------------------------------------------------
 # Test: _azure_date_to_datetime
 # ---------------------------------------------------------------------------
+
 
 class TestAzureDateToDatetime:
     def test_integer_format(self):
@@ -182,6 +187,7 @@ class TestAzureDateToDatetime:
 # Test: _parse_tags
 # ---------------------------------------------------------------------------
 
+
 class TestParseTags:
     def test_dict_input(self):
         result = _parse_tags({"project": "finops", "env": "prod"})
@@ -208,6 +214,7 @@ class TestParseTags:
 # ---------------------------------------------------------------------------
 # Test: transform_row (field mapping)
 # ---------------------------------------------------------------------------
+
 
 class TestTransformRow:
     def setup_method(self):
@@ -346,6 +353,7 @@ class TestTransformRow:
 # Test: pagination handling
 # ---------------------------------------------------------------------------
 
+
 class TestFetchCostRows:
     def _mock_column(self, name: str) -> MagicMock:
         col = MagicMock()
@@ -364,15 +372,25 @@ class TestFetchCostRows:
 
     def test_single_page(self):
         mock_client = MagicMock()
-        columns = ["UsageDate", "SubscriptionId", "ResourceGroup", "MeterCategory",
-                    "MeterSubCategory", "Product", "CostInBillingCurrency", "Currency", "Tags"]
+        columns = [
+            "UsageDate",
+            "SubscriptionId",
+            "ResourceGroup",
+            "MeterCategory",
+            "MeterSubCategory",
+            "Product",
+            "CostInBillingCurrency",
+            "Currency",
+            "Tags",
+        ]
         rows = [
             [20240315, "sub-001", "rg-1", "Virtual Machines", "D2s v3", "D2s v3/Win", 10.0, "USD", {}],
         ]
         mock_client.query.usage_by_scope.return_value = self._mock_result(rows, columns)
 
         result = fetch_cost_rows(
-            mock_client, "/subscriptions/sub-001",
+            mock_client,
+            "/subscriptions/sub-001",
             datetime(2024, 3, 1, tzinfo=timezone.utc),
             datetime(2024, 3, 31, tzinfo=timezone.utc),
         )
@@ -382,8 +400,17 @@ class TestFetchCostRows:
 
     def test_pagination_with_next_link(self):
         mock_client = MagicMock()
-        columns = ["UsageDate", "SubscriptionId", "ResourceGroup", "MeterCategory",
-                    "MeterSubCategory", "Product", "CostInBillingCurrency", "Currency", "Tags"]
+        columns = [
+            "UsageDate",
+            "SubscriptionId",
+            "ResourceGroup",
+            "MeterCategory",
+            "MeterSubCategory",
+            "Product",
+            "CostInBillingCurrency",
+            "Currency",
+            "Tags",
+        ]
         page1_rows = [
             [20240315, "sub-001", "rg-1", "VM", "D2s", "D2s/Win", 10.0, "USD", {}],
         ]
@@ -397,7 +424,8 @@ class TestFetchCostRows:
         mock_client.query.usage_by_scope.side_effect = [page1, page2]
 
         result = fetch_cost_rows(
-            mock_client, "/subscriptions/sub-001",
+            mock_client,
+            "/subscriptions/sub-001",
             datetime(2024, 3, 1, tzinfo=timezone.utc),
             datetime(2024, 3, 31, tzinfo=timezone.utc),
         )
@@ -409,8 +437,17 @@ class TestFetchCostRows:
 
     def test_pagination_with_skip_token(self):
         mock_client = MagicMock()
-        columns = ["UsageDate", "SubscriptionId", "ResourceGroup", "MeterCategory",
-                    "MeterSubCategory", "Product", "CostInBillingCurrency", "Currency", "Tags"]
+        columns = [
+            "UsageDate",
+            "SubscriptionId",
+            "ResourceGroup",
+            "MeterCategory",
+            "MeterSubCategory",
+            "Product",
+            "CostInBillingCurrency",
+            "Currency",
+            "Tags",
+        ]
         page1_rows = [[20240315, "sub-001", "rg-1", "VM", "D2s", "D2s/Win", 10.0, "USD", {}]]
         page2_rows = [[20240316, "sub-001", "rg-2", "Storage", "Blob", "Blob/Hot", 5.0, "USD", {}]]
 
@@ -420,7 +457,8 @@ class TestFetchCostRows:
         mock_client.query.usage_by_scope.side_effect = [page1, page2]
 
         result = fetch_cost_rows(
-            mock_client, "/subscriptions/sub-001",
+            mock_client,
+            "/subscriptions/sub-001",
             datetime(2024, 3, 1, tzinfo=timezone.utc),
             datetime(2024, 3, 31, tzinfo=timezone.utc),
         )
@@ -428,12 +466,22 @@ class TestFetchCostRows:
 
     def test_empty_result_set(self):
         mock_client = MagicMock()
-        columns = ["UsageDate", "SubscriptionId", "ResourceGroup", "MeterCategory",
-                    "MeterSubCategory", "Product", "CostInBillingCurrency", "Currency", "Tags"]
+        columns = [
+            "UsageDate",
+            "SubscriptionId",
+            "ResourceGroup",
+            "MeterCategory",
+            "MeterSubCategory",
+            "Product",
+            "CostInBillingCurrency",
+            "Currency",
+            "Tags",
+        ]
         mock_client.query.usage_by_scope.return_value = self._mock_result([], columns)
 
         result = fetch_cost_rows(
-            mock_client, "/subscriptions/sub-001",
+            mock_client,
+            "/subscriptions/sub-001",
             datetime(2024, 3, 1, tzinfo=timezone.utc),
             datetime(2024, 3, 31, tzinfo=timezone.utc),
         )
@@ -441,8 +489,17 @@ class TestFetchCostRows:
 
     def test_three_pages(self):
         mock_client = MagicMock()
-        columns = ["UsageDate", "SubscriptionId", "ResourceGroup", "MeterCategory",
-                    "MeterSubCategory", "Product", "CostInBillingCurrency", "Currency", "Tags"]
+        columns = [
+            "UsageDate",
+            "SubscriptionId",
+            "ResourceGroup",
+            "MeterCategory",
+            "MeterSubCategory",
+            "Product",
+            "CostInBillingCurrency",
+            "Currency",
+            "Tags",
+        ]
         p1 = [[20240310, "sub-001", "rg-1", "VM", "D2s", "D2s/Win", 10.0, "USD", {}]]
         p2 = [[20240311, "sub-001", "rg-1", "VM", "D2s", "D2s/Win", 10.0, "USD", {}]]
         p3 = [[20240312, "sub-001", "rg-1", "VM", "D2s", "D2s/Win", 10.0, "USD", {}]]
@@ -454,7 +511,8 @@ class TestFetchCostRows:
         mock_client.query.usage_by_scope.side_effect = [r1, r2, r3]
 
         result = fetch_cost_rows(
-            mock_client, "/subscriptions/sub-001",
+            mock_client,
+            "/subscriptions/sub-001",
             datetime(2024, 3, 1, tzinfo=timezone.utc),
             datetime(2024, 3, 31, tzinfo=timezone.utc),
         )
@@ -466,6 +524,7 @@ class TestFetchCostRows:
 # Test: extractor health marking
 # ---------------------------------------------------------------------------
 
+
 class TestExtractorHealth:
     def test_mark_healthy(self):
         mock_conn = MagicMock()
@@ -474,7 +533,8 @@ class TestExtractorHealth:
         mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
 
         mark_extractor_healthy(
-            mock_conn, "azure",
+            mock_conn,
+            "azure",
             datetime(2024, 3, 1, tzinfo=timezone.utc),
             datetime(2024, 3, 31, tzinfo=timezone.utc),
             100,
@@ -482,13 +542,14 @@ class TestExtractorHealth:
 
         mock_cursor.execute.assert_called_once()
         call_args = mock_cursor.execute.call_args
-        assert "ok" in str(call_args)
+        assert "success" in str(call_args)
         mock_conn.commit.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
 # Test: run_extractor integration (mocked)
 # ---------------------------------------------------------------------------
+
 
 class TestRunExtractor:
     @patch("extractors.azure_cost.psycopg.connect")
@@ -506,11 +567,13 @@ class TestRunExtractor:
         mock_pg_connect.return_value.__exit__ = MagicMock(return_value=False)
 
         from extractors.azure_cost import run_extractor
+
         total = run_extractor(
             pg_dsn="postgresql://test:test@localhost/test",
             date_from=datetime(2024, 3, 1, tzinfo=timezone.utc),
             date_to=datetime(2024, 3, 31, tzinfo=timezone.utc),
             subscription_id="sub-001",
+            resource_group="test-rg",
         )
         assert total == 0
 
@@ -533,11 +596,13 @@ class TestRunExtractor:
         mock_pg_connect.return_value.__exit__ = MagicMock(return_value=False)
 
         from extractors.azure_cost import run_extractor
+
         total = run_extractor(
             pg_dsn="postgresql://test:test@localhost/test",
             date_from=datetime(2024, 3, 1, tzinfo=timezone.utc),
             date_to=datetime(2024, 3, 31, tzinfo=timezone.utc),
             subscription_id="sub-001",
+            resource_group="test-rg",
         )
         assert total == 2
         mock_insert.assert_called_once()

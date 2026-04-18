@@ -49,7 +49,7 @@ _SENSITIVE_PATTERNS: list[tuple[str, re.Pattern]] = [
     ),
     (
         "GCP Service Account JSON",
-        re.compile(r'"private_key":\s*"[^"]+"'),
+        re.compile(r'"private_key":\s*"[^"]*(?:-----BEGIN|-----END)[^"]*"', re.DOTALL),
     ),
     (
         "GCP Private Key ID",

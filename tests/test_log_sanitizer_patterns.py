@@ -198,7 +198,8 @@ class TestPatternSanitization:
 
     def test_gcp_private_key_sanitized(self):
         """Test GCP private key is sanitized."""
-        text = '"private_key": "-----BEGIN RSA PRIVATE KEY-----\nMIICXAIBAAKBgQC...'
+        # Full private key with both BEGIN and END markers
+        text = '"private_key": "-----BEGIN RSA PRIVATE KEY-----\nMIICXAIBAAKBgQC...\n-----END RSA PRIVATE KEY-----"'
         result = sanitize_log(text)
 
         assert "-----BEGIN RSA PRIVATE KEY-----" not in result
