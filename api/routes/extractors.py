@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from api.auth import require_auth
 from api.db import query_one, query_all
 from api.models import (
     ExtractorRunRequest,
@@ -18,7 +20,20 @@ from api.runner import cancel_run, get_run_status, list_runs, start_extractor
 router = APIRouter()
 
 
-@router.post("/extractors/run", response_model=ExtractorRunResponse)
+
+from api.auth import require_auth
+from api.db import query_one, query_all
+from api.models import (
+    ExtractorRunRequest,
+    ExtractorRunResponse,
+    ExtractorStatusResponse,
+)
+from api.runner import cancel_run, get_run_status, list_runs, start_extractor
+
+router = APIRouter()
+
+
+@router.post("/extractors/run", response_model=ExtractorRunResponse, dependencies=[Depends(require_auth)])
 async def run_extractor(request: ExtractorRunRequest) -> dict[str, Any]:
     """Start an extractor run."""
     from api.db import get_connection
@@ -60,7 +75,7 @@ async def run_extractor(request: ExtractorRunRequest) -> dict[str, Any]:
     }
 
 
-@router.get("/extractors/status", response_model=list[ExtractorStatusResponse])
+@router.get("/extractors/status", response_model=list[ExtractorStatusResponse], dependencies=[Depends(require_auth)])
 async def get_status(
     limit: int = 50, provider: Optional[str] = None
 ) -> list[dict[str, Any]]:
@@ -81,7 +96,7 @@ async def get_status(
     ]
 
 
-@router.get("/extractors/status/{run_id}", response_model=ExtractorStatusResponse)
+@router.get("/extractors/status/{run_id}", response_model=ExtractorStatusResponse, dependencies=[Depends(require_auth)])
 async def get_run_detail(run_id: str) -> dict[str, Any]:
     """Get detailed status of a run."""
     run = get_run_status(run_id)
@@ -100,7 +115,7 @@ async def get_run_detail(run_id: str) -> dict[str, Any]:
     }
 
 
-@router.post("/extractors/cancel/{run_id}")
+@router.post("/extractors/cancel/{run_id}", dependencies=[Depends(require_auth)])
 async def cancel_extractor(run_id: str) -> dict[str, str]:
     """Cancel a running extractor."""
     success = cancel_run(run_id)
@@ -109,7 +124,7 @@ async def cancel_extractor(run_id: str) -> dict[str, str]:
     return {"status": "cancelled", "run_id": run_id}
 
 
-@router.get("/extractors/health")
+@router.get("/extractors/health", dependencies=[Depends(require_auth)])
 async def get_extractor_health() -> list[dict[str, Any]]:
     """Get health status for all extractors."""
     from api.db import get_connection
