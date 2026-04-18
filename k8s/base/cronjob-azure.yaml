@@ -1,0 +1,73 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: finops-extractor-azure
+  namespace: finops
+  labels:
+    app: finops-extractor
+    extractor: azure-cost
+spec:
+  schedule: "30 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  activeDeadlineSeconds: 3600
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: finops-extractor
+            extractor: azure-cost
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+          - name: extractor
+            image: finops-extractor:latest
+            imagePullPolicy: IfNotPresent
+            env:
+            - name: EXTRACTOR_TYPE
+              value: "azure_cost"
+            - name: AZURE_SUBSCRIPTION_ID
+              valueFrom:
+                secretKeyRef:
+                  name: finops-secret
+                  key: AZURE_SUBSCRIPTION_ID
+            - name: AZURE_TENANT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: finops-secret
+                  key: AZURE_TENANT_ID
+            - name: AZURE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: finops-secret
+                  key: AZURE_CLIENT_ID
+            - name: AZURE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: finops-secret
+                  key: AZURE_CLIENT_SECRET
+            - name: PG_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: finops-secret
+                  key: PG_DSN
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL

@@ -2,27 +2,22 @@
 
 from __future__ import annotations
 
-import os
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException
 
 from api.auth import require_auth
-
-from api.db import execute, insert_and_return, query_one, query_all
+from api.db import execute, insert_and_return, query_all, query_one
 from api.models import (
     CloudConfigCreate,
     CloudConfigResponse,
     CloudConfigUpdate,
-    CredentialType,
-    Provider,
 )
-from utils.encryption import encrypt_config, decrypt_config
+from utils.encryption import decrypt_config, encrypt_config
 
 router = APIRouter()
-
 
 
 def _mask_secrets(config: dict[str, Any]) -> dict[str, Any]:
