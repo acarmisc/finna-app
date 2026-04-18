@@ -8,14 +8,14 @@ import { RunsScreen } from '../screens/RunsScreen';
 import { BudgetsScreen } from '../screens/BudgetsScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { CommandPalette } from './CommandPalette';
-import { NewConnectionModal } from './modals/NewConnectionModal';
-import { ConnectionDrawer } from './drawers/ConnectionDrawer';
-import { CostDrawer } from './drawers/CostDrawer';
-import { RunDrawer } from './drawers/RunDrawer';
+import { NewConnectionModal } from '../modals/NewConnectionModal';
+import { ConnectionDrawer } from '../drawers/ConnectionDrawer';
+import { CostDrawer } from '../drawers/CostDrawer';
+import { RunDrawer } from '../drawers/RunDrawer';
 import { Toaster } from './Toaster';
-import { useTheme } from '../hooks/useTheme';
-import { useLocalStorage } from '../hooks/useLocalStorage';
-import type { Toast, Connection, CostRecord, Run } from '../types';
+import { useTheme } from '../../hooks/useTheme';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
+import type { Toast, Connection, CostRecord, Run } from '../../types';
 import './Console.css';
 
 const SCREENS = [
