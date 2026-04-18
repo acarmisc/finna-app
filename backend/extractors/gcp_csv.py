@@ -34,13 +34,13 @@ from tenacity import (
     wait_exponential,
 )
 
-from extractors.gcp_shared import (
+from backend.extractors.gcp_shared import (
     DEFAULT_SERVICE_CATEGORY_MAP,
     normalize_csv_row,
 )
-from models import NormalizedCostRecord, ServiceCategory
+from backend.models import NormalizedCostRecord, ServiceCategory
 
-logger = logging.getLogger("extractors.gcp_csv")
+logger = logging.getLogger("backend.extractors.gcp_csv")
 
 # ---------------------------------------------------------------------------
 # Configuration

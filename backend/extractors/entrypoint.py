@@ -16,10 +16,10 @@ import os
 import sys
 
 EXTRACTOR_MAP = {
-    "gcp_billing": "extractors.gcp_billing",
-    "gcp_csv": "extractors.gcp_csv",
-    "azure_cost": "extractors.azure_cost",
-    "exchange_rates": "extractors.exchange_rates",
+    "gcp_billing": "backend.extractors.gcp_billing",
+    "gcp_csv": "backend.extractors.gcp_csv",
+    "azure_cost": "backend.extractors.azure_cost",
+    "exchange_rates": "backend.extractors.exchange_rates",
 }
 
 
@@ -28,16 +28,14 @@ def main() -> None:
 
     if not extractor_type:
         print(
-            "ERROR: EXTRACTOR_TYPE env var is required. "
-            f"Valid values: {', '.join(EXTRACTOR_MAP)}",
+            f"ERROR: EXTRACTOR_TYPE env var is required. Valid values: {', '.join(EXTRACTOR_MAP)}",
             file=sys.stderr,
         )
         sys.exit(1)
 
     if extractor_type not in EXTRACTOR_MAP:
         print(
-            f"ERROR: Unknown EXTRACTOR_TYPE '{extractor_type}'. "
-            f"Valid values: {', '.join(EXTRACTOR_MAP)}",
+            f"ERROR: Unknown EXTRACTOR_TYPE '{extractor_type}'. Valid values: {', '.join(EXTRACTOR_MAP)}",
             file=sys.stderr,
         )
         sys.exit(1)

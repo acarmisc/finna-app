@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # Import the module under test
-from extractors.azure_cost import (
+from backend.extractors.azure_cost import (
     DEFAULT_METER_CATEGORY_MAP,
     _azure_date_to_datetime,
     _parse_tags,
@@ -21,7 +21,7 @@ from extractors.azure_cost import (
     mark_extractor_healthy,
     transform_row,
 )
-from models import NormalizedCostRecord, Provider, ServiceCategory
+from backend.models import NormalizedCostRecord, Provider, ServiceCategory
 
 # ---------------------------------------------------------------------------
 # Fixtures — realistic Azure cost rows
@@ -549,9 +549,9 @@ class TestExtractorHealth:
 
 
 class TestRunExtractor:
-    @patch("extractors.azure_cost.psycopg.connect")
-    @patch("extractors.azure_cost.fetch_cost_rows")
-    @patch("extractors.azure_cost._create_azure_client")
+    @patch("backend.extractors.azure_cost.psycopg.connect")
+    @patch("backend.extractors.azure_cost.fetch_cost_rows")
+    @patch("backend.extractors.azure_cost._create_azure_client")
     def test_empty_result_set_graceful(self, mock_client_fn, mock_fetch, mock_pg_connect):
         """When Azure returns 0 rows, extractor exits gracefully and marks healthy."""
         mock_fetch.return_value = []
@@ -563,7 +563,7 @@ class TestRunExtractor:
         mock_pg_connect.return_value.__enter__ = MagicMock(return_value=mock_conn)
         mock_pg_connect.return_value.__exit__ = MagicMock(return_value=False)
 
-        from extractors.azure_cost import run_extractor
+        from backend.extractors.azure_cost import run_extractor
 
         total = run_extractor(
             pg_dsn="postgresql://test:test@localhost/test",
@@ -574,11 +574,11 @@ class TestRunExtractor:
         )
         assert total == 0
 
-    @patch("extractors.azure_cost._load_exchange_rates")
-    @patch("extractors.azure_cost.insert_records")
-    @patch("extractors.azure_cost.psycopg.connect")
-    @patch("extractors.azure_cost.fetch_cost_rows")
-    @patch("extractors.azure_cost._create_azure_client")
+    @patch("backend.extractors.azure_cost._load_exchange_rates")
+    @patch("backend.extractors.azure_cost.insert_records")
+    @patch("backend.extractors.azure_cost.psycopg.connect")
+    @patch("backend.extractors.azure_cost.fetch_cost_rows")
+    @patch("backend.extractors.azure_cost._create_azure_client")
     def test_records_inserted(self, mock_client_fn, mock_fetch, mock_pg_connect, mock_insert, mock_rates):
         """Verify the full pipeline transforms and inserts records."""
         mock_fetch.return_value = [_make_azure_row(), _make_azure_row(subscription_id="sub-002")]
@@ -592,7 +592,7 @@ class TestRunExtractor:
         mock_pg_connect.return_value.__enter__ = MagicMock(return_value=mock_conn)
         mock_pg_connect.return_value.__exit__ = MagicMock(return_value=False)
 
-        from extractors.azure_cost import run_extractor
+        from backend.extractors.azure_cost import run_extractor
 
         total = run_extractor(
             pg_dsn="postgresql://test:test@localhost/test",

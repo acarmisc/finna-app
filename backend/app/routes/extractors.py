@@ -7,13 +7,13 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from api.auth import require_auth
-from api.models import (
+from backend.app.auth import require_auth
+from backend.app.models import (
     ExtractorRunRequest,
     ExtractorRunResponse,
     ExtractorStatusResponse,
 )
-from api.runner import cancel_run, get_run_status, list_runs, start_extractor
+from backend.app.runner import cancel_run, get_run_status, list_runs, start_extractor
 
 router = APIRouter()
 
@@ -21,7 +21,7 @@ router = APIRouter()
 @router.post("/extractors/run", response_model=ExtractorRunResponse, dependencies=[Depends(require_auth)])
 async def run_extractor(request: ExtractorRunRequest) -> dict[str, Any]:
     """Start an extractor run."""
-    from api.db import get_connection
+    from backend.app.db import get_connection
 
     # Get config_id from request or find first config for provider
     config_id = request.config_id
@@ -109,7 +109,7 @@ async def cancel_extractor(run_id: str) -> dict[str, str]:
 @router.get("/extractors/health", dependencies=[Depends(require_auth)])
 async def get_extractor_health() -> list[dict[str, Any]]:
     """Get health status for all extractors."""
-    from api.db import get_connection
+    from backend.app.db import get_connection
 
     conn = get_connection()
     with conn.cursor() as cur:

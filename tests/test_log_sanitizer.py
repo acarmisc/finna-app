@@ -1,6 +1,6 @@
 """Tests for log sanitizer."""
 
-from utils.log_sanitizer import sanitize_log
+from backend.utils.log_sanitizer import sanitize_log
 
 
 def test_aws_access_key_id():

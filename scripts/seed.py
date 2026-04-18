@@ -24,7 +24,7 @@ def get_pg_dsn() -> str:
 
 
 def load_fixtures() -> dict[str, list[dict[str, Any]]]:
-    fixture_path = Path(__file__).parent.parent / "fixtures" / "sample_data.json"
+    fixture_path = Path(__file__).parent.parent / "resources" / "fixtures" / "sample_data.json"
     if not fixture_path.exists():
         raise FileNotFoundError(f"Fixture file not found: {fixture_path}")
 

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import psycopg
 
-from extractors.health_check import (
+from backend.extractors.health_check import (
     detect_stale_extractors,
     get_extractor_status,
     mark_extractor_failed,
@@ -35,7 +35,7 @@ def _make_connection() -> MagicMock:
 
 
 class TestMarkExtractorStarted:
-    @patch("extractors.health_check._get_pg_connection")
+    @patch("backend.extractors.health_check._get_pg_connection")
     def test_inserts_running_row(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
         mock_pg.return_value = conn
@@ -52,7 +52,7 @@ class TestMarkExtractorStarted:
         conn.commit.assert_called_once()
         conn.close.assert_called_once()
 
-    @patch("extractors.health_check._get_pg_connection")
+    @patch("backend.extractors.health_check._get_pg_connection")
     def test_uses_upsert_on_conflict(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
         mock_pg.return_value = conn
@@ -70,7 +70,7 @@ class TestMarkExtractorStarted:
 
 
 class TestMarkExtractorSucceeded:
-    @patch("extractors.health_check._get_pg_connection")
+    @patch("backend.extractors.health_check._get_pg_connection")
     def test_updates_status_and_count(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
         mock_pg.return_value = conn
@@ -94,7 +94,7 @@ class TestMarkExtractorSucceeded:
 
 
 class TestMarkExtractorFailed:
-    @patch("extractors.health_check._get_pg_connection")
+    @patch("backend.extractors.health_check._get_pg_connection")
     def test_updates_status_and_error(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
         mock_pg.return_value = conn
@@ -112,7 +112,7 @@ class TestMarkExtractorFailed:
         conn.commit.assert_called_once()
         conn.close.assert_called_once()
 
-    @patch("extractors.health_check._get_pg_connection")
+    @patch("backend.extractors.health_check._get_pg_connection")
     def test_truncates_long_error_message(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
         mock_pg.return_value = conn
@@ -123,7 +123,7 @@ class TestMarkExtractorFailed:
         params = conn.cursor.return_value.__enter__.return_value.execute.call_args[0][1]
         assert len(params[0]) <= 2000
 
-    @patch("extractors.health_check._get_pg_connection")
+    @patch("backend.extractors.health_check._get_pg_connection")
     def test_does_not_raise_on_db_failure(self, mock_pg: MagicMock) -> None:
         """mark_extractor_failed should swallow exceptions (best-effort write)."""
         conn = _make_connection()
@@ -140,7 +140,7 @@ class TestMarkExtractorFailed:
 
 
 class TestGetExtractorStatus:
-    @patch("extractors.health_check._get_pg_connection")
+    @patch("backend.extractors.health_check._get_pg_connection")
     def test_returns_status_list(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
         cursor = conn.cursor.return_value.__enter__.return_value
@@ -177,7 +177,7 @@ class TestGetExtractorStatus:
         )
         conn.close.assert_called_once()
 
-    @patch("extractors.health_check._get_pg_connection")
+    @patch("backend.extractors.health_check._get_pg_connection")
     def test_returns_empty_when_no_extractors(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
         cursor = conn.cursor.return_value.__enter__.return_value
@@ -194,7 +194,7 @@ class TestGetExtractorStatus:
 
 
 class TestDetectStaleExtractors:
-    @patch("extractors.health_check._get_pg_connection")
+    @patch("backend.extractors.health_check._get_pg_connection")
     def test_detects_stale_extractor(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
         cursor = conn.cursor.return_value.__enter__.return_value
@@ -216,7 +216,7 @@ class TestDetectStaleExtractors:
         assert len(stale) == 1
         assert stale[0][0] == "exchange_rates"
 
-    @patch("extractors.health_check._get_pg_connection")
+    @patch("backend.extractors.health_check._get_pg_connection")
     def test_does_not_flag_fresh_extractor(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
         cursor = conn.cursor.return_value.__enter__.return_value
@@ -237,7 +237,7 @@ class TestDetectStaleExtractors:
 
         assert stale == []
 
-    @patch("extractors.health_check._get_pg_connection")
+    @patch("backend.extractors.health_check._get_pg_connection")
     def test_reports_missing_extractor_as_stale(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
         cursor = conn.cursor.return_value.__enter__.return_value
@@ -250,7 +250,7 @@ class TestDetectStaleExtractors:
         assert len(stale) == 1
         assert stale[0] == ("gcp_billing", "no health record found")
 
-    @patch("extractors.health_check._get_pg_connection")
+    @patch("backend.extractors.health_check._get_pg_connection")
     def test_reports_extractor_with_no_timestamp(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
         cursor = conn.cursor.return_value.__enter__.return_value
@@ -271,7 +271,7 @@ class TestDetectStaleExtractors:
         assert stale[0][0] == "gcp_billing"
         assert "no run timestamp" in stale[0][1]
 
-    @patch("extractors.health_check._get_pg_connection")
+    @patch("backend.extractors.health_check._get_pg_connection")
     def test_exactly_at_threshold_is_not_stale(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
         cursor = conn.cursor.return_value.__enter__.return_value
@@ -295,7 +295,7 @@ class TestDetectStaleExtractors:
         # on microsecond precision. We accept either result as correct.
         # A more precise test would mock datetime, but this verifies the logic path.
 
-    @patch("extractors.health_check._get_pg_connection")
+    @patch("backend.extractors.health_check._get_pg_connection")
     def test_naive_timestamp_is_treated_as_utc(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
         cursor = conn.cursor.return_value.__enter__.return_value

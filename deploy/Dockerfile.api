@@ -1,7 +1,7 @@
 # ---------------------------------------------------------------------------
 # FinOps Orchestrator API — Multi-stage Dockerfile
 #
-# Build:  docker build -f Dockerfile.api -t finops-api .
+# Build:  docker build -f deploy/Dockerfile.api -t finops-api .
 # Run:    docker run --rm -p 8000:8000 -e PG_DSN=... finops-api
 # ---------------------------------------------------------------------------
 
@@ -9,10 +9,10 @@
 FROM node:20-slim AS frontend-builder
 
 WORKDIR /build
-COPY package.json package-lock.json* ./
+COPY frontend/package.json frontend/package-lock.json* ./
 RUN npm install
-COPY src/ ./src/
-COPY tsconfig.json tsconfig*.json* vite.config.* index.html* ./
+COPY frontend/src/ ./src/
+COPY frontend/tsconfig.json frontend/tsconfig*.json* frontend/vite.config.* frontend/index.html ./
 RUN npm run build && mv dist /frontend
 
 # ---- Stage 2: Python builder ----
@@ -36,20 +36,18 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-COPY api/ ./api/
-COPY models/ ./models/
-COPY config/ ./config/
-COPY extractors/ ./extractors/
-COPY sql/ ./sql/
-COPY alembic/ ./alembic/
-COPY alembic.ini ./alembic.ini
+# Copy backend components
+COPY backend/ ./backend/
+COPY cli/ ./cli/
+COPY resources/sql/ ./resources/sql/
 
 # Copy frontend build output into static/ for SPA serving
 COPY --from=frontend-builder /frontend ./static/
 
 ENV HOST=0.0.0.0
 ENV PORT=8000
+ENV PYTHONPATH=/app
 
 USER appuser
 
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]

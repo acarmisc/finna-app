@@ -11,7 +11,7 @@ import pytest
 @pytest.fixture(autouse=True)
 def cleanup_fernet():
     """Clean up Fernet instance before and after each test."""
-    from utils import encryption
+    from backend.utils import encryption
 
     encryption.FernetWrapper._instance = None
     yield
@@ -23,7 +23,7 @@ class TestEncryptionKey:
 
     def test_get_encryption_key_from_env(self, monkeypatch, cleanup_fernet):
         """Test getting key from environment variable."""
-        from utils.encryption import _get_encryption_key
+        from backend.utils.encryption import _get_encryption_key
 
         monkeypatch.setenv("ENCRYPTION_KEY", "test-key-12345678901234567890123=")
 
@@ -32,7 +32,7 @@ class TestEncryptionKey:
 
     def test_encryption_key_format(self, cleanup_fernet):
         """Test encryption key is valid Fernet key."""
-        from utils.encryption import _get_encryption_key
+        from backend.utils.encryption import _get_encryption_key
 
         key = _get_encryption_key()
         # Fernet keys are 32 URL-safe base64-encoded bytes (44 chars)
@@ -44,7 +44,7 @@ class TestEncrypt:
 
     def test_encrypt_string(self):
         """Test encrypting a string."""
-        from utils.encryption import encrypt
+        from backend.utils.encryption import encrypt
 
         result = encrypt("test-secret-password")
         assert result != "test-secret-password"
@@ -53,14 +53,14 @@ class TestEncrypt:
 
     def test_encrypt_empty_string(self):
         """Test encrypting empty string."""
-        from utils.encryption import encrypt
+        from backend.utils.encryption import encrypt
 
         result = encrypt("")
         assert result == ""
 
     def test_encrypt_bytes(self):
         """Test encrypting bytes input."""
-        from utils.encryption import encrypt
+        from backend.utils.encryption import encrypt
 
         result = encrypt(b"test-bytes")
         assert result != "test-bytes"
@@ -72,7 +72,7 @@ class TestDecrypt:
 
     def test_decrypt_valid_token(self):
         """Test decrypting valid encrypted token."""
-        from utils.encryption import decrypt, encrypt
+        from backend.utils.encryption import decrypt, encrypt
 
         original = "test-password-12345"
         encrypted = encrypt(original)
@@ -81,21 +81,21 @@ class TestDecrypt:
 
     def test_decrypt_empty_string(self):
         """Test decrypting empty string."""
-        from utils.encryption import decrypt
+        from backend.utils.encryption import decrypt
 
         result = decrypt("")
         assert result == ""
 
     def test_decrypt_invalid_token(self):
         """Test decrypting invalid token returns original."""
-        from utils.encryption import decrypt
+        from backend.utils.encryption import decrypt
 
         result = decrypt("invalid-token-here")
         assert result == "invalid-token-here"
 
     def test_decrypt_corrupted_token(self):
         """Test decrypting corrupted token."""
-        from utils.encryption import decrypt
+        from backend.utils.encryption import decrypt
 
         result = decrypt("abc.def.ghi")
         assert "abc.def.ghi" in result
@@ -106,7 +106,7 @@ class TestEncryptConfig:
 
     def test_encrypt_config_sensitive_fields(self):
         """Test encrypting config with sensitive fields."""
-        from utils.encryption import encrypt_config
+        from backend.utils.encryption import encrypt_config
 
         config = {
             "id": "test-id",
@@ -122,7 +122,7 @@ class TestEncryptConfig:
 
     def test_encrypt_config_nested_dict_top_level(self):
         """Test encrypting config with nested dict at top level."""
-        from utils.encryption import encrypt_config
+        from backend.utils.encryption import encrypt_config
 
         # Nested dicts are encrypted only if they are SENSITIVE_FIELDS themselves
         config = {
@@ -142,7 +142,7 @@ class TestEncryptConfig:
 
     def test_encrypt_config_skip_non_sensitive(self):
         """Test that non-sensitive fields are unchanged."""
-        from utils.encryption import encrypt_config
+        from backend.utils.encryption import encrypt_config
 
         config = {
             "id": "test-id",
@@ -158,14 +158,14 @@ class TestEncryptConfig:
 
     def test_encrypt_config_empty_config(self):
         """Test encrypting empty config."""
-        from utils.encryption import encrypt_config
+        from backend.utils.encryption import encrypt_config
 
         result = encrypt_config({})
         assert result == {}
 
     def test_encrypt_config_non_dict(self):
         """Test encrypt_config with non-dict input."""
-        from utils.encryption import encrypt_config
+        from backend.utils.encryption import encrypt_config
 
         with pytest.raises(AttributeError):
             encrypt_config("not a dict")
@@ -176,7 +176,7 @@ class TestDecryptConfig:
 
     def test_decrypt_config_sensitive_fields(self):
         """Test decrypting config with encrypted fields."""
-        from utils.encryption import decrypt_config, encrypt_config
+        from backend.utils.encryption import decrypt_config, encrypt_config
 
         config = {
             "id": "test-id",
@@ -190,7 +190,7 @@ class TestDecryptConfig:
 
     def test_decrypt_config_skip_non_encrypted(self):
         """Test that non-encrypted fields pass through."""
-        from utils.encryption import decrypt_config
+        from backend.utils.encryption import decrypt_config
 
         config = {
             "id": "test-id",
@@ -203,7 +203,7 @@ class TestDecryptConfig:
 
     def test_decrypt_config_already_decrypted(self):
         """Test decrypting already-decrypted config."""
-        from utils.encryption import decrypt_config
+        from backend.utils.encryption import decrypt_config
 
         config = {
             "id": "test-id",
@@ -215,14 +215,14 @@ class TestDecryptConfig:
 
     def test_decrypt_config_empty_config(self):
         """Test decrypting empty config."""
-        from utils.encryption import decrypt_config
+        from backend.utils.encryption import decrypt_config
 
         result = decrypt_config({})
         assert result == {}
 
     def test_decrypt_config_nested(self):
         """Test decrypting nested config."""
-        from utils.encryption import decrypt_config, encrypt_config
+        from backend.utils.encryption import decrypt_config, encrypt_config
 
         config = {
             "outer": "value",
@@ -246,7 +246,7 @@ class TestFernetLazyInitialization:
         """Test that Fernet is lazy-loaded."""
         from cryptography.fernet import Fernet
 
-        from utils import encryption
+        from backend.utils import encryption
 
         valid_key = Fernet.generate_key().decode()
         monkeypatch.setenv("ENCRYPTION_KEY", valid_key)
@@ -259,7 +259,7 @@ class TestFernetLazyInitialization:
 
     def test_fernet_key_reuse(self, monkeypatch, cleanup_fernet):
         """Test same key is reused across calls."""
-        from utils import encryption
+        from backend.utils import encryption
 
         valid_key = "UayERRmq69W03BckLAmsQ5DpjQtEnpXj2ZjuAT5Mdhw="
         monkeypatch.setenv("ENCRYPTION_KEY", valid_key)
@@ -271,7 +271,7 @@ class TestFernetLazyInitialization:
 
     def test_fernet_key_generation(self, monkeypatch, cleanup_fernet):
         """Test automatic key generation."""
-        from utils import encryption
+        from backend.utils import encryption
 
         monkeypatch.delenv("ENCRYPTION_KEY", raising=False)
 
@@ -288,7 +288,7 @@ class TestSensitiveFields:
 
     def test_sensitive_fields_defined(self):
         """Test that SENSITIVE_FIELDS contains expected fields."""
-        from utils.encryption import SENSITIVE_FIELDS
+        from backend.utils.encryption import SENSITIVE_FIELDS
 
         assert "client_secret" in SENSITIVE_FIELDS
         assert "key_file_content" in SENSITIVE_FIELDS
@@ -296,13 +296,13 @@ class TestSensitiveFields:
 
     def test_sensitive_fields_count(self):
         """Test SENSITIVE_FIELDS has expected number of fields."""
-        from utils.encryption import SENSITIVE_FIELDS
+        from backend.utils.encryption import SENSITIVE_FIELDS
 
         assert len(SENSITIVE_FIELDS) == 3
 
     def test_sensitive_field_matching(self):
         """Test SENSITIVE_FIELDS includes expected fields."""
-        from utils.encryption import SENSITIVE_FIELDS
+        from backend.utils.encryption import SENSITIVE_FIELDS
 
         assert SENSITIVE_FIELDS == {"client_secret", "key_file_content", "service_account_key"}
 
@@ -312,7 +312,7 @@ class TestEncryptionRoundtrip:
 
     def test_roundtrip_simple_string(self):
         """Test simple string roundtrip."""
-        from utils.encryption import decrypt, encrypt
+        from backend.utils.encryption import decrypt, encrypt
 
         test_cases = [
             "password123",
@@ -328,7 +328,7 @@ class TestEncryptionRoundtrip:
 
     def test_roundtrip_with_special_chars(self):
         """Test roundtrip with special characters."""
-        from utils.encryption import decrypt, encrypt
+        from backend.utils.encryption import decrypt, encrypt
 
         test_cases = [
             "pass@word#123",
@@ -347,7 +347,7 @@ class TestAdditionalEncryptedDecryptedCases:
 
     def test_encrypt_non_string(self, cleanup_fernet):
         """Test encryption with non-string input."""
-        from utils.encryption import encrypt
+        from backend.utils.encryption import encrypt
 
         result = encrypt(b"test-bytes-input")
         assert result != "test-bytes-input"
@@ -355,7 +355,7 @@ class TestAdditionalEncryptedDecryptedCases:
 
     def test_invalid_ciphertext(self, cleanup_fernet):
         """Test decryption with invalid ciphertext."""
-        from utils.encryption import decrypt
+        from backend.utils.encryption import decrypt
 
         invalid = "this-is-not-a-valid-base64-ciphertext!!!"
         result = decrypt(invalid)
@@ -363,14 +363,14 @@ class TestAdditionalEncryptedDecryptedCases:
 
     def test_decrypt_empty_string(self, cleanup_fernet):
         """Test decryption with empty string."""
-        from utils.encryption import decrypt
+        from backend.utils.encryption import decrypt
 
         result = decrypt("")
         assert result == ""
 
     def test_encrypt_config_with_nested_dict(self, cleanup_fernet):
         """Test encrypting config with nested dict containing sensitive fields."""
-        from utils.encryption import encrypt_config
+        from backend.utils.encryption import encrypt_config
 
         config = {
             "id": "test-id",
@@ -382,7 +382,7 @@ class TestAdditionalEncryptedDecryptedCases:
 
     def test_decrypt_config_with_nested_dict(self, cleanup_fernet):
         """Test decrypting config with nested dict containing sensitive fields."""
-        from utils.encryption import decrypt_config, encrypt_config
+        from backend.utils.encryption import decrypt_config, encrypt_config
 
         config = {
             "id": "test-id",

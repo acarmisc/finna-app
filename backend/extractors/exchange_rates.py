@@ -29,7 +29,7 @@ from tenacity import (
     wait_exponential,
 )
 
-logger = logging.getLogger("extractors.exchange_rates")
+logger = logging.getLogger("backend.extractors.exchange_rates")
 
 # ---------------------------------------------------------------------------
 # Configuration

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import psycopg
 import pytest
 
-from extractors.exchange_rates import (
+from backend.extractors.exchange_rates import (
     _convert_to_usd_rates,
     _parse_ecb_xml,
     _upsert_rates,
@@ -201,8 +201,8 @@ class TestUpsertRates:
 class TestExtract:
     """Tests for the full extract() pipeline."""
 
-    @patch("extractors.exchange_rates._get_pg_connection")
-    @patch("extractors.exchange_rates._fetch_ecb_xml")
+    @patch("backend.extractors.exchange_rates._get_pg_connection")
+    @patch("backend.extractors.exchange_rates._fetch_ecb_xml")
     def test_extract_happy_path(self, mock_fetch: MagicMock, mock_pg: MagicMock) -> None:
         mock_fetch.return_value = MOCK_ECB_XML
 
@@ -219,8 +219,8 @@ class TestExtract:
         mock_fetch.assert_called_once()
         conn.close.assert_called_once()
 
-    @patch("extractors.exchange_rates._get_pg_connection")
-    @patch("extractors.exchange_rates._fetch_ecb_xml")
+    @patch("backend.extractors.exchange_rates._get_pg_connection")
+    @patch("backend.extractors.exchange_rates._fetch_ecb_xml")
     def test_extract_marks_failure_on_error(self, mock_fetch: MagicMock, mock_pg: MagicMock) -> None:
         mock_fetch.side_effect = urllib_error("Connection refused")
 
@@ -235,12 +235,12 @@ class TestExtract:
 
     def test_extract_raises_without_dsn(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that ValueError is raised when no DSN is provided."""
-        monkeypatch.setattr("extractors.exchange_rates.PG_DSN", "")
+        monkeypatch.setattr("backend.extractors.exchange_rates.PG_DSN", "")
         with pytest.raises(ValueError, match="PG_DSN is required"):
             extract(pg_dsn="")
 
-    @patch("extractors.exchange_rates._get_pg_connection")
-    @patch("extractors.exchange_rates._fetch_ecb_xml")
+    @patch("backend.extractors.exchange_rates._get_pg_connection")
+    @patch("backend.extractors.exchange_rates._fetch_ecb_xml")
     def test_extract_uses_custom_url(self, mock_fetch: MagicMock, mock_pg: MagicMock) -> None:
         mock_fetch.return_value = MOCK_ECB_XML
         conn = MagicMock(spec=psycopg.Connection)

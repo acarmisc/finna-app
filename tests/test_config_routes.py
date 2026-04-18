@@ -39,8 +39,8 @@ SAMPLE_GCP_CONFIG = {
 
 @pytest.fixture
 def config_client():
-    import api.db as db_module
-    import api.main as main_module
+    import backend.app.db as db_module
+    import backend.app.main as main_module
 
     original_lifespan = main_module.app.router.lifespan_context
 
@@ -61,7 +61,7 @@ def config_client():
     mock_connection.commit = MagicMock()
     mock_connection.rollback = MagicMock()
 
-    from api.auth import create_access_token
+    from backend.app.auth import create_access_token
 
     token = create_access_token(data={"sub": "testuser"})
 
@@ -116,15 +116,15 @@ class TestConfigAuth:
 
 class TestListConfigs:
     def test_list_configs_empty(self, config_client):
-        with patch("api.routes.config.query_all", return_value=[]):
-            with patch("api.routes.config.decrypt_config", side_effect=lambda x: x):
+        with patch("backend.app.routes.config.query_all", return_value=[]):
+            with patch("backend.app.routes.config.decrypt_config", side_effect=lambda x: x):
                 resp = config_client.get("/api/v1/config", headers=_auth_headers(config_client))
                 assert resp.status_code == 200
                 assert resp.json() == []
 
     def test_list_configs_with_data(self, config_client):
-        with patch("api.routes.config.query_all", return_value=[SAMPLE_CONFIG]):
-            with patch("api.routes.config.decrypt_config", side_effect=lambda x: x):
+        with patch("backend.app.routes.config.query_all", return_value=[SAMPLE_CONFIG]):
+            with patch("backend.app.routes.config.decrypt_config", side_effect=lambda x: x):
                 resp = config_client.get("/api/v1/config", headers=_auth_headers(config_client))
                 assert resp.status_code == 200
                 data = resp.json()
@@ -133,8 +133,8 @@ class TestListConfigs:
                 assert data[0]["provider"] == "azure"
 
     def test_list_configs_by_provider(self, config_client):
-        with patch("api.routes.config.query_all", return_value=[SAMPLE_GCP_CONFIG]):
-            with patch("api.routes.config.decrypt_config", side_effect=lambda x: x):
+        with patch("backend.app.routes.config.query_all", return_value=[SAMPLE_GCP_CONFIG]):
+            with patch("backend.app.routes.config.decrypt_config", side_effect=lambda x: x):
                 resp = config_client.get("/api/v1/config/provider/gcp", headers=_auth_headers(config_client))
                 assert resp.status_code == 200
                 data = resp.json()
@@ -144,8 +144,8 @@ class TestListConfigs:
 
 class TestCreateConfig:
     def test_create_azure_config(self, config_client):
-        with patch("api.routes.config.encrypt_config", side_effect=lambda x: x):
-            with patch("api.routes.config.insert_and_return", return_value="cfg-new"):
+        with patch("backend.app.routes.config.encrypt_config", side_effect=lambda x: x):
+            with patch("backend.app.routes.config.insert_and_return", return_value="cfg-new"):
                 resp = config_client.post(
                     "/api/v1/config",
                     json={
@@ -168,8 +168,8 @@ class TestCreateConfig:
                 assert "id" in data
 
     def test_create_gcp_config(self, config_client):
-        with patch("api.routes.config.encrypt_config", side_effect=lambda x: x):
-            with patch("api.routes.config.insert_and_return", return_value="cfg-gcp"):
+        with patch("backend.app.routes.config.encrypt_config", side_effect=lambda x: x):
+            with patch("backend.app.routes.config.insert_and_return", return_value="cfg-gcp"):
                 resp = config_client.post(
                     "/api/v1/config",
                     json={
@@ -185,8 +185,8 @@ class TestCreateConfig:
                 assert data["provider"] == "gcp"
 
     def test_create_config_masks_secrets(self, config_client):
-        with patch("api.routes.config.encrypt_config", side_effect=lambda x: x):
-            with patch("api.routes.config.insert_and_return", return_value="cfg-mask"):
+        with patch("backend.app.routes.config.encrypt_config", side_effect=lambda x: x):
+            with patch("backend.app.routes.config.insert_and_return", return_value="cfg-mask"):
                 resp = config_client.post(
                     "/api/v1/config",
                     json={
@@ -209,15 +209,15 @@ class TestCreateConfig:
 
 class TestGetConfig:
     def test_get_config_found(self, config_client):
-        with patch("api.routes.config.query_one", return_value=SAMPLE_CONFIG):
-            with patch("api.routes.config.decrypt_config", side_effect=lambda x: x):
+        with patch("backend.app.routes.config.query_one", return_value=SAMPLE_CONFIG):
+            with patch("backend.app.routes.config.decrypt_config", side_effect=lambda x: x):
                 resp = config_client.get("/api/v1/config/cfg-001", headers=_auth_headers(config_client))
                 assert resp.status_code == 200
                 data = resp.json()
                 assert data["id"] == "cfg-001"
 
     def test_get_config_not_found(self, config_client):
-        with patch("api.routes.config.query_one", return_value=None):
+        with patch("backend.app.routes.config.query_one", return_value=None):
             resp = config_client.get("/api/v1/config/nonexistent", headers=_auth_headers(config_client))
             assert resp.status_code == 404
 
@@ -225,9 +225,9 @@ class TestGetConfig:
 class TestUpdateConfig:
     def test_update_config_name(self, config_client):
         updated = {**SAMPLE_CONFIG, "name": "Updated Name"}
-        with patch("api.routes.config.query_one", return_value=updated):
-            with patch("api.routes.config.decrypt_config", side_effect=lambda x: x):
-                with patch("api.routes.config.encrypt_config", side_effect=lambda x: x):
+        with patch("backend.app.routes.config.query_one", return_value=updated):
+            with patch("backend.app.routes.config.decrypt_config", side_effect=lambda x: x):
+                with patch("backend.app.routes.config.encrypt_config", side_effect=lambda x: x):
                     resp = config_client.put(
                         "/api/v1/config/cfg-001",
                         json={"name": "Updated Name"},
@@ -236,7 +236,7 @@ class TestUpdateConfig:
                     assert resp.status_code == 200
 
     def test_update_config_not_found(self, config_client):
-        with patch("api.routes.config.query_one", return_value=None):
+        with patch("backend.app.routes.config.query_one", return_value=None):
             resp = config_client.put(
                 "/api/v1/config/nonexistent",
                 json={"name": "x"},
@@ -257,6 +257,6 @@ class TestUpdateConfig:
 
 class TestDeleteConfig:
     def test_delete_config(self, config_client):
-        with patch("api.routes.config.execute"):
+        with patch("backend.app.routes.config.execute"):
             resp = config_client.delete("/api/v1/config/cfg-001", headers=_auth_headers(config_client))
             assert resp.status_code == 204

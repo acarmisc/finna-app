@@ -55,7 +55,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from models import NormalizedCostRecord, Provider, ServiceCategory
+from backend.models import NormalizedCostRecord, Provider, ServiceCategory
 
 logger = logging.getLogger(__name__)
 
@@ -600,7 +600,7 @@ def _create_azure_client(
     """
     sid = subscription_id or _env("AZURE_SUBSCRIPTION_ID")
 
-    from config.auth import get_azure_credential
+    from cli.config.auth import get_azure_credential
 
     if tenant_id and client_id and client_secret:
         from azure.identity import ClientSecretCredential
@@ -745,7 +745,7 @@ def main() -> None:
     multi_subs = discover_azure_subscriptions_from_env()
 
     if not multi_subs:
-        from config.auth import get_azure_subscription_selections
+        from cli.config.auth import get_azure_subscription_selections
 
         saved_subs = get_azure_subscription_selections()
         if saved_subs:

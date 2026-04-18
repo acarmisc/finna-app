@@ -10,8 +10,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from aggregation.config import AggregationConfig, MetricAggregationSettings
-from aggregation.engine import (
+from backend.aggregation.config import AggregationConfig, MetricAggregationSettings
+from backend.aggregation.engine import (
     aggregate,
     align_to_window,
     compute_aggregates,
@@ -365,7 +365,7 @@ aggregation:
         config_file = tmp_path / "agg_config.yaml"
         config_file.write_text(yaml_content)
 
-        from aggregation.config import load_aggregation_config
+        from backend.aggregation.config import load_aggregation_config
 
         config = load_aggregation_config(str(config_file))
         assert config.infra_metrics.window_size_minutes == 15
@@ -386,7 +386,7 @@ aggregation:
         config_file = tmp_path / "client_config.yaml"
         config_file.write_text(yaml_content)
 
-        from aggregation.config import load_client_config
+        from backend.aggregation.config import load_client_config
 
         client_config = load_client_config(str(config_file))
         assert client_config.client_id == "acme-corp"
@@ -395,7 +395,7 @@ aggregation:
         assert client_config.aggregation.infra_metrics.retention_days == 90
 
     def test_missing_config_file_raises(self):
-        from aggregation.config import load_aggregation_config
+        from backend.aggregation.config import load_aggregation_config
 
         with pytest.raises(FileNotFoundError):
             load_aggregation_config("/nonexistent/config.yaml")

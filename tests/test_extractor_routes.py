@@ -43,8 +43,8 @@ SAMPLE_HEALTH = {
 
 @pytest.fixture
 def extractor_client():
-    import api.db as db_module
-    import api.main as main_module
+    import backend.app.db as db_module
+    import backend.app.main as main_module
 
     original_lifespan = main_module.app.router.lifespan_context
 
@@ -65,7 +65,7 @@ def extractor_client():
     mock_connection.commit = MagicMock()
     mock_connection.rollback = MagicMock()
 
-    from api.auth import create_access_token
+    from backend.app.auth import create_access_token
 
     token = create_access_token(data={"sub": "testuser"})
 
@@ -112,8 +112,8 @@ class TestExtractorAuth:
 
 
 class TestExtractorRun:
-    @patch("api.db.get_connection")
-    @patch("api.routes.extractors.start_extractor", return_value="run-001")
+    @patch("backend.app.db.get_connection")
+    @patch("backend.app.routes.extractors.start_extractor", return_value="run-001")
     def test_run_extractor_success(self, mock_start, mock_conn, extractor_client):
         mock_cursor = MagicMock()
         mock_cursor.fetchone.return_value = {"id": "cfg-001"}
@@ -132,8 +132,8 @@ class TestExtractorRun:
         assert data["status"] == "running"
         assert data["provider"] == "azure"
 
-    @patch("api.db.get_connection")
-    @patch("api.routes.extractors.start_extractor", side_effect=ValueError("Config not found"))
+    @patch("backend.app.db.get_connection")
+    @patch("backend.app.routes.extractors.start_extractor", side_effect=ValueError("Config not found"))
     def test_run_extractor_config_not_found(self, mock_start, mock_conn, extractor_client):
         mock_cursor = MagicMock()
         mock_cursor.fetchone.return_value = None
@@ -152,7 +152,7 @@ class TestExtractorRun:
 
 class TestExtractorStatus:
     def test_get_status_list(self, extractor_client):
-        with patch("api.routes.extractors.list_runs", return_value=[SAMPLE_RUN, SAMPLE_RUN_COMPLETED]):
+        with patch("backend.app.routes.extractors.list_runs", return_value=[SAMPLE_RUN, SAMPLE_RUN_COMPLETED]):
             resp = extractor_client.get(
                 "/api/v1/extractors/status",
                 headers=_auth_headers(extractor_client),
@@ -165,7 +165,7 @@ class TestExtractorStatus:
             assert data[1]["records_extracted"] == 26
 
     def test_get_status_with_provider_filter(self, extractor_client):
-        with patch("api.routes.extractors.list_runs", return_value=[SAMPLE_RUN]):
+        with patch("backend.app.routes.extractors.list_runs", return_value=[SAMPLE_RUN]):
             resp = extractor_client.get(
                 "/api/v1/extractors/status?provider=azure",
                 headers=_auth_headers(extractor_client),
@@ -175,7 +175,7 @@ class TestExtractorStatus:
             assert len(data) == 1
 
     def test_get_run_detail(self, extractor_client):
-        with patch("api.routes.extractors.get_run_status", return_value=SAMPLE_RUN_COMPLETED):
+        with patch("backend.app.routes.extractors.get_run_status", return_value=SAMPLE_RUN_COMPLETED):
             resp = extractor_client.get(
                 "/api/v1/extractors/status/run-002",
                 headers=_auth_headers(extractor_client),
@@ -187,7 +187,7 @@ class TestExtractorStatus:
             assert data["records_extracted"] == 26
 
     def test_get_run_detail_not_found(self, extractor_client):
-        with patch("api.routes.extractors.get_run_status", return_value=None):
+        with patch("backend.app.routes.extractors.get_run_status", return_value=None):
             resp = extractor_client.get(
                 "/api/v1/extractors/status/nonexistent",
                 headers=_auth_headers(extractor_client),
@@ -197,7 +197,7 @@ class TestExtractorStatus:
 
 class TestExtractorCancel:
     def test_cancel_running_extractor(self, extractor_client):
-        with patch("api.routes.extractors.cancel_run", return_value=True):
+        with patch("backend.app.routes.extractors.cancel_run", return_value=True):
             resp = extractor_client.post(
                 "/api/v1/extractors/cancel/run-001",
                 headers=_auth_headers(extractor_client),
@@ -207,7 +207,7 @@ class TestExtractorCancel:
             assert data["status"] == "cancelled"
 
     def test_cancel_finished_extractor(self, extractor_client):
-        with patch("api.routes.extractors.cancel_run", return_value=False):
+        with patch("backend.app.routes.extractors.cancel_run", return_value=False):
             resp = extractor_client.post(
                 "/api/v1/extractors/cancel/run-002",
                 headers=_auth_headers(extractor_client),
@@ -230,7 +230,7 @@ class TestExtractorHealth:
         mock_connection.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
         mock_connection.cursor.return_value.__exit__ = MagicMock(return_value=False)
 
-        with patch("api.db.get_connection", return_value=mock_connection):
+        with patch("backend.app.db.get_connection", return_value=mock_connection):
             resp = extractor_client.get(
                 "/api/v1/extractors/health",
                 headers=_auth_headers(extractor_client),
@@ -249,7 +249,7 @@ class TestExtractorHealth:
         mock_connection.cursor.return_value.__enter__ = MagicMock(return_value=mock_cursor)
         mock_connection.cursor.return_value.__exit__ = MagicMock(return_value=False)
 
-        with patch("api.db.get_connection", return_value=mock_connection):
+        with patch("backend.app.db.get_connection", return_value=mock_connection):
             resp = extractor_client.get(
                 "/api/v1/extractors/health",
                 headers=_auth_headers(extractor_client),

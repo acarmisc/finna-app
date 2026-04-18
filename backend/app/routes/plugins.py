@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from api.auth import require_auth
-from extractors.base import list_plugins
+from backend.app.auth import require_auth
+from backend.extractors.base import list_plugins
 
 router = APIRouter()
 
@@ -19,7 +19,7 @@ async def get_plugins() -> list[dict]:
     auth_methods. Third-party plugins discovered via EXTRACTOR_PLUGINS
     env var are included automatically.
     """
-    from extractors.base import plugin_metadata
+    from backend.extractors.base import plugin_metadata
 
     return plugin_metadata()
 
@@ -27,7 +27,7 @@ async def get_plugins() -> list[dict]:
 @router.get("/plugins/{extractor_type}", dependencies=[Depends(require_auth)])
 async def get_plugin_detail(extractor_type: str) -> dict:
     """Return metadata for a single plugin."""
-    from extractors.base import get_plugin
+    from backend.extractors.base import get_plugin
 
     cls = get_plugin(extractor_type)
     if not cls:

@@ -21,7 +21,7 @@ from tenacity import (
     wait_exponential,
 )
 
-logger = logging.getLogger("extractors.health_check")
+logger = logging.getLogger("backend.extractors.health_check")
 
 
 # ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@ while also being available as a plugin through the registry.
 
 External contributors can add new extractors by:
   1. Creating a new Python module in extractors/
-  2. Subclassing ExtractorPlugin from extractors.base
+  2. Subclassing ExtractorPlugin from backend.extractors.base
   3. Using the @extractor_plugin decorator
   4. Adding the module to DISCOVERY_MODULES below
 """
@@ -18,16 +18,16 @@ import importlib
 import logging
 import os
 
-from extractors.base import ExtractorPlugin, ConfigField, extractor_plugin, _REGISTRY
+from backend.extractors.base import ExtractorPlugin, ConfigField, extractor_plugin, _REGISTRY
 
 logger = logging.getLogger(__name__)
 
 # Modules to auto-discover and register. Add new extractors here.
 DISCOVERY_MODULES = [
-    "extractors.gcp_billing",
-    "extractors.gcp_csv",
-    "extractors.azure_cost",
-    "extractors.exchange_rates",
+    "backend.extractors.gcp_billing",
+    "backend.extractors.gcp_csv",
+    "backend.extractors.azure_cost",
+    "backend.extractors.exchange_rates",
 ]
 
 
@@ -38,7 +38,7 @@ DISCOVERY_MODULES = [
 )
 class GCPBillingPlugin(ExtractorPlugin):
     def extract(self) -> int:
-        from extractors.gcp_billing import extract
+        from backend.extractors.gcp_billing import extract
 
         return extract(
             project_id=self.config.get("project_id", os.getenv("GCP_PROJECT", "")),
@@ -81,7 +81,7 @@ class GCPBillingPlugin(ExtractorPlugin):
 )
 class GCPCSVPlugin(ExtractorPlugin):
     def extract(self) -> int:
-        from extractors.gcp_csv import extract
+        from backend.extractors.gcp_csv import extract
 
         return extract(
             csv_path=self.config.get("csv_path", os.getenv("GCP_CSV_PATH", "")),
@@ -107,7 +107,7 @@ class GCPCSVPlugin(ExtractorPlugin):
 )
 class AzureCostPlugin(ExtractorPlugin):
     def extract(self) -> int:
-        from extractors.azure_cost import run_extractor
+        from backend.extractors.azure_cost import run_extractor
 
         return run_extractor(pg_dsn=self.pg_dsn)
 
@@ -164,7 +164,7 @@ class AzureCostPlugin(ExtractorPlugin):
 )
 class ExchangeRatesPlugin(ExtractorPlugin):
     def extract(self) -> int:
-        from extractors.exchange_rates import extract
+        from backend.extractors.exchange_rates import extract
 
         return extract(pg_dsn=self.pg_dsn)
 

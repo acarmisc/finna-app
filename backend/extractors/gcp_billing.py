@@ -37,16 +37,16 @@ from tenacity import (
     wait_exponential,
 )
 
-from extractors.gcp_shared import (
+from backend.extractors.gcp_shared import (
     extract_project_label,
     generate_record_id,
     labels_to_tags,
     parse_datetime,
     resolve_service_category,
 )
-from models import NormalizedCostRecord, Provider, ServiceCategory
+from backend.models import NormalizedCostRecord, Provider, ServiceCategory
 
-logger = logging.getLogger("extractors.gcp_billing")
+logger = logging.getLogger("backend.extractors.gcp_billing")
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -400,7 +400,7 @@ def extract(
         client = bq_client
     else:
         try:
-            from config.auth import get_gcp_credentials
+            from cli.config.auth import get_gcp_credentials
 
             creds, _ = get_gcp_credentials()
             client = bigquery.Client(project=project, credentials=creds)

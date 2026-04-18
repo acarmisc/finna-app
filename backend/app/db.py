@@ -12,7 +12,7 @@ from psycopg import AsyncConnection
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool, ConnectionPool, PoolTimeout
 
-logger = logging.getLogger("api.db")
+logger = logging.getLogger("backend.app.db")
 
 # Pool size constants
 POOL_MIN_CONNS = int(os.getenv("POOL_MIN_CONNS", "2"))

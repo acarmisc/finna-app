@@ -94,7 +94,7 @@ def test_single_record():
 
 
 def test_runner_monitor_parses_azure_output():
-    from api.runner import _parse_records_from_lines
+    from backend.app.runner import _parse_records_from_lines
 
     lines = [
         "2026-04-18 10:00:00,123 INFO [extractors.azure_cost] Azure Cost Extractor completed: 26 records inserted\n",
@@ -103,7 +103,7 @@ def test_runner_monitor_parses_azure_output():
 
 
 def test_runner_monitor_parses_gcp_output():
-    from api.runner import _parse_records_from_lines
+    from backend.app.runner import _parse_records_from_lines
 
     lines = [
         "2026-04-18 10:00:00,123 INFO [extractors.gcp_billing] GCP billing extractor finished: 142 records\n",
@@ -112,7 +112,7 @@ def test_runner_monitor_parses_gcp_output():
 
 
 def test_runner_monitor_parses_exchange_rates():
-    from api.runner import _parse_records_from_lines
+    from backend.app.runner import _parse_records_from_lines
 
     lines = [
         "2026-04-18 10:00:00,123 INFO [extractors.exchange_rates] ECB exchange rate extractor finished: 34 rates\n",

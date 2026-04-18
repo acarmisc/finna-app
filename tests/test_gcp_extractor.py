@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from extractors.gcp_billing import (
+from backend.extractors.gcp_billing import (
     _batch_insert,
     _build_query,
     _mark_health_failure,
@@ -20,7 +20,7 @@ from extractors.gcp_billing import (
     extract,
     normalise_row,
 )
-from models import NormalizedCostRecord, Provider, ServiceCategory
+from backend.models import NormalizedCostRecord, Provider, ServiceCategory
 
 # ---------------------------------------------------------------------------
 # Fixtures — realistic BigQuery billing rows
@@ -217,8 +217,8 @@ class TestExtractorHealth:
 
 
 class TestExtract:
-    @patch("extractors.gcp_billing._get_pg_connection")
-    @patch("extractors.gcp_billing.bigquery.Client")
+    @patch("backend.extractors.gcp_billing._get_pg_connection")
+    @patch("backend.extractors.gcp_billing.bigquery.Client")
     def test_extract_happy_path(self, mock_bq_cls, mock_pg_conn_factory) -> None:
         mock_bq_client = MagicMock()
         mock_bq_cls.return_value = mock_bq_client
@@ -251,8 +251,8 @@ class TestExtract:
         assert total == 3
         mock_pg_conn.close.assert_called_once()
 
-    @patch("extractors.gcp_billing._get_pg_connection")
-    @patch("extractors.gcp_billing.bigquery.Client")
+    @patch("backend.extractors.gcp_billing._get_pg_connection")
+    @patch("backend.extractors.gcp_billing.bigquery.Client")
     def test_extract_empty_result_set(self, mock_bq_cls, mock_pg_conn_factory) -> None:
         mock_bq_client = MagicMock()
         mock_bq_cls.return_value = mock_bq_client
@@ -279,8 +279,8 @@ class TestExtract:
         assert total == 0
         mock_pg_conn.close.assert_called_once()
 
-    @patch("extractors.gcp_billing._get_pg_connection")
-    @patch("extractors.gcp_billing.bigquery.Client")
+    @patch("backend.extractors.gcp_billing._get_pg_connection")
+    @patch("backend.extractors.gcp_billing.bigquery.Client")
     def test_extract_with_batching(self, mock_bq_cls, mock_pg_conn_factory) -> None:
         """Verify multiple batch inserts when rows exceed batch_size."""
         mock_bq_client = MagicMock()
@@ -325,7 +325,7 @@ class TestExtract:
 
     def test_extract_missing_pg_dsn(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Test that ValueError is raised when no DSN is provided."""
-        monkeypatch.setattr("extractors.gcp_billing.PG_DSN", "")
+        monkeypatch.setattr("backend.extractors.gcp_billing.PG_DSN", "")
         with pytest.raises(ValueError, match="PG_DSN"):
             extract(
                 gcp_project="test-project",
@@ -343,8 +343,8 @@ class TestExtract:
                 date_to="",
             )
 
-    @patch("extractors.gcp_billing._get_pg_connection")
-    @patch("extractors.gcp_billing.bigquery.Client")
+    @patch("backend.extractors.gcp_billing._get_pg_connection")
+    @patch("backend.extractors.gcp_billing.bigquery.Client")
     def test_extract_db_failure_marks_health_failed(self, mock_bq_cls, mock_pg_conn_factory) -> None:
         """When a DB error occurs, health should be marked as failed."""
         mock_bq_client = MagicMock()

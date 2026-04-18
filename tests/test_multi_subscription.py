@@ -5,11 +5,11 @@ from __future__ import annotations
 import os
 from unittest.mock import MagicMock, patch
 
-from extractors.azure_cost import (
+from backend.extractors.azure_cost import (
     discover_azure_subscriptions_from_env,
     run_extractor,
 )
-from extractors.gcp_billing import (
+from backend.extractors.gcp_billing import (
     discover_gcp_projects_from_env,
     extract,
 )
@@ -92,9 +92,9 @@ class TestDiscoverAzureSubscriptions:
 
 
 class TestAzureMultiSubscriptionRun:
-    @patch("extractors.azure_cost.psycopg.connect")
-    @patch("extractors.azure_cost.fetch_cost_rows")
-    @patch("extractors.azure_cost._create_azure_client")
+    @patch("backend.extractors.azure_cost.psycopg.connect")
+    @patch("backend.extractors.azure_cost.fetch_cost_rows")
+    @patch("backend.extractors.azure_cost._create_azure_client")
     def test_run_extractor_with_explicit_credentials(self, mock_client_fn, mock_fetch, mock_pg_connect):
         """run_extractor should accept tenant_id/client_id/client_secret params."""
         from datetime import datetime, timezone
@@ -127,9 +127,9 @@ class TestAzureMultiSubscriptionRun:
             subscription_id="sub-001",
         )
 
-    @patch("extractors.azure_cost.psycopg.connect")
-    @patch("extractors.azure_cost.fetch_cost_rows")
-    @patch("extractors.azure_cost._create_azure_client")
+    @patch("backend.extractors.azure_cost.psycopg.connect")
+    @patch("backend.extractors.azure_cost.fetch_cost_rows")
+    @patch("backend.extractors.azure_cost._create_azure_client")
     def test_run_extractor_backward_compat(self, mock_client_fn, mock_fetch, mock_pg_connect, monkeypatch):
         """Single-subscription mode via AZURE_SUBSCRIPTION_ID still works."""
         from datetime import datetime, timezone
@@ -225,8 +225,8 @@ class TestDiscoverGcpProjects:
 
 
 class TestGcpMultiProjectExtract:
-    @patch("extractors.gcp_billing._get_pg_connection")
-    @patch("extractors.gcp_billing.bigquery.Client")
+    @patch("backend.extractors.gcp_billing._get_pg_connection")
+    @patch("backend.extractors.gcp_billing.bigquery.Client")
     def test_extract_with_custom_health_name(self, mock_bq_cls, mock_pg_conn_factory):
         """extract() should accept health_name for per-project health tracking."""
         mock_bq_client = MagicMock()

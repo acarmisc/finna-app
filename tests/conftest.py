@@ -49,8 +49,8 @@ def mock_connection():
 @pytest.fixture
 def client(mock_connection, mock_sync_pool):
     """Create test client with mocked dependencies."""
-    import api.db as db_module
-    import api.main as main_module
+    import backend.app.db as db_module
+    import backend.app.main as main_module
 
     original_lifespan = main_module.app.router.lifespan_context
 
@@ -76,8 +76,8 @@ def client(mock_connection, mock_sync_pool):
 @pytest.fixture
 def auth_client(mock_connection, mock_sync_pool):
     """Create test client with mocked dependencies and authentication."""
-    import api.db as db_module
-    import api.main as main_module
+    import backend.app.db as db_module
+    import backend.app.main as main_module
 
     original_lifespan = main_module.app.router.lifespan_context
 
@@ -94,7 +94,7 @@ def auth_client(mock_connection, mock_sync_pool):
                     with patch.object(db_module, "query_all", return_value=[]):
                         with patch.object(db_module, "execute"):
                             with patch.object(db_module, "insert_and_return", return_value="test-id"):
-                                from api.auth import create_access_token
+                                from backend.app.auth import create_access_token
                                 token = create_access_token(data={"sub": "testuser"})
                                 auth_headers = {"Authorization": f"Bearer {token}"}
 

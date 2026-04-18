@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-from models import NormalizedCostRecord, Provider, ServiceCategory
+from backend.models import NormalizedCostRecord, Provider, ServiceCategory
 
 # ---------------------------------------------------------------------------
 # Service-category mapping

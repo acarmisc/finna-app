@@ -20,7 +20,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import FileResponse
 from starlette.staticfiles import StaticFiles
 
-logger = logging.getLogger("api.main")
+logger = logging.getLogger("backend.app.main")
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -72,7 +72,7 @@ class TokenVerificationMiddleware(BaseHTTPMiddleware):
             if auth_header and auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
                 try:
-                    from api.auth import decode_token
+                    from backend.app.auth import decode_token
 
                     decode_token(token)
                 except HTTPException:
@@ -105,7 +105,7 @@ class RequestDurationMiddleware(BaseHTTPMiddleware):
         start = time.perf_counter()
         response = await call_next(request)
         duration = time.perf_counter() - start
-        from api.metrics import api_request_duration_histogram
+        from backend.app.metrics import api_request_duration_histogram
 
         endpoint = request.url.path
         api_request_duration_histogram.labels(method=request.method, endpoint=endpoint).observe(duration)
@@ -153,12 +153,12 @@ def setup_telemetry(app: FastAPI) -> None:
 async def lifespan(app: FastAPI) -> None:
     """Application lifecycle: startup and shutdown."""
     # Startup: initialize connection pool
-    from api.db import get_pg_dsn
-    from api.metrics import config_count
+    from backend.app.db import get_pg_dsn
+    from backend.app.metrics import config_count
 
     if get_pg_dsn():
         try:
-            from api.db import init_sync_pool
+            from backend.app.db import init_sync_pool
 
             init_sync_pool()
             logger.info("Connection pool initialized")
@@ -166,7 +166,7 @@ async def lifespan(app: FastAPI) -> None:
             logger.warning(f"Could not initialize connection pool: {e}. Will retry on first request.")
 
         try:
-            from api.db import init_db
+            from backend.app.db import init_db
 
             init_db()
             logger.info("Database initialized")
@@ -175,7 +175,7 @@ async def lifespan(app: FastAPI) -> None:
 
         # Initialize config_count metric
         try:
-            from api.db import query_all
+            from backend.app.db import query_all
 
             rows = query_all("SELECT provider, COUNT(*) as count FROM cloud_config GROUP BY provider")
             for row in rows:
@@ -210,7 +210,7 @@ async def lifespan(app: FastAPI) -> None:
     yield
 
     # Shutdown: close connection pools
-    from api.db import close_pools
+    from backend.app.db import close_pools
 
     close_pools()
     logger.info("Connection pools closed")
@@ -246,7 +246,7 @@ app.add_middleware(
 @app.get("/metrics", include_in_schema=False)
 async def metrics():
     """Expose Prometheus metrics."""
-    from api.metrics import api_request_duration_histogram  # noqa: F401
+    from backend.app.metrics import api_request_duration_histogram  # noqa: F401
 
     return PlainTextResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
@@ -254,7 +254,7 @@ async def metrics():
 @app.get("/healthz")
 async def healthz() -> JSONResponse:
     """Health check endpoint."""
-    from api.db import get_connection, release_connection
+    from backend.app.db import get_connection, release_connection
 
     status = {
         "status": "ok",
@@ -281,15 +281,15 @@ async def healthz() -> JSONResponse:
 @app.get("/api/v1/db/stats")
 async def db_stats() -> JSONResponse:
     """Get database connection pool stats."""
-    from api.db import get_pool_stats
+    from backend.app.db import get_pool_stats
 
     return JSONResponse(get_pool_stats())
 
 
 # Mount routers
-from api.routes import auth, extractors  # noqa: E402
-from api.routes import config as config_router  # noqa: E402
-from api.routes import plugins as plugins_router  # noqa: E402
+from backend.app.routes import auth, extractors  # noqa: E402
+from backend.app.routes import config as config_router  # noqa: E402
+from backend.app.routes import plugins as plugins_router  # noqa: E402
 
 app.include_router(config_router.router, prefix="/api/v1", tags=["config"])
 app.include_router(extractors.router, prefix="/api/v1", tags=["extractors"])
@@ -299,7 +299,9 @@ app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 # ---------------------------------------------------------------------------
 # Serve frontend static files (SPA fallback)
 # ---------------------------------------------------------------------------
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")
+# In production (Docker), static files are at /app/static
+# In local dev, this directory might not exist (proxied by Vite)
+STATIC_DIR = os.getenv("STATIC_DIR", os.path.join(os.path.dirname(__file__), "..", "..", "static"))
 
 
 @app.get("/{path:path}", include_in_schema=False)
@@ -307,13 +309,15 @@ async def spa_fallback(path: str):
     """Serve static files or fall back to index.html for SPA routing."""
     if path.startswith("api/") or path.startswith("metrics") or path.startswith("healthz"):
         return JSONResponse({"detail": "Not Found"}, status_code=404)
-    static_dir = os.path.join(STATIC_DIR)
-    file_path = os.path.join(static_dir, path)
+
+    file_path = os.path.join(STATIC_DIR, path)
     if os.path.isfile(file_path):
         return FileResponse(file_path)
-    index_path = os.path.join(static_dir, "index.html")
+
+    index_path = os.path.join(STATIC_DIR, "index.html")
     if os.path.isfile(index_path):
         return FileResponse(index_path)
+
     return JSONResponse({"detail": "Not Found"}, status_code=404)
 
 
@@ -326,7 +330,7 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "api.main:app",
+        "backend.app.main:app",
         host=os.getenv("HOST", "0.0.0.0"),
         port=int(os.getenv("PORT", "8000")),
         reload=os.getenv("DEBUG", "false").lower() == "true",

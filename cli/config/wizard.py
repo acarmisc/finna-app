@@ -21,7 +21,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from config.schema import (
+from cli.config.schema import (
     AggregationConfig,
     AggregationSettings,
     AzureConfig,
@@ -309,7 +309,7 @@ def ask_gcp() -> dict[str, Any]:
     """Ask for full GCP configuration including projects and authentication."""
     console.rule("[bold green]GCP Configuration[/bold green]")
 
-    from config.auth import gcp_auth_interactive
+    from cli.config.auth import gcp_auth_interactive
 
     auth_result = gcp_auth_interactive()
     auth_method = auth_result.get("auth_method", "skipped")
@@ -444,7 +444,7 @@ def ask_azure_subscription(tenant_id_hint: str | None = None) -> dict[str, Any]:
             or ""
         )
     elif auth_method and "OAuth" in auth_method:
-        from config.auth import azure_device_flow
+        from cli.config.auth import azure_device_flow
 
         console.print(
             f"\n[bold]Authenticating via OAuth for subscription {subscription_id.strip()}[/bold]"

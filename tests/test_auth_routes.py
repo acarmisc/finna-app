@@ -11,8 +11,8 @@ from fastapi.testclient import TestClient
 
 @pytest.fixture
 def auth_test_client():
-    import api.db as db_module
-    import api.main as main_module
+    import backend.app.db as db_module
+    import backend.app.main as main_module
 
     original_lifespan = main_module.app.router.lifespan_context
 
@@ -38,7 +38,7 @@ def auth_test_client():
     mock_sync_pool.max_size = 10
     mock_sync_pool.__len__ = lambda self: 5
 
-    from api.auth import create_access_token
+    from backend.app.auth import create_access_token
 
     token = create_access_token(data={"sub": "testuser"})
 
@@ -73,7 +73,7 @@ class TestDeviceCodeStart:
         assert resp.status_code == 200
         assert "access-control-allow-origin" in resp.headers
 
-    @patch("api.routes.auth.DeviceCodeCredential", create=True)
+    @patch("backend.app.routes.auth.DeviceCodeCredential", create=True)
     @patch("msal.Application", create=True)
     def test_device_code_start_success(self, mock_app_cls, mock_cred_cls, auth_test_client):
         mock_app = MagicMock()
@@ -87,7 +87,7 @@ class TestDeviceCodeStart:
         }
         mock_app_cls.return_value = mock_app
 
-        with patch("api.routes.auth.DeviceCodeCredential"):
+        with patch("backend.app.routes.auth.DeviceCodeCredential"):
             resp = auth_test_client.post(
                 "/api/v1/auth/azure/device-code",
                 json={"tenant_id": "organizations"},
@@ -171,7 +171,7 @@ class TestGCPRegister:
 
 class TestAuthResponseStructure:
     def test_device_code_response_fields(self):
-        from api.models import DeviceCodeStartResponse
+        from backend.app.models import DeviceCodeStartResponse
 
         resp = DeviceCodeStartResponse(
             verification_uri="https://microsoft.com/devicelogin",
@@ -189,7 +189,7 @@ class TestAuthResponseStructure:
         assert resp.message == "Enter the code"
 
     def test_device_code_poll_response_fields(self):
-        from api.models import DeviceCodePollResponse
+        from backend.app.models import DeviceCodePollResponse
 
         resp = DeviceCodePollResponse(status="pending")
         assert resp.status == "pending"

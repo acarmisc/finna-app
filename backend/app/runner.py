@@ -13,9 +13,9 @@ from typing import Any, Optional
 
 from psycopg.rows import dict_row
 
-from api.metrics import extractor_run_total
+from backend.app.metrics import extractor_run_total
 
-logger = logging.getLogger("api.runner")
+logger = logging.getLogger("backend.app.runner")
 
 # Global registry of running processes
 _running_processes: dict[str, subprocess.Popen] = {}
@@ -52,7 +52,7 @@ def _get_extractor_type(provider: str) -> str:
 
     First checks the plugin registry, then falls back to a hardcoded mapping.
     """
-    from extractors.base import get_plugin
+    from backend.extractors.base import get_plugin
 
     # Try common naming convention: provider -> provider_cost
     for candidate in [f"{provider}_cost", f"{provider}_billing", provider]:
@@ -106,7 +106,7 @@ def _update_run_status(
     log_output: Optional[str] = None,
 ) -> None:
     """Update extractor_runs table."""
-    from api.db import get_connection
+    from backend.app.db import get_connection
 
     conn = get_connection()
     try:
@@ -146,7 +146,7 @@ def start_extractor(
 
     Returns the run_id.
     """
-    from api.db import get_connection, insert_and_return
+    from backend.app.db import get_connection, insert_and_return
 
     if pg_dsn is None:
         pg_dsn = _get_pg_dsn()
@@ -188,7 +188,7 @@ def start_extractor(
     insert_and_return(sql, (run_id, config_id, provider, extractor_type, now))
 
     # Build command
-    cmd = [sys.executable, "-m", f"extractors.{extractor_type}"]
+    cmd = [sys.executable, "-m", f"backend.extractors.{extractor_type}"]
 
     # Build environment (credential_type is now in config)
     env = _build_env_from_config(config, provider)
@@ -250,7 +250,7 @@ def start_extractor(
 
 def get_run_status(run_id: str) -> Optional[dict[str, Any]]:
     """Get status of a run."""
-    from api.db import query_one
+    from backend.app.db import query_one
 
     sql = """
         SELECT id, config_id, provider, extractor_type, status,
@@ -263,7 +263,7 @@ def get_run_status(run_id: str) -> Optional[dict[str, Any]]:
 
 def list_runs(limit: int = 50, provider: Optional[str] = None) -> list[dict[str, Any]]:
     """List recent runs."""
-    from api.db import query_all
+    from backend.app.db import query_all
 
     if provider:
         sql = """

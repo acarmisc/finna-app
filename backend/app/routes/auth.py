@@ -10,10 +10,10 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from api.auth import require_auth
-from api.db import insert_and_return
+from backend.app.auth import require_auth
+from backend.app.db import insert_and_return
 
-logger = logging.getLogger("api.auth")
+logger = logging.getLogger("backend.app.auth")
 
 router = APIRouter()
 

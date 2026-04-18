@@ -8,14 +8,14 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from api.auth import require_auth
-from api.db import execute, insert_and_return, query_all, query_one
-from api.models import (
+from backend.app.auth import require_auth
+from backend.app.db import execute, insert_and_return, query_all, query_one
+from backend.app.models import (
     CloudConfigCreate,
     CloudConfigResponse,
     CloudConfigUpdate,
 )
-from utils.encryption import decrypt_config, encrypt_config
+from backend.utils.encryption import decrypt_config, encrypt_config
 
 router = APIRouter()
 
