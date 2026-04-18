@@ -1,0 +1,236 @@
+.fn-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgb(0 0 0 / 0.4);
+  display: grid;
+  place-items: center;
+  animation: fn-fade 120ms var(--ease-out);
+}
+
+@keyframes fn-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fn-cmdk {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: 540px;
+  max-width: 92vw;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-top: -120px;
+  animation: fn-pop 180ms var(--ease-out);
+}
+
+@keyframes fn-pop {
+  from {
+    transform: translateY(6px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.fn-cmdk-input {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 12px var(--s-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.fn-cmdk-input input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--fg);
+}
+
+.fn-cmdk-input input::placeholder {
+  color: var(--fg-subtle);
+}
+
+.fn-cmdk-list {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.fn-cmdk-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  padding: 8px var(--s-3);
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--fg);
+  font-size: var(--fs-13);
+  text-align: left;
+}
+
+.fn-cmdk-item:hover {
+  background: var(--bg-accent);
+}
+
+.fn-cmdk-kind {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--fg-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-family: var(--font-mono);
+}
+
+.fn-cmdk-empty {
+  padding: var(--s-5);
+  text-align: center;
+  color: var(--fg-subtle);
+  font-size: var(--fs-12);
+}
+
+.fn-cmdk-foot {
+  display: flex;
+  gap: var(--s-4);
+  padding: 8px var(--s-4);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg);
+  font-size: 11px;
+  color: var(--fg-subtle);
+}
+
+.fn-cmdk-foot span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fn-modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  max-width: calc(100vw - 48px);
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  animation: fn-pop 180ms var(--ease-out);
+}
+
+.fn-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--s-5) var(--s-5) var(--s-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.fn-modal-title {
+  font-size: var(--fs-16);
+  font-weight: var(--fw-semi);
+}
+
+.fn-modal-sub {
+  font-size: var(--fs-12);
+  color: var(--fg-subtle);
+  margin-top: 2px;
+}
+
+.fn-modal-body {
+  padding: var(--s-5);
+  overflow-y: auto;
+}
+
+.fn-modal-foot {
+  display: flex;
+  gap: var(--s-2);
+  justify-content: flex-end;
+  padding: var(--s-4) var(--s-5);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg);
+}
+
+.fn-drawer-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgb(0 0 0 / 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-med) var(--ease-out);
+}
+
+.fn-drawer-scrim.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.fn-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(100%);
+  transition: transform var(--dur-med) var(--ease-out);
+  display: flex;
+  flex-direction: column;
+  max-width: 92vw;
+  width: 480px;
+}
+
+.fn-drawer.is-open {
+  transform: none;
+}
+
+.fn-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--s-5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.fn-drawer-title {
+  font-size: var(--fs-16);
+  font-weight: var(--fw-semi);
+}
+
+.fn-drawer-sub {
+  font-size: var(--fs-12);
+  color: var(--fg-subtle);
+  margin-top: 2px;
+}
+
+.fn-drawer-body {
+  padding: var(--s-5);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.fn-drawer-foot {
+  display: flex;
+  gap: var(--s-2);
+  padding: var(--s-4) var(--s-5);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg);
+}
