@@ -19,6 +19,7 @@ from api.models import (
     CredentialType,
     Provider,
 )
+from utils.encryption import encrypt_config, decrypt_config
 
 router = APIRouter()
 
@@ -38,7 +39,11 @@ def _mask_secrets(config: dict[str, Any]) -> dict[str, Any]:
     return masked
 
 
-@router.get("/config", response_model=list[CloudConfigResponse], dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")])
+@router.get(
+    "/config",
+    response_model=list[CloudConfigResponse],
+    dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")],
+)
 async def list_configs() -> list[dict[str, Any]]:
     """List all cloud configurations."""
     sql = """
@@ -53,7 +58,7 @@ async def list_configs() -> list[dict[str, Any]]:
             "provider": r["provider"],
             "name": r["name"],
             "credential_type": r["credential_type"],
-            "config": _mask_secrets(r["config"]),
+            "config": _mask_secrets(decrypt_config(r["config"])),
             "created_at": r["created_at"],
             "updated_at": r["updated_at"],
         }
@@ -61,7 +66,12 @@ async def list_configs() -> list[dict[str, Any]]:
     ]
 
 
-@router.post("/config", response_model=CloudConfigResponse, status_code=201, dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")])
+@router.post(
+    "/config",
+    response_model=CloudConfigResponse,
+    status_code=201,
+    dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")],
+)
 async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
     """Create a new cloud configuration."""
     config_id = str(uuid.uuid4())
@@ -77,7 +87,7 @@ async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
         data.provider.value,
         data.name,
         data.credential_type.value,
-        data.config,
+        encrypt_config(data.config),
         now,
         now,
     )
@@ -95,7 +105,11 @@ async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
     }
 
 
-@router.get("/config/{config_id}", response_model=CloudConfigResponse, dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")])
+@router.get(
+    "/config/{config_id}",
+    response_model=CloudConfigResponse,
+    dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")],
+)
 async def get_config(config_id: str) -> dict[str, Any]:
     """Get a cloud configuration by ID."""
     sql = """
@@ -112,13 +126,17 @@ async def get_config(config_id: str) -> dict[str, Any]:
         "provider": result["provider"],
         "name": result["name"],
         "credential_type": result["credential_type"],
-        "config": _mask_secrets(result["config"]),
+        "config": _mask_secrets(decrypt_config(result["config"])),
         "created_at": result["created_at"],
         "updated_at": result["updated_at"],
     }
 
 
-@router.put("/config/{config_id}", response_model=CloudConfigResponse, dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")])
+@router.put(
+    "/config/{config_id}",
+    response_model=CloudConfigResponse,
+    dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")],
+)
 async def update_config(config_id: str, data: CloudConfigUpdate) -> dict[str, Any]:
     """Update a cloud configuration."""
     # Build dynamic update
@@ -133,7 +151,7 @@ async def update_config(config_id: str, data: CloudConfigUpdate) -> dict[str, An
         params.append(data.credential_type.value)
     if data.config is not None:
         updates.append("config = %s")
-        params.append(data.config)
+        params.append(encrypt_config(data.config))
 
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -158,20 +176,28 @@ async def update_config(config_id: str, data: CloudConfigUpdate) -> dict[str, An
         "provider": result["provider"],
         "name": result["name"],
         "credential_type": result["credential_type"],
-        "config": _mask_secrets(result["config"]),
+        "config": _mask_secrets(decrypt_config(result["config"])),
         "created_at": result["created_at"],
         "updated_at": result["updated_at"],
     }
 
 
-@router.delete("/config/{config_id}", status_code=204, dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")])
+@router.delete(
+    "/config/{config_id}",
+    status_code=204,
+    dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")],
+)
 async def delete_config(config_id: str) -> None:
     """Delete a cloud configuration."""
     sql = "DELETE FROM cloud_config WHERE id = %s"
     execute(sql, (config_id,))
 
 
-@router.get("/config/provider/{provider}", response_model=list[CloudConfigResponse], dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")])
+@router.get(
+    "/config/provider/{provider}",
+    response_model=list[CloudConfigResponse],
+    dependencies=[_limiter.limit(f"{_rate_limit_per_minute}/{_rate_limit_per_hour}")],
+)
 async def list_configs_by_provider(provider: str) -> list[dict[str, Any]]:
     """List configurations for a specific provider."""
     sql = """
@@ -187,7 +213,7 @@ async def list_configs_by_provider(provider: str) -> list[dict[str, Any]]:
             "provider": r["provider"],
             "name": r["name"],
             "credential_type": r["credential_type"],
-            "config": _mask_secrets(r["config"]),
+            "config": _mask_secrets(decrypt_config(r["config"])),
             "created_at": r["created_at"],
             "updated_at": r["updated_at"],
         }
