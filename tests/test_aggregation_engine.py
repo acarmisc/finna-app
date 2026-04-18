@@ -10,14 +10,13 @@ from datetime import datetime, timezone
 
 import pytest
 
-from aggregation.config import AggregationConfig, ClientConfig, MetricAggregationSettings
+from aggregation.config import AggregationConfig, MetricAggregationSettings
 from aggregation.engine import (
     aggregate,
     align_to_window,
     compute_aggregates,
     compute_percentile,
 )
-
 
 # ---------------------------------------------------------------------------
 # Tests: window alignment

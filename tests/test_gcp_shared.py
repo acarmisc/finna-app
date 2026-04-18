@@ -5,11 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 
-import pytest
-
-from models import Provider, ServiceCategory
 from extractors.gcp_shared import (
-    DEFAULT_SERVICE_CATEGORY_MAP,
     extract_project_label,
     generate_record_id,
     labels_to_tags,
@@ -17,7 +13,7 @@ from extractors.gcp_shared import (
     parse_datetime,
     resolve_service_category,
 )
-
+from models import Provider, ServiceCategory
 
 # ---------------------------------------------------------------------------
 # resolve_service_category

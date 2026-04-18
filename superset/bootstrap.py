@@ -20,9 +20,9 @@ import json
 import os
 import sys
 import time
-import urllib.request
 import urllib.error
 import urllib.parse
+import urllib.request
 import warnings
 
 # ---------------------------------------------------------------------------
@@ -31,9 +31,7 @@ import warnings
 SUPERSET_BASE_URL = os.getenv("SUPERSET_BASE_URL", "http://superset:8088")
 ADMIN_USERNAME = os.getenv("SUPERSET_ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
-FINOPS_PG_URI = os.getenv(
-    "FINOPS_PG_URI", "postgresql://finops:finops_dev@postgres:5432/finops"
-)
+FINOPS_PG_URI = os.getenv("FINOPS_PG_URI", "postgresql://finops:finops_dev@postgres:5432/finops")
 
 # ---------------------------------------------------------------------------
 # Password validation
@@ -47,7 +45,7 @@ def _validate_password(password):
         print(f"ERROR: ADMIN_PASSWORD must be at least 12 characters (got {len(password)}).", file=sys.stderr)
         return False
     if password.lower() in COMMON_PASSWORDS:
-        print(f"ERROR: ADMIN_PASSWORD cannot be a common password.", file=sys.stderr)
+        print("ERROR: ADMIN_PASSWORD cannot be a common password.", file=sys.stderr)
         return False
     return True
 
@@ -63,6 +61,7 @@ if not _validate_password(ADMIN_PASSWORD):
 # ---------------------------------------------------------------------------
 # HTTP helpers
 # ---------------------------------------------------------------------------
+
 
 def _req(path, method="GET", body=None, token=None):
     url = f"{SUPERSET_BASE_URL}{path}"
@@ -84,11 +83,15 @@ def _req(path, method="GET", body=None, token=None):
 
 def login():
     """Authenticate and return an access token."""
-    resp = _req("/api/v1/security/login", "POST", {
-        "username": ADMIN_USERNAME,
-        "password": ADMIN_PASSWORD,
-        "provider": "db",
-    })
+    resp = _req(
+        "/api/v1/security/login",
+        "POST",
+        {
+            "username": ADMIN_USERNAME,
+            "password": ADMIN_PASSWORD,
+            "provider": "db",
+        },
+    )
     return resp["access_token"]
 
 
@@ -140,10 +143,13 @@ class Api:
 # Resource helpers (idempotent)
 # ---------------------------------------------------------------------------
 
+
 def ensure_database(api, name, uri):
     """Create or return the FinOps PostgreSQL database connection."""
     try:
-        result = api.get("/api/v1/database/", {"q": json.dumps({"filters": [{"col": "database_name", "opr": "eq", "value": name}])}})
+        result = api.get(
+            "/api/v1/database/", {"q": json.dumps({"filters": [{"col": "database_name", "opr": "eq", "value": name}]})}
+        )
         if result.get("result"):
             db = result["result"][0]
             print(f"  Database '{name}' already exists (id={db['id']}).")
@@ -169,14 +175,19 @@ def ensure_database(api, name, uri):
 def ensure_dataset(api, table_name, schema, db_id):
     """Create or return a physical dataset."""
     try:
-        result = api.get("/api/v1/dataset/", {
-            "q": json.dumps({
-                "filters": [
-                    {"col": "table_name", "opr": "eq", "value": table_name},
-                    {"col": "database_id", "opr": "eq", "value": db_id},
-                ]
-            })
-        })
+        result = api.get(
+            "/api/v1/dataset/",
+            {
+                "q": json.dumps(
+                    {
+                        "filters": [
+                            {"col": "table_name", "opr": "eq", "value": table_name},
+                            {"col": "database_id", "opr": "eq", "value": db_id},
+                        ]
+                    }
+                )
+            },
+        )
         if result.get("result"):
             ds = result["result"][0]
             print(f"  Dataset '{table_name}' already exists (id={ds['id']}).")
@@ -199,14 +210,19 @@ def ensure_dataset(api, table_name, schema, db_id):
 def ensure_virtual_dataset(api, dataset_name, sql, db_id):
     """Create or return a virtual (SQL) dataset."""
     try:
-        result = api.get("/api/v1/dataset/", {
-            "q": json.dumps({
-                "filters": [
-                    {"col": "table_name", "opr": "eq", "value": dataset_name},
-                    {"col": "database_id", "opr": "eq", "value": db_id},
-                ]
-            })
-        })
+        result = api.get(
+            "/api/v1/dataset/",
+            {
+                "q": json.dumps(
+                    {
+                        "filters": [
+                            {"col": "table_name", "opr": "eq", "value": dataset_name},
+                            {"col": "database_id", "opr": "eq", "value": db_id},
+                        ]
+                    }
+                )
+            },
+        )
         if result.get("result"):
             ds = result["result"][0]
             print(f"  Virtual dataset '{dataset_name}' already exists (id={ds['id']}).")
@@ -228,9 +244,10 @@ def ensure_virtual_dataset(api, dataset_name, sql, db_id):
 def ensure_dashboard(api, dashboard_title, dashboard_json):
     """Create or return a dashboard by title."""
     try:
-        result = api.get("/api/v1/dashboard/", {
-            "q": json.dumps({"filters": [{"col": "dashboard_title", "opr": "eq", "value": dashboard_title}]})
-        })
+        result = api.get(
+            "/api/v1/dashboard/",
+            {"q": json.dumps({"filters": [{"col": "dashboard_title", "opr": "eq", "value": dashboard_title}]})},
+        )
         if result.get("result"):
             db = result["result"][0]
             print(f"  Dashboard '{dashboard_title}' already exists (id={db['id']}).")
@@ -274,7 +291,10 @@ FINOPS_OVERVIEW_DASHBOARD = {
             "datasource": "daily_costs",
             "groupby": ["provider"],
             "metrics": [{"expressionType": "SQL", "sqlExpression": "SUM(total_cost)", "label": "cost"}],
-            "sql": "SELECT provider, SUM(total_cost) AS cost FROM daily_costs WHERE day >= CURRENT_DATE - 30 GROUP BY provider ORDER BY cost DESC",
+            "sql": (
+                "SELECT provider, SUM(total_cost) AS cost FROM daily_costs "
+                "WHERE day >= CURRENT_DATE - 30 GROUP BY provider ORDER BY cost DESC"
+            ),
             "time_range": "Last 30 days",
         },
         {
@@ -285,7 +305,10 @@ FINOPS_OVERVIEW_DASHBOARD = {
             "groupby": ["provider"],
             "x_axis": "day",
             "metrics": [{"expressionType": "SQL", "sqlExpression": "SUM(total_cost)", "label": "daily_cost"}],
-            "sql": "SELECT day, provider, SUM(total_cost) AS daily_cost FROM daily_costs WHERE day >= CURRENT_DATE - 90 GROUP BY day, provider ORDER BY day",
+            "sql": (
+                "SELECT day, provider, SUM(total_cost) AS daily_cost FROM daily_costs "
+                "WHERE day >= CURRENT_DATE - 90 GROUP BY day, provider ORDER BY day"
+            ),
             "time_range": "Last 90 days",
         },
         {
@@ -295,7 +318,10 @@ FINOPS_OVERVIEW_DASHBOARD = {
             "datasource": "daily_costs",
             "groupby": ["project_id"],
             "metrics": [{"expressionType": "SQL", "sqlExpression": "SUM(total_cost)", "label": "cost"}],
-            "sql": "SELECT project_id, SUM(total_cost) AS cost FROM daily_costs WHERE day >= CURRENT_DATE - 30 GROUP BY project_id ORDER BY cost DESC LIMIT 10",
+            "sql": (
+                "SELECT project_id, SUM(total_cost) AS cost FROM daily_costs "
+                "WHERE day >= CURRENT_DATE - 30 GROUP BY project_id ORDER BY cost DESC LIMIT 10"
+            ),
             "time_range": "Last 30 days",
         },
         {
@@ -308,7 +334,11 @@ FINOPS_OVERVIEW_DASHBOARD = {
                 {"expressionType": "SQL", "sqlExpression": "SUM(total_cost)", "label": "cost"},
                 {"expressionType": "SQL", "sqlExpression": "SUM(record_count)", "label": "records"},
             ],
-            "sql": "SELECT service_category, SUM(total_cost) AS cost, SUM(record_count) AS records FROM daily_costs WHERE day >= CURRENT_DATE - 30 GROUP BY service_category ORDER BY cost DESC",
+            "sql": (
+                "SELECT service_category, SUM(total_cost) AS cost, SUM(record_count) AS records "
+                "FROM daily_costs WHERE day >= CURRENT_DATE - 30 "
+                "GROUP BY service_category ORDER BY cost DESC"
+            ),
             "time_range": "Last 30 days",
         },
     ],
@@ -442,6 +472,7 @@ PROJECT_DRILLDOWN_DASHBOARD = {
 # Chart creation helper
 # ---------------------------------------------------------------------------
 
+
 def create_chart(api, chart_def, dataset_id, db_id):
     """Create a single chart (slice) via the API."""
     slice_name = chart_def["slice_name"]
@@ -450,9 +481,9 @@ def create_chart(api, chart_def, dataset_id, db_id):
 
     # Check if chart already exists
     try:
-        result = api.get("/api/v1/chart/", {
-            "q": json.dumps({"filters": [{"col": "slice_name", "opr": "eq", "value": slice_name}]})
-        })
+        result = api.get(
+            "/api/v1/chart/", {"q": json.dumps({"filters": [{"col": "slice_name", "opr": "eq", "value": slice_name}]})}
+        )
         if result.get("result"):
             print(f"    Chart '{slice_name}' already exists (id={result['result'][0]['id']}).")
             return result["result"][0]["id"]
@@ -501,6 +532,7 @@ def create_chart(api, chart_def, dataset_id, db_id):
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
     print("=== Superset Bootstrap (API) ===")
 
@@ -532,8 +564,8 @@ def main():
     # -- Datasets ------------------------------------------------------------
     print("\n[2/4] Creating datasets ...")
     ds_daily_costs = ensure_dataset(api, "daily_costs", "public", db_id)
-    ds_cost_records = ensure_dataset(api, "cost_records", "public", db_id)
-    ds_extractor_health = ensure_dataset(api, "extractor_health", "public", db_id)
+    ensure_dataset(api, "cost_records", "public", db_id)
+    ensure_dataset(api, "extractor_health", "public", db_id)
 
     # -- Charts & Dashboards -------------------------------------------------
     print("\n[3/4] Creating dashboards and charts ...")

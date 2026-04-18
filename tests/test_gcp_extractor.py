@@ -11,7 +11,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from models import NormalizedCostRecord, Provider, ServiceCategory
 from extractors.gcp_billing import (
     _batch_insert,
     _build_query,
@@ -21,7 +20,7 @@ from extractors.gcp_billing import (
     extract,
     normalise_row,
 )
-
+from models import NormalizedCostRecord, Provider, ServiceCategory
 
 # ---------------------------------------------------------------------------
 # Fixtures — realistic BigQuery billing rows

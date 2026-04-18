@@ -3,28 +3,25 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from models import NormalizedCostRecord, Provider, ServiceCategory
-
 # Import the module under test
 from extractors.azure_cost import (
     DEFAULT_METER_CATEGORY_MAP,
-    AZURE_QUERY_COLUMNS,
+    _azure_date_to_datetime,
+    _parse_tags,
     convert_to_usd,
     fetch_cost_rows,
     generate_record_id,
     map_service_category,
     mark_extractor_healthy,
     transform_row,
-    _parse_tags,
-    _azure_date_to_datetime,
 )
-
+from models import NormalizedCostRecord, Provider, ServiceCategory
 
 # ---------------------------------------------------------------------------
 # Fixtures — realistic Azure cost rows

@@ -5,8 +5,6 @@ from __future__ import annotations
 import os
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from extractors.azure_cost import (
     discover_azure_subscriptions_from_env,
     run_extractor,
@@ -15,7 +13,6 @@ from extractors.gcp_billing import (
     discover_gcp_projects_from_env,
     extract,
 )
-
 
 # ---------------------------------------------------------------------------
 # Azure: discover_azure_subscriptions_from_env

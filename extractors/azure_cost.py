@@ -35,15 +35,13 @@ import os
 import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
-from typing import Any, Optional
+from typing import Any
 
 import psycopg
-from azure.identity import ClientSecretCredential, DefaultAzureCredential
 from azure.mgmt.costmanagement import CostManagementClient
 from azure.mgmt.costmanagement.models import (
-    QueryDefinition,
     QueryDataset,
-    QueryFilter,
+    QueryDefinition,
     QueryGrouping,
     QueryTimePeriod,
     TimeframeType,

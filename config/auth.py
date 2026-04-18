@@ -22,7 +22,6 @@ from typing import Any, Optional
 import keyring
 from rich.console import Console
 from rich.panel import Panel
-from rich.text import Text
 
 logger = logging.getLogger("config.auth")
 
@@ -164,9 +163,7 @@ def azure_auth_interactive(
         }
 
         if _keyring_available():
-            keyring.set_password(
-                KEYRING_SERVICE, KEYRING_AZURE_TOKEN_KEY, json.dumps(meta)
-            )
+            keyring.set_password(KEYRING_SERVICE, KEYRING_AZURE_TOKEN_KEY, json.dumps(meta))
             console.print("[dim]Credential metadata saved to OS keyring.[/dim]")
     elif "OAuth" in method:
         cli_client_id = client_id or os.getenv("AZURE_CLIENT_ID")
@@ -190,9 +187,7 @@ def azure_auth_interactive(
             "auth_method": "client_secret",
         }
         if _keyring_available() and client_secret:
-            keyring.set_password(
-                KEYRING_SERVICE, f"azure-client-secret-{tenant.strip()}", client_secret
-            )
+            keyring.set_password(KEYRING_SERVICE, f"azure-client-secret-{tenant.strip()}", client_secret)
             console.print("[dim]Client secret saved to OS keyring.[/dim]")
 
     credential = _build_credential_from_meta(meta)
@@ -203,9 +198,7 @@ def azure_auth_interactive(
         return meta
 
     if auto_select:
-        console.print(
-            f"[dim]Auto-selecting all {len(subscriptions)} subscription(s)[/dim]"
-        )
+        console.print(f"[dim]Auto-selecting all {len(subscriptions)} subscription(s)[/dim]")
         selected = subscriptions
     else:
         selected = _select_azure_subscriptions(subscriptions)
@@ -223,9 +216,7 @@ def azure_auth_interactive(
                 )
                 chosen = rgs
             else:
-                chosen = _select_azure_resource_groups(
-                    sub["subscription_id"], sub.get("display_name", ""), rgs
-                )
+                chosen = _select_azure_resource_groups(sub["subscription_id"], sub.get("display_name", ""), rgs)
             if chosen is not None:
                 rg_selections[sub["subscription_id"]] = chosen
 
@@ -242,9 +233,7 @@ def azure_auth_interactive(
         keyring.set_password(KEYRING_SERVICE, KEYRING_AZURE_TOKEN_KEY, json.dumps(meta))
         console.print("[dim]Subscription selections saved to OS keyring.[/dim]")
 
-    console.print(
-        f"\n[bold green]Configured {len(selected)} subscription(s) for extraction.[/bold green]"
-    )
+    console.print(f"\n[bold green]Configured {len(selected)} subscription(s) for extraction.[/bold green]")
     return meta
 
 
@@ -264,8 +253,8 @@ def _build_credential_from_meta(meta: dict[str, Any]):
 
         return AzureCliCredential()
 
-    from msal_extensions import PersistedTokenCache, build_encrypted_persistence
     from azure.identity import DeviceCodeCredential
+    from msal_extensions import PersistedTokenCache, build_encrypted_persistence
 
     persistence = build_encrypted_persistence("finna-app-azure-cache")
     token_cache = PersistedTokenCache(persistence)
@@ -325,16 +314,11 @@ def _select_azure_subscriptions(subs: list[dict[str, str]]) -> list[dict[str, st
     table.add_column("Name")
     table.add_column("State")
     for i, s in enumerate(subs, 1):
-        table.add_row(
-            str(i), s["subscription_id"], s["display_name"], s.get("state", "")
-        )
+        table.add_row(str(i), s["subscription_id"], s["display_name"], s.get("state", ""))
     console.print(table)
 
     choices = [
-        f"{s['display_name']} ({s['subscription_id']})"
-        if s["display_name"]
-        else s["subscription_id"]
-        for s in subs
+        f"{s['display_name']} ({s['subscription_id']})" if s["display_name"] else s["subscription_id"] for s in subs
     ]
     choices.append("ALL")
 
@@ -352,11 +336,7 @@ def _select_azure_subscriptions(subs: list[dict[str, str]]) -> list[dict[str, st
     result = []
     for choice in selected:
         for s in subs:
-            label = (
-                f"{s['display_name']} ({s['subscription_id']})"
-                if s["display_name"]
-                else s["subscription_id"]
-            )
+            label = f"{s['display_name']} ({s['subscription_id']})" if s["display_name"] else s["subscription_id"]
             if label == choice:
                 result.append(s)
                 break
@@ -374,15 +354,11 @@ def _discover_azure_resource_groups(credential, subscription_id: str) -> list[st
         rgs.sort()
         return rgs
     except Exception as exc:
-        console.print(
-            f"[dim]Could not list resource groups for {subscription_id}: {exc}[/dim]"
-        )
+        console.print(f"[dim]Could not list resource groups for {subscription_id}: {exc}[/dim]")
         return []
 
 
-def _select_azure_resource_groups(
-    sub_id: str, sub_name: str, rgs: list[str]
-) -> Optional[list[str]]:
+def _select_azure_resource_groups(sub_id: str, sub_name: str, rgs: list[str]) -> Optional[list[str]]:
     """Let the user pick resource groups for a subscription."""
     import questionary
     from rich.table import Table
@@ -447,8 +423,8 @@ def get_azure_credential(
     from azure.identity import (
         AzureCliCredential,
         ClientSecretCredential,
-        DeviceCodeCredential,
         DefaultAzureCredential,
+        DeviceCodeCredential,
     )
 
     explicit_tenant = tenant_id or os.getenv("AZURE_TENANT_ID")
@@ -527,9 +503,7 @@ def gcp_auth_interactive() -> dict[str, Any]:
     try:
         creds, project = google_auth_default()
         if creds and creds.valid:
-            console.print(
-                f"[bold green]GCP credentials found![/bold green] Project: [cyan]{project}[/cyan]"
-            )
+            console.print(f"[bold green]GCP credentials found![/bold green] Project: [cyan]{project}[/cyan]")
             return {"auth_method": "adc", "project": project, "valid": True}
     except (DefaultCredentialsError, Exception):
         pass
@@ -555,9 +529,7 @@ def gcp_auth_interactive() -> dict[str, Any]:
         try:
             subprocess.run(cmd, check=True)
         except FileNotFoundError:
-            console.print(
-                "[red]gcloud CLI not found. Install from https://cloud.google.com/sdk[/red]"
-            )
+            console.print("[red]gcloud CLI not found. Install from https://cloud.google.com/sdk[/red]")
             return {"auth_method": "failed", "error": "gcloud not found"}
         except subprocess.CalledProcessError as exc:
             console.print(f"[red]gcloud auth login failed: {exc}[/red]")
@@ -566,13 +538,9 @@ def gcp_auth_interactive() -> dict[str, Any]:
         try:
             creds, project = google_auth_default()
             if creds and creds.valid:
-                console.print(
-                    f"[bold green]GCP authenticated![/bold green] Project: [cyan]{project}[/cyan]"
-                )
+                console.print(f"[bold green]GCP authenticated![/bold green] Project: [cyan]{project}[/cyan]")
                 if _keyring_available():
-                    keyring.set_password(
-                        KEYRING_SERVICE, KEYRING_GCP_ADC_STATUS, "configured"
-                    )
+                    keyring.set_password(KEYRING_SERVICE, KEYRING_GCP_ADC_STATUS, "configured")
                 return {"auth_method": "adc", "project": project, "valid": True}
         except Exception:
             console.print("[yellow]ADC still not detected after gcloud login.[/yellow]")
@@ -589,7 +557,8 @@ def gcp_auth_interactive() -> dict[str, Any]:
                 creds, project = google_auth_default()
                 if creds and creds.valid:
                     console.print(
-                        f"[bold green]GCP authenticated via service account![/bold green] Project: [cyan]{project}[/cyan]"
+                        f"[bold green]GCP authenticated via service account![/bold green] "
+                        f"Project: [cyan]{project}[/cyan]"
                     )
                     return {
                         "auth_method": "service_account",
@@ -619,8 +588,7 @@ def get_gcp_credentials():
     creds, project = google_auth_default()
     if not creds or not creds.valid:
         raise RuntimeError(
-            "No GCP credentials available. Run 'python -m config.auth gcp' or "
-            "set GOOGLE_APPLICATION_CREDENTIALS."
+            "No GCP credentials available. Run 'python -m config.auth gcp' or set GOOGLE_APPLICATION_CREDENTIALS."
         )
     return creds, project
 
@@ -717,12 +685,8 @@ def push_config_to_api(meta: dict[str, Any], api_url: str) -> dict[str, Any]:
             subs = meta["subscriptions"]
             if subs:
                 sub = subs[0]
-                config_payload["config"]["subscription_id"] = sub.get(
-                    "subscription_id", ""
-                )
-                config_payload["config"]["resource_groups"] = sub.get(
-                    "resource_groups", []
-                )
+                config_payload["config"]["subscription_id"] = sub.get("subscription_id", "")
+                config_payload["config"]["resource_groups"] = sub.get("resource_groups", [])
 
     elif provider == "gcp":
         config_payload = {
@@ -743,9 +707,7 @@ def push_config_to_api(meta: dict[str, Any], api_url: str) -> dict[str, Any]:
     response.raise_for_status()
 
     result = response.json()
-    console.print(
-        f"[green]Config pushed successfully! config_id={result.get('id')}[/green]"
-    )
+    console.print(f"[green]Config pushed successfully! config_id={result.get('id')}[/green]")
 
     return result
 
@@ -773,9 +735,7 @@ def run_extractor_via_api(provider: str, api_url: str) -> dict[str, Any]:
     response.raise_for_status()
 
     result = response.json()
-    console.print(
-        f"[green]Extractor started! run_id={result.get('id')}, status={result.get('status')}[/green]"
-    )
+    console.print(f"[green]Extractor started! run_id={result.get('id')}, status={result.get('status')}[/green]")
 
     return result
 
@@ -785,9 +745,7 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="FinOps cloud provider authentication")
-    parser.add_argument(
-        "provider", choices=["azure", "gcp"], help="Cloud provider to authenticate"
-    )
+    parser.add_argument("provider", choices=["azure", "gcp"], help="Cloud provider to authenticate")
     parser.add_argument("--tenant-id", default=None, help="Azure AD tenant ID")
     parser.add_argument("--client-id", default=None, help="Azure app client ID")
     parser.add_argument(
@@ -795,9 +753,7 @@ def main() -> None:
         default=None,
         help="Subscription ID (auto-select all if not provided)",
     )
-    parser.add_argument(
-        "--auto-select", action="store_true", help="Auto-select all subscriptions"
-    )
+    parser.add_argument("--auto-select", action="store_true", help="Auto-select all subscriptions")
     parser.add_argument("--clear", action="store_true", help="Clear saved credentials")
     parser.add_argument(
         "--api-url",
@@ -811,9 +767,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s — %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s — %(message)s")
 
     if args.clear:
         clear_credentials(args.provider)
@@ -840,16 +794,12 @@ def main() -> None:
             result["provider"] = "azure"
             try:
                 config_result = push_config_to_api(result, api_url)
-                console.print(
-                    f"[green]Config pushed to API: {config_result.get('id')}[/green]"
-                )
+                console.print(f"[green]Config pushed to API: {config_result.get('id')}[/green]")
 
                 # Trigger run if requested
                 if args.run:
                     run_result = run_extractor_via_api("azure", api_url)
-                    console.print(
-                        f"[green]Extractor triggered: {run_result.get('id')}[/green]"
-                    )
+                    console.print(f"[green]Extractor triggered: {run_result.get('id')}[/green]")
             except Exception as e:
                 console.print(f"[red]API error: {e}[/red]")
 
@@ -862,16 +812,12 @@ def main() -> None:
             result["provider"] = "gcp"
             try:
                 config_result = push_config_to_api(result, api_url)
-                console.print(
-                    f"[green]Config pushed to API: {config_result.get('id')}[/green]"
-                )
+                console.print(f"[green]Config pushed to API: {config_result.get('id')}[/green]")
 
                 # Trigger run if requested
                 if args.run:
                     run_result = run_extractor_via_api("gcp", api_url)
-                    console.print(
-                        f"[green]Extractor triggered: {run_result.get('id')}[/green]"
-                    )
+                    console.print(f"[green]Extractor triggered: {run_result.get('id')}[/green]")
             except Exception as e:
                 console.print(f"[red]API error: {e}[/red]")
 

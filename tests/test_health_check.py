@@ -6,7 +6,6 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import psycopg
-import pytest
 
 from extractors.health_check import (
     detect_stale_extractors,
@@ -16,10 +15,10 @@ from extractors.health_check import (
     mark_extractor_succeeded,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_connection() -> MagicMock:
     """Build a mock psycopg.Connection with a working cursor context manager."""
@@ -34,8 +33,8 @@ def _make_connection() -> MagicMock:
 # Tests: mark_extractor_started
 # ---------------------------------------------------------------------------
 
-class TestMarkExtractorStarted:
 
+class TestMarkExtractorStarted:
     @patch("extractors.health_check._get_pg_connection")
     def test_inserts_running_row(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
@@ -69,8 +68,8 @@ class TestMarkExtractorStarted:
 # Tests: mark_extractor_succeeded
 # ---------------------------------------------------------------------------
 
-class TestMarkExtractorSucceeded:
 
+class TestMarkExtractorSucceeded:
     @patch("extractors.health_check._get_pg_connection")
     def test_updates_status_and_count(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
@@ -93,8 +92,8 @@ class TestMarkExtractorSucceeded:
 # Tests: mark_extractor_failed
 # ---------------------------------------------------------------------------
 
-class TestMarkExtractorFailed:
 
+class TestMarkExtractorFailed:
     @patch("extractors.health_check._get_pg_connection")
     def test_updates_status_and_error(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
@@ -139,8 +138,8 @@ class TestMarkExtractorFailed:
 # Tests: get_extractor_status
 # ---------------------------------------------------------------------------
 
-class TestGetExtractorStatus:
 
+class TestGetExtractorStatus:
     @patch("extractors.health_check._get_pg_connection")
     def test_returns_status_list(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
@@ -193,8 +192,8 @@ class TestGetExtractorStatus:
 # Tests: detect_stale_extractors
 # ---------------------------------------------------------------------------
 
-class TestDetectStaleExtractors:
 
+class TestDetectStaleExtractors:
     @patch("extractors.health_check._get_pg_connection")
     def test_detects_stale_extractor(self, mock_pg: MagicMock) -> None:
         conn = _make_connection()
@@ -289,7 +288,7 @@ class TestDetectStaleExtractors:
         mock_pg.return_value = conn
 
         intervals = {"exchange_rates": timedelta(hours=1)}
-        stale = detect_stale_extractors(intervals, "postgresql://test:test@localhost/db")
+        detect_stale_extractors(intervals, "postgresql://test:test@localhost/db")
 
         # At exactly 2x, the elapsed time is approximately equal, not strictly
         # greater than the threshold, so it may or may not be flagged depending

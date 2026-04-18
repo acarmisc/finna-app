@@ -22,22 +22,21 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
-from psycopg.sql import SQL
+import psycopg
 from psycopg.rows import dict_row
+from psycopg.sql import SQL
 from psycopg.types.json import Json
 from tenacity import (
+    before_sleep_log,
     retry,
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    before_sleep_log,
 )
-import psycopg
 
 from extractors.gcp_shared import (
-    normalize_csv_row,
-    resolve_service_category,
     DEFAULT_SERVICE_CATEGORY_MAP,
+    normalize_csv_row,
 )
 from models import NormalizedCostRecord, ServiceCategory
 

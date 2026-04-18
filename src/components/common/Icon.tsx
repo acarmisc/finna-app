@@ -5,9 +5,18 @@ interface IconProps {
   size?: number;
   className?: string;
   style?: React.CSSProperties;
+  'aria-hidden'?: boolean;
+  'aria-label'?: string;
 }
 
-export function Icon({ name, size = 16, className = '', style }: IconProps) {
+export function Icon({
+  name,
+  size = 16,
+  className = '',
+  style,
+  'aria-hidden': ariaHidden = true,
+  'aria-label': ariaLabel,
+}: IconProps) {
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -19,6 +28,8 @@ export function Icon({ name, size = 16, className = '', style }: IconProps) {
       });
     }
   }, [name]);
+
+  const isDecorative = ariaHidden !== false && !ariaLabel;
 
   return (
     <i
@@ -33,6 +44,9 @@ export function Icon({ name, size = 16, className = '', style }: IconProps) {
         justifyContent: 'center',
         ...style,
       }}
+      aria-hidden={isDecorative ? true : undefined}
+      aria-label={ariaLabel || undefined}
+      role={ariaLabel ? 'img' : undefined}
     />
   );
 }
