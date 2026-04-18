@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import subprocess
@@ -11,8 +10,9 @@ import threading
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-import psycopg
 from psycopg.rows import dict_row
+
+from api.metrics import extractor_run_total
 
 logger = logging.getLogger("api.runner")
 
@@ -34,9 +34,7 @@ def _get_extractor_type(provider: str) -> str:
     return mapping.get(provider, provider)
 
 
-def _build_env_from_config(
-    config: dict[str, Any], provider: str, cred_type: str | None = None
-) -> dict[str, str]:
+def _build_env_from_config(config: dict[str, Any], provider: str, cred_type: str | None = None) -> dict[str, str]:
     """Build environment variables from cloud_config."""
     env = os.environ.copy()
 
@@ -137,9 +135,7 @@ def start_extractor(
 
     # Also get credential_type from cloud_config table
     with conn.cursor(row_factory=dict_row) as cur:
-        cur.execute(
-            "SELECT credential_type FROM cloud_config WHERE id = %s", (config_id,)
-        )
+        cur.execute("SELECT credential_type FROM cloud_config WHERE id = %s", (config_id,))
         config_row = cur.fetchone()
     if config_row:
         cred_type = config_row["credential_type"]
@@ -173,6 +169,9 @@ def start_extractor(
         stderr=subprocess.STDOUT,
         text=True,
     )
+
+    # Increment extractor run counter on start
+    extractor_run_total.labels(provider=provider, status="running").inc()
 
     # Register running process
     with _process_lock:
@@ -209,6 +208,9 @@ def start_extractor(
         else:
             status = "failed"
             error = f"Exit code: {proc.returncode}"
+
+        # Increment extractor run counter on completion
+        extractor_run_total.labels(provider=provider, status=status).inc()
 
         _update_run_status(run_id, status, records, error, output)
 
