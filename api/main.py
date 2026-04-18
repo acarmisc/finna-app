@@ -4,17 +4,21 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import FileResponse
+from starlette.staticfiles import StaticFiles
 
 logger = logging.getLogger("api.main")
 
@@ -94,6 +98,57 @@ class TokenVerificationMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class RequestDurationMiddleware(BaseHTTPMiddleware):
+    """Middleware to record request duration in Prometheus histogram."""
+
+    async def dispatch(self, request: Request, call_next):
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration = time.perf_counter() - start
+        from api.metrics import api_request_duration_histogram
+
+        endpoint = request.url.path
+        api_request_duration_histogram.labels(method=request.method, endpoint=endpoint).observe(duration)
+        return response
+
+
+def setup_telemetry(app: FastAPI) -> None:
+    """Configure OpenTelemetry tracing for FastAPI."""
+    try:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+        from opentelemetry import trace
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanExporter
+        from opentelemetry.sdk.resources import Resource
+
+        otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+        service_name = os.getenv("OTEL_SERVICE_NAME", "finna-api")
+
+        resource = Resource.create({"service.name": service_name})
+        provider = TracerProvider(resource=resource)
+
+        if otlp_endpoint:
+            try:
+                from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+                    OTLPSpanExporter,
+                )
+
+                exporter = OTLPSpanExporter(endpoint=otlp_endpoint)
+                provider.add_span_processor(
+                    __import__("opentelemetry.sdk.trace.export", fromlist=["BatchSpanProcessor"]).BatchSpanProcessor(
+                        exporter
+                    )
+                )
+            except Exception:
+                pass
+
+        trace.set_tracer_provider(provider)
+        FastAPIInstrumentor.instrument_app(app)
+        logger.info("OpenTelemetry tracing configured (service=%s)", service_name)
+    except ImportError:
+        logger.debug("OpenTelemetry packages not installed — skipping tracing setup")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> None:
     """Application lifecycle: startup and shutdown."""
@@ -147,7 +202,10 @@ async def lifespan(app: FastAPI) -> None:
         should_ignore_health_status=True,
         excluded_handlers=["/metrics", "/healthz"],
     )
-    instrumentator.instrument(app).expose(app, include_in_schema=False)
+    instrumentator.instrument(app)
+
+    # Configure OpenTelemetry tracing
+    setup_telemetry(app)
 
     yield
 
@@ -168,6 +226,9 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_middleware(RateLimitMiddleware)
 
+# Request duration middleware
+app.add_middleware(RequestDurationMiddleware)
+
 # Token verification middleware
 app.add_middleware(TokenVerificationMiddleware)
 
@@ -180,6 +241,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics():
+    """Expose Prometheus metrics."""
+    from api.metrics import api_request_duration_histogram  # noqa: F401
+
+    return PlainTextResponse(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 @app.get("/healthz")
@@ -224,6 +293,31 @@ from api.routes import config as config_router  # noqa: E402
 app.include_router(config_router.router, prefix="/api/v1", tags=["config"])
 app.include_router(extractors.router, prefix="/api/v1", tags=["extractors"])
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
+
+# ---------------------------------------------------------------------------
+# Serve frontend static files (SPA fallback)
+# ---------------------------------------------------------------------------
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")
+
+
+@app.get("/{path:path}", include_in_schema=False)
+async def spa_fallback(path: str):
+    """Serve static files or fall back to index.html for SPA routing."""
+    if path.startswith("api/") or path.startswith("metrics") or path.startswith("healthz"):
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    static_dir = os.path.join(STATIC_DIR)
+    file_path = os.path.join(static_dir, path)
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+    index_path = os.path.join(static_dir, "index.html")
+    if os.path.isfile(index_path):
+        return FileResponse(index_path)
+    return JSONResponse({"detail": "Not Found"}, status_code=404)
+
+
+# Mount static directory for direct static file access (after routes so API takes priority)
+if os.path.isdir(STATIC_DIR):
+    app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="static-assets")
 
 
 if __name__ == "__main__":

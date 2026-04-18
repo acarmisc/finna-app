@@ -113,6 +113,15 @@ Generate a secure secret key:
 python -c 'import secrets; print(secrets.token_hex(32))'
 ```
 
+#### Security enforcement
+
+- `superset/superset_config.py` will **raise `SystemExit`** if `SUPERSET_SECRET_KEY` is unset, is the default placeholder, or is shorter than 32 characters.
+- `superset/bootstrap.py` **never logs credentials** — passwords are masked in all output.
+- Use `--dry-run` to validate configuration without making changes:
+  ```bash
+  python3 superset/bootstrap.py --dry-run
+  ```
+
 Three dashboards are created:
 - **FinOps Overview** — total cost, cost per provider, daily trends, top projects
 - **LLM Costs** — model cost efficiency, daily LLM spend, LLM share of total

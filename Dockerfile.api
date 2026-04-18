@@ -5,7 +5,17 @@
 # Run:    docker run --rm -p 8000:8000 -e PG_DSN=... finops-api
 # ---------------------------------------------------------------------------
 
-# ---- Stage 1: Builder ----
+# ---- Stage 1: Frontend build ----
+FROM node:20-slim AS frontend-builder
+
+WORKDIR /build
+COPY package.json package-lock.json* ./
+RUN npm install
+COPY src/ ./src/
+COPY tsconfig.json tsconfig*.json* vite.config.* index.html* ./
+RUN npm run build && mv dist /frontend
+
+# ---- Stage 2: Python builder ----
 FROM python:3.12-slim AS builder
 
 WORKDIR /build
@@ -15,7 +25,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY pyproject.toml .
 RUN uv pip install --system --no-cache -r pyproject.toml
 
-# ---- Stage 2: Runtime ----
+# ---- Stage 3: Runtime ----
 FROM python:3.12-slim
 
 RUN groupadd --gid 1000 appuser && \
@@ -31,6 +41,11 @@ COPY models/ ./models/
 COPY config/ ./config/
 COPY extractors/ ./extractors/
 COPY sql/ ./sql/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./alembic.ini
+
+# Copy frontend build output into static/ for SPA serving
+COPY --from=frontend-builder /frontend ./static/
 
 ENV HOST=0.0.0.0
 ENV PORT=8000

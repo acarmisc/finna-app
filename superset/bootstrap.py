@@ -59,6 +59,11 @@ if not _validate_password(ADMIN_PASSWORD):
     sys.exit(1)
 
 # ---------------------------------------------------------------------------
+# Dry-run support
+# ---------------------------------------------------------------------------
+DRY_RUN = "--dry-run" in sys.argv
+
+# ---------------------------------------------------------------------------
 # HTTP helpers
 # ---------------------------------------------------------------------------
 
@@ -535,6 +540,16 @@ def create_chart(api, chart_def, dataset_id, db_id):
 
 def main():
     print("=== Superset Bootstrap (API) ===")
+
+    if DRY_RUN:
+        print("\n  --dry-run: validating configuration without making changes")
+        print(f"  SUPERSET_BASE_URL: {SUPERSET_BASE_URL}")
+        print(f"  ADMIN_USERNAME: {ADMIN_USERNAME}")
+        print(f"  ADMIN_PASSWORD: {'***' if ADMIN_PASSWORD else '<empty>'}")
+        print(f"  FINOPS_PG_URI: {FINOPS_PG_URI.split('@')[-1] if '@' in FINOPS_PG_URI else '***'}")
+        print("\n  Validation passed. No changes were made.")
+        print("=== Done (dry-run) ===")
+        return
 
     # Wait for Superset to be ready
     max_wait = 120

@@ -1,6 +1,6 @@
 """Prometheus metrics for API."""
 
-from prometheus_client import Counter, Gauge
+from prometheus_client import Counter, Gauge, Histogram
 
 config_count = Gauge(
     "finna_config_total",
@@ -29,3 +29,11 @@ api_request_total = Counter(
     ["method", "endpoint", "status"],
 )
 """Counter metric tracking total API requests by method, endpoint, and status."""
+
+api_request_duration_histogram = Histogram(
+    "finna_api_request_duration_seconds_bucket",
+    "API request duration histogram in seconds",
+    ["method", "endpoint"],
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
+)
+"""Histogram metric tracking API request durations with configurable buckets."""
