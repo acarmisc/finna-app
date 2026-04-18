@@ -6,119 +6,34 @@ This guide covers common operational tasks for the FinOps multi-cloud monitoring
 
 ## Adding a New Extractor Type
 
-1. **Create the extractor module** in `extractors/<name>.py`. It must:
-   - Define a `main()` function as the Cloud Run Job entrypoint.
-   - Read configuration from environment variables (see existing extractors for the pattern).
-   - Normalize raw data into `NormalizedCostRecord` instances.
-   - Insert records into `cost_records` using `ON CONFLICT (record_id) DO NOTHING` for idempotency.
-   - Track health in the `extractor_health` table (mark running/success/failed).
+Finna now uses a **Plugin-based system**.
 
-2. **Register the extractor** in `extractors/entrypoint.py` by adding it to `EXTRACTOR_MAP`:
-   ```python
-   EXTRACTOR_MAP = {
-       ...
-       "<name>": "extractors.<name>",
-   }
-   ```
+1.  **Create the extractor plugin** in `extractors/`. See [Extractor Plugin Guide](./plugins-guide.md) for implementation details.
+2.  **Register the plugin**: 
+    -   Add it to `extractors/plugins.py` for built-in support.
+    -   Or set the `EXTRACTOR_PLUGINS` env var for external modules.
 
-3. **Add required env vars** to the client's `extractor_config.yaml` (update `onboarding/setup_client.py` if the extractor should be auto-configured for new clients).
-
-4. **Deploy** by rebuilding the Docker image:
-   ```bash
-   docker build -f Dockerfile.extractor -t finops-extractor .
-   ```
-
-5. **Create a Cloud Run Job** that sets `EXTRACTOR_TYPE=<name>` and the required environment variables.
-
-6. **Verify** by running the job manually and checking `extractor_health`:
-   ```sql
-   SELECT * FROM extractor_health WHERE extractor_name = '<name>';
-   ```
-
----
-
-## Updating Dashboards
-
-Dashboards are provisioned in Apache Superset via the `superset/bootstrap.py` script:
-
-- **FinOps Overview** — High-level cost overview
-- **LLM Costs** — LLM-specific cost and token metrics
-- **Project Drill-down** — Per-project cost drilldown
-
-### To update a dashboard
-
-1. Edit the chart definitions in `superset/bootstrap.py`.
-2. Re-run the bootstrap script against your Superset instance:
-   ```bash
-   export SUPERSET_BASE_URL=http://your-superset:8088
-   export SUPERSET_ADMIN_USERNAME=admin
-   export ADMIN_PASSWORD=your-password
-   export FINOPS_PG_URI=postgresql://finops:finops_dev@postgres:5432/finops
-   python3 superset/bootstrap.py
-   ```
-   The script is idempotent — it checks by name before creating resources.
-
-### To add a new dashboard
-
-1. Add a new dashboard definition dict in `superset/bootstrap.py`.
-2. Add chart creation calls and the `ensure_dashboard()` call in `main()`.
-3. Re-run the bootstrap script.
-
-### Datasource
-
-The FinOps PostgreSQL connection is created automatically by the bootstrap script. If the connection string changes, update `FINOPS_PG_URI` and re-run.
-
----
-
-## Adding a New Client
-
-Use the onboarding script for idempotent client setup:
-
-```bash
-python -m onboarding.setup_client <client_id> \
-    --providers gcp azure \
-    --projects proj-1 proj-2
-```
-
-This generates:
-- `clients/<client_id>/extractor_config.yaml` -- Env var config per extractor
-- `clients/<client_id>/aggregation_config.yaml` -- Per-client aggregation settings
-- `clients/<client_id>/test_connectivity.py` -- Connectivity test script
-- `clients/registry.yaml` -- Updated registry entry
-
-After running the script:
-1. Fill in real values for placeholders (subscription IDs, tenant IDs, secrets) in the generated config files.
-2. Deploy Cloud Run Jobs for each enabled extractor type.
-4. Run the connectivity test:
-   ```bash
-   PG_DSN="postgresql://finops:...@host/finops" python clients/<client_id>/test_connectivity.py
-   ```
-
-Re-running the script is safe; it updates existing configs without errors.
+The legacy method of modifying `extractors/entrypoint.py` still works for standalone job execution but is being phased out in favor of the registry-driven orchestrator.
 
 ---
 
 ## Updating Seed Data
 
-Seed data is defined in `sql/init.sql` and loaded on first PostgreSQL startup via the Docker entrypoint.
+There are two ways to manage seed data:
 
-### To modify seed data
+### 1. Simple Seeding (Recommended for Dev)
+Use the JSON-based seeding script. This is the fastest way to populate the UI.
+1.  Edit `fixtures/sample_data.json`.
+2.  Run `make seed`.
 
-1. Edit `sql/init.sql`. The seed section is clearly labeled.
-2. For a fresh database, drop and recreate:
-   ```bash
-   docker compose down -v   # removes pg_data volume
-   docker compose up -d postgres
-   ```
-3. For an existing database without losing real data, run incremental inserts manually:
-   ```bash
-   psql "$PG_DSN" -f sql/init.sql  # only safe on a fresh DB
-   ```
-   For incremental changes, write targeted INSERT statements and run them directly.
+### 2. SQL-based Seeding (Legacy/Bulk)
+Seed data can also be defined in `sql/init.sql`. Note that this file is currently excluded from the default Docker Compose startup to avoid conflicts with Alembic migrations.
 
-### To add a new seed project
+To load it manually:
+```bash
+psql "$PG_DSN" -f sql/init.sql
+```
 
-Add a new entry to the project arrays in the `INSERT INTO cost_records` blocks for each provider. Follow the existing pattern of array indexing.
 
 ---
 
