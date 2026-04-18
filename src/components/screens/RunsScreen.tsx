@@ -4,7 +4,9 @@ import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { ProviderTag } from '../common/ProviderTag';
 import { Icon } from '../common/Icon';
-import { FINNA_DATA } from '../../data';
+import { Skeleton } from '../common/Skeleton';
+import { ErrorMessage } from '../common/ErrorMessage';
+import { useExtractorRuns } from '../../api/queries';
 import type { Run } from '../../types';
 
 interface RunsScreenProps {
@@ -12,15 +14,49 @@ interface RunsScreenProps {
 }
 
 export function RunsScreen({ onOpenRun }: RunsScreenProps) {
-  const { RUNS } = FINNA_DATA;
+  const { data: runsData, loading, error, refetch } = useExtractorRuns();
   const [flt, setFlt] = useState<'all' | 'success' | 'running' | 'failed'>('all');
+
+  const RUNS: Run[] = runsData
+    ? runsData.map(r => ({
+        id: r.id,
+        type: r.extractor_type,
+        prov: (r.provider || 'ecb') as any,
+        status: r.status === 'running' ? 'running' : r.status === 'success' ? 'success' : 'failed',
+        started: r.started_at,
+        dur: r.finished_at && r.started_at
+          ? (() => { const d = new Date(r.finished_at).getTime() - new Date(r.started_at).getTime(); return d < 60000 ? `${Math.round(d/1000)}s` : `${Math.floor(d/60000)}m ${Math.round((d%60000)/1000)}s`; })()
+          : '—',
+        rows: r.records_extracted,
+        err: r.error_message || undefined,
+      }))
+    : [];
+
   const rows = flt === 'all' ? RUNS : RUNS.filter(r => r.status === flt);
+
+  if (loading) {
+    return (
+      <div className="fn-screen" data-screen-label="Run log">
+        <TopBar title="Run log" subtitle="Loading..." />
+        <div style={{ padding: 24 }}><Skeleton height={40} /><Skeleton height={40} /><Skeleton height={40} /></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="fn-screen" data-screen-label="Run log">
+        <TopBar title="Run log" subtitle="Error" />
+        <ErrorMessage message={`Failed to load runs: ${error}`} onRetry={refetch} />
+      </div>
+    );
+  }
 
   return (
     <div className="fn-screen" data-screen-label="Run log">
       <TopBar title="Run log"
         subtitle={`Last ${RUNS.length} subprocess runs · from extractor_runs`}
-        actions={<Button variant="outline" size="sm" icon="refresh-cw">Refresh</Button>}
+        actions={<Button variant="outline" size="sm" icon="refresh-cw" onClick={refetch}>Refresh</Button>}
       />
       <div className="fn-filter-bar">
         <div className="fn-seg">
@@ -49,6 +85,7 @@ export function RunsScreen({ onOpenRun }: RunsScreenProps) {
                 <td><Icon name="chevron-right" size={14} style={{ color: 'var(--fg-subtle)' }} /></td>
               </tr>
             ))}
+            {rows.length === 0 && <tr><td colSpan={8} className="fn-empty">No runs found.</td></tr>}
           </tbody>
         </table>
       </div>

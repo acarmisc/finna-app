@@ -47,3 +47,7 @@ superset_data/
 *service-account*
 *.pem
 *.key
+# Node / Vite
+node_modules/
+dist/
+*.tsbuildinfo

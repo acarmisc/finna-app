@@ -23,7 +23,7 @@ import { Toaster } from './Toaster';
 import { TweaksPanel } from '../common/TweaksPanel';
 import { useTheme } from '../../hooks/useTheme';
 import { useLocalStorage } from '../../hooks/useLocalStorage';
-import { FINNA_DATA } from '../../data';
+import { useAppData } from '../../hooks/useAppData';
 import type { Toast, Connection, CostRecord, Run, Route, Resource, FinProject } from '../../types';
 import './Console.css';
 
@@ -56,6 +56,7 @@ export function Console() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [tweaksOpen, setTweaksOpen] = useState(false);
   const { theme, accent, density, setTheme, setAccent, setDensity } = useTheme();
+  const { data: FINNA_DATA } = useAppData();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

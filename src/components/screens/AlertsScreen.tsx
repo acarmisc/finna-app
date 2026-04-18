@@ -3,7 +3,9 @@ import { TopBar } from '../common/TopBar';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { Icon } from '../common/Icon';
-import { FINNA_DATA } from '../../data';
+import { Skeleton } from '../common/Skeleton';
+import { ErrorMessage } from '../common/ErrorMessage';
+import { useExtractorHealth } from '../../api/queries';
 import type { Toast, Alert } from '../../types';
 
 interface AlertsScreenProps {
@@ -11,14 +13,44 @@ interface AlertsScreenProps {
 }
 
 export function AlertsScreen({ pushToast }: AlertsScreenProps) {
-  const { ALERTS } = FINNA_DATA;
+  const { data: healthData, loading, error, refetch } = useExtractorHealth();
   const [tab, setTab] = useState<'firing' | 'resolved' | 'all'>('firing');
+
+  const ALERTS: Alert[] = healthData
+    ? healthData.map((h, i) => ({
+        id: `a_health_${i}`,
+        severity: h.status === 'ok' ? 'ok' as const : h.status === 'warn' ? 'warn' as const : 'err' as const,
+        title: h.name,
+        body: `Status: ${h.status} · ${h.records_count} records · last run ${h.last_run}`,
+        rule: `extractor_health.last_success < 6h`,
+        firing: h.status !== 'ok' ? 'recently' : null,
+        channels: ['#finops · Slack'],
+      }))
+    : [];
 
   const list = tab === 'firing'
     ? ALERTS.filter(a => a.severity !== 'ok')
     : tab === 'resolved'
     ? ALERTS.filter(a => a.severity === 'ok')
     : ALERTS;
+
+  if (loading) {
+    return (
+      <div className="fn-screen" data-screen-label="Alerts">
+        <TopBar title="Alerts" subtitle="Loading..." />
+        <div style={{ padding: 24 }}><Skeleton height={80} /><Skeleton height={80} /></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="fn-screen" data-screen-label="Alerts">
+        <TopBar title="Alerts" subtitle="Error" />
+        <ErrorMessage message={`Failed to load alerts: ${error}`} onRetry={refetch} />
+      </div>
+    );
+  }
 
   return (
     <div className="fn-screen" data-screen-label="Alerts">
@@ -45,6 +77,7 @@ export function AlertsScreen({ pushToast }: AlertsScreenProps) {
           <AlertCard key={a.id} a={a}
             onSnooze={() => pushToast({ tone: 'info', title: `Snoozed ${a.title}`, body: 'Will recheck in 1h' })} />
         ))}
+        {list.length === 0 && <div className="fn-empty" style={{ padding: 40, textAlign: 'center', color: 'var(--fg-subtle)' }}>No alerts to display.</div>}
       </div>
     </div>
   );

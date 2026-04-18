@@ -5,8 +5,11 @@ import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { ProviderTag, ProviderDot } from '../common/ProviderTag';
 import { Icon } from '../common/Icon';
-import { FINNA_DATA } from '../../data';
+import { Skeleton } from '../common/Skeleton';
+import { ErrorMessage } from '../common/ErrorMessage';
+import { useExtractorRuns } from '../../api/queries';
 import { fmt } from '../../utils/fmt';
+import { FINNA_DATA } from '../../data';
 import type { Toast, DayData, CostRecord, Run } from '../../types';
 
 interface DashboardScreenProps {
@@ -14,7 +17,23 @@ interface DashboardScreenProps {
 }
 
 export function DashboardScreen({ pushToast }: DashboardScreenProps) {
-  const { COSTS, RUNS, DAYS, ALERTS, PROJECTS } = FINNA_DATA;
+  const { data: runsData, loading: runsLoading, error: runsError, refetch: refetchRuns } = useExtractorRuns();
+  const { COSTS, DAYS, ALERTS, PROJECTS } = FINNA_DATA;
+  const RUNS: Run[] = runsData
+    ? runsData.map(r => ({
+        id: r.id,
+        type: r.extractor_type,
+        prov: (r.provider || 'ecb') as any,
+        status: r.status === 'running' ? 'running' : r.status === 'success' ? 'success' : 'failed',
+        started: r.started_at,
+        dur: r.finished_at && r.started_at
+          ? (() => { const d = new Date(r.finished_at).getTime() - new Date(r.started_at).getTime(); return d < 60000 ? `${Math.round(d/1000)}s` : `${Math.floor(d/60000)}m ${Math.round((d%60000)/1000)}s`; })()
+          : '—',
+        rows: r.records_extracted,
+        err: r.error_message || undefined,
+      }))
+    : FINNA_DATA.RUNS;
+
   const [range, setRange] = useState<'mtd' | 'ytd' | '90d'>('mtd');
   const [hover, setHover] = useState<DayData | null>(null);
   const [provFilter, setProvFilter] = useState('all');
@@ -84,6 +103,12 @@ export function DashboardScreen({ pushToast }: DashboardScreenProps) {
     </button>
   );
 
+  const runsEl = runsLoading
+    ? <div className="fn-runs"><Skeleton height={40} /><Skeleton height={40} /></div>
+    : runsError
+    ? <ErrorMessage message={`Failed to load runs: ${runsError}`} onRetry={refetchRuns} />
+    : <div className="fn-runs">{RUNS.slice(0, 5).map(r => <RunRow key={r.id} r={r} />)}</div>;
+
   return (
     <div className="fn-screen" data-screen-label="Dashboard">
       <TopBar
@@ -118,7 +143,7 @@ export function DashboardScreen({ pushToast }: DashboardScreenProps) {
             ))}
           </FilterChip>
           <Button variant="outline" size="sm" icon="refresh-cw"
-            onClick={() => pushToast({ tone: 'ok', title: 'Extractors queued', body: '4 extractors scheduled · ~90s' })}>
+            onClick={() => { refetchRuns(); pushToast({ tone: 'ok', title: 'Extractors queued', body: '4 extractors scheduled · ~90s' }); }}>
             Run now
           </Button>
           <Button variant="primary" size="sm" icon="download">Export</Button>
@@ -176,9 +201,7 @@ export function DashboardScreen({ pushToast }: DashboardScreenProps) {
             </div>
             <a href="#" onClick={e => e.preventDefault()}>Run log →</a>
           </div>
-          <div className="fn-runs">
-            {RUNS.slice(0, 5).map(r => <RunRow key={r.id} r={r} />)}
-          </div>
+          {runsEl}
         </div>
       </div>
 

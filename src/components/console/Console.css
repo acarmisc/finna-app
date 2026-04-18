@@ -720,5 +720,10 @@ button {
 /* ========== SETTINGS TWEAKS ========== */
 .fn-tweaks-grid { display: flex; flex-direction: column; gap: var(--s-4); }
 
+/* ========== SKELETON ========== */
+@keyframes fn-pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+.fn-skeleton { background: var(--bg-accent); border-radius: var(--radius-sm); animation: fn-pulse 1.5s ease-in-out infinite; }
+.fn-error-state { color: var(--fg-subtle); }
+
 /* mono helper */
 .mono { font-family: var(--font-mono); font-feature-settings: 'ss02', 'zero'; }

@@ -4,6 +4,9 @@ import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { ProviderTag, ProviderDot } from '../common/ProviderTag';
 import { Icon } from '../common/Icon';
+import { Skeleton } from '../common/Skeleton';
+import { ErrorMessage } from '../common/ErrorMessage';
+import { useConfigs } from '../../api/queries';
 import { FINNA_DATA } from '../../data';
 import type { Toast, Connection, Route } from '../../types';
 
@@ -15,7 +18,9 @@ interface ConnectionsScreenProps {
 }
 
 export function ConnectionsScreen({ pushToast, onNew, onOpen, onNav }: ConnectionsScreenProps) {
-  const { CONNECTIONS, FIN_PROJECTS } = FINNA_DATA;
+  const { data: configs, loading, error, refetch } = useConfigs();
+  const { FIN_PROJECTS } = FINNA_DATA;
+  const CONNECTIONS = FINNA_DATA.CONNECTIONS;
   const [view, setView] = useState<'cards' | 'table'>(
     (localStorage.getItem('finna-conn-view') as 'cards' | 'table') || 'cards'
   );
@@ -26,6 +31,24 @@ export function ConnectionsScreen({ pushToast, onNew, onOpen, onNav }: Connectio
     setView(v);
     localStorage.setItem('finna-conn-view', v);
   };
+
+  if (loading) {
+    return (
+      <div className="fn-screen" data-screen-label="Connections">
+        <TopBar title="Connections" subtitle="Loading..." />
+        <div style={{ padding: 24 }}><Skeleton height={120} /><Skeleton height={120} /><Skeleton height={120} /></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="fn-screen" data-screen-label="Connections">
+        <TopBar title="Connections" subtitle="Error" />
+        <ErrorMessage message={`Failed to load connections: ${error}`} onRetry={refetch} />
+      </div>
+    );
+  }
 
   return (
     <div className="fn-screen" data-screen-label="Connections">
@@ -38,7 +61,7 @@ export function ConnectionsScreen({ pushToast, onNew, onOpen, onNav }: Connectio
             ))}
           </div>
           <Button variant="outline" size="sm" icon="refresh-cw"
-            onClick={() => pushToast({ tone: 'info', title: 'Re-checking all connections' })}>
+            onClick={() => { refetch(); pushToast({ tone: 'info', title: 'Re-checking all connections' }); }}>
             Check all
           </Button>
           <Button variant="primary" size="sm" icon="plus" onClick={onNew}>New connection</Button>
