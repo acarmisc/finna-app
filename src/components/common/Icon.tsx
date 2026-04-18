@@ -18,7 +18,7 @@ export function Icon({ name, size = 16, className = '', style }: IconProps) {
         nameAttr: 'data-lucide',
       });
     }
-  });
+  }, [name]);
 
   return (
     <i

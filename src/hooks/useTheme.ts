@@ -34,9 +34,9 @@ export function useTheme() {
     document.body.className = state.density === 'compact' ? 'density-compact' : '';
 
     const accentColors = ACCENT_COLORS[state.accent];
-    root.style.setProperty('--accent-slate-brand', accentColors.brand);
-    root.style.setProperty('--accent-slate-weak', accentColors.weak);
-    root.style.setProperty('--accent-slate-ink', accentColors.ink);
+    root.style.setProperty(`--accent-${state.accent}-brand`, accentColors.brand);
+    root.style.setProperty(`--accent-${state.accent}-weak`, accentColors.weak);
+    root.style.setProperty(`--accent-${state.accent}-ink`, accentColors.ink);
     root.style.setProperty('--primary', accentColors.brand);
     root.style.setProperty('--ring', accentColors.brand);
   }, [state]);
