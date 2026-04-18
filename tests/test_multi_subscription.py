@@ -35,7 +35,7 @@ class TestDiscoverAzureSubscriptions:
         assert result["ABC123"]["tenant_id"] == "tenant-001"
         assert result["ABC123"]["client_id"] == "client-001"
         assert result["ABC123"]["client_secret"] == "secret-001"
-        assert result["ABC123"]["scope"] == "subscription"
+        assert result["ABC123"]["scope"] == "resourcegroup"
         assert result["ABC123"]["mgmt_group_id"] == ""
 
     def test_multiple_subscriptions(self, monkeypatch):
@@ -83,11 +83,7 @@ class TestDiscoverAzureSubscriptions:
         """AZURE_SUBSCRIPTION_ID (no prefix) should NOT be discovered."""
         monkeypatch.setenv("AZURE_SUBSCRIPTION_ID", "legacy-sub")
         for key in list(os.environ):
-            if (
-                key.startswith("AZURE_")
-                and key.endswith("_SUBSCRIPTION_ID")
-                and key != "AZURE_SUBSCRIPTION_ID"
-            ):
+            if key.startswith("AZURE_") and key.endswith("_SUBSCRIPTION_ID") and key != "AZURE_SUBSCRIPTION_ID":
                 monkeypatch.delenv(key, raising=False)
         result = discover_azure_subscriptions_from_env()
         assert result == {}
@@ -102,9 +98,7 @@ class TestAzureMultiSubscriptionRun:
     @patch("extractors.azure_cost.psycopg.connect")
     @patch("extractors.azure_cost.fetch_cost_rows")
     @patch("extractors.azure_cost._create_azure_client")
-    def test_run_extractor_with_explicit_credentials(
-        self, mock_client_fn, mock_fetch, mock_pg_connect
-    ):
+    def test_run_extractor_with_explicit_credentials(self, mock_client_fn, mock_fetch, mock_pg_connect):
         """run_extractor should accept tenant_id/client_id/client_secret params."""
         from datetime import datetime, timezone
 
@@ -126,6 +120,7 @@ class TestAzureMultiSubscriptionRun:
             client_id="client-001",
             client_secret="secret-001",
             health_provider="azure_prod",
+            resource_group="test-rg",
         )
         assert total == 0
         mock_client_fn.assert_called_once_with(
@@ -138,9 +133,7 @@ class TestAzureMultiSubscriptionRun:
     @patch("extractors.azure_cost.psycopg.connect")
     @patch("extractors.azure_cost.fetch_cost_rows")
     @patch("extractors.azure_cost._create_azure_client")
-    def test_run_extractor_backward_compat(
-        self, mock_client_fn, mock_fetch, mock_pg_connect, monkeypatch
-    ):
+    def test_run_extractor_backward_compat(self, mock_client_fn, mock_fetch, mock_pg_connect, monkeypatch):
         """Single-subscription mode via AZURE_SUBSCRIPTION_ID still works."""
         from datetime import datetime, timezone
 
@@ -162,6 +155,7 @@ class TestAzureMultiSubscriptionRun:
         total = run_extractor(
             date_from=datetime(2024, 3, 1, tzinfo=timezone.utc),
             date_to=datetime(2024, 3, 31, tzinfo=timezone.utc),
+            resource_group="test-rg",
         )
         assert total == 0
 
@@ -222,11 +216,7 @@ class TestDiscoverGcpProjects:
     def test_does_not_match_legacy_single_var(self, monkeypatch):
         monkeypatch.setenv("GCP_PROJECT", "legacy-project")
         for key in list(os.environ):
-            if (
-                key.startswith("GCP_")
-                and key.endswith("_PROJECT")
-                and key != "GCP_PROJECT"
-            ):
+            if key.startswith("GCP_") and key.endswith("_PROJECT") and key != "GCP_PROJECT":
                 monkeypatch.delenv(key, raising=False)
         result = discover_gcp_projects_from_env()
         assert result == {}

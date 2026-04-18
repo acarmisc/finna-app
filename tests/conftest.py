@@ -5,6 +5,7 @@ import os
 os.environ["PG_DSN"] = "postgresql://test:test@localhost/testdb"
 os.environ["POOL_MIN_CONNS"] = "1"
 os.environ["POOL_MAX_CONNS"] = "5"
+os.environ["ENCRYPTION_KEY"] = "fd7Em6qcDLS1FfjAgi0oSc6-keC5uK8r8rshY_UVw5I="
 
 import asyncio
 from contextlib import asynccontextmanager

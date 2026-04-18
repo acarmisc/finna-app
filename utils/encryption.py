@@ -11,17 +11,19 @@ from cryptography.fernet import Fernet, InvalidToken
 SENSITIVE_FIELDS = {"client_secret", "key_file_content", "service_account_key"}
 
 
-def _get_encryption_key() -> bytes:
-    """Get or generate encryption key from ENCRYPTION_KEY env var."""
+def _get_encryption_key() -> str:
+    """Get or generate encryption key from ENCRYPTION_KEY env var.
+
+    Returns the base64-encoded key string (which Fernet will decode).
+    """
     key_env = os.getenv("ENCRYPTION_KEY")
     if key_env:
-        try:
-            return base64.urlsafe_b64decode(key_env)
-        except ValueError:
-            pass
+        return key_env
     key = Fernet.generate_key()
-    os.environ["ENCRYPTION_KEY"] = base64.urlsafe_b64encode(key).decode()  # type: ignore
-    return key
+    # key is bytes, but contains base64-encoded ASCII
+    key_str = key.decode()
+    os.environ["ENCRYPTION_KEY"] = key_str  # type: ignore
+    return key_str
 
 
 _fernet = Fernet(_get_encryption_key())

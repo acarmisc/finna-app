@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 os.environ["RATE_LIMIT_REQUESTS"] = "5"
 os.environ["RATE_LIMIT_WINDOW"] = "60"
+os.environ["ENCRYPTION_KEY"] = "fd7Em6qcDLS1FfjAgi0oSc6-keC5uK8r8rshY_UVw5I="
 
 
 class TestRateLimiter:
@@ -37,7 +38,7 @@ class TestRateLimiter:
         )
 
         assert limiter is not None
-        assert hasattr(limiter, "default_limits")
+        assert hasattr(limiter, "_default_limits")
 
     def test_rate_limit_dependency(self):
         """Test rate limit dependency injection."""

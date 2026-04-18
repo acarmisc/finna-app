@@ -14,6 +14,11 @@ from psycopg_pool import AsyncConnectionPool, ConnectionPool, PoolTimeout
 
 logger = logging.getLogger("api.db")
 
+# Pool size constants
+POOL_MIN_CONNS = int(os.getenv("POOL_MIN_CONNS", "2"))
+POOL_MAX_CONNS = int(os.getenv("POOL_MAX_CONNS", "10"))
+POOL_RECYCLE = int(os.getenv("POOL_RECYCLE", "3600"))
+
 # Global connection pools
 _async_pool: Optional[AsyncConnectionPool] = None
 _sync_pool: Optional[ConnectionPool] = None

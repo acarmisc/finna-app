@@ -22,15 +22,18 @@ class TestSupersetSecurity:
         """Test SECRET_KEY meets minimum length."""
         os.environ["SECRET_KEY"] = "a" * 32
 
-        from superset.app import create_app
+        with patch("superset.app.create_app") as mock_create_app:
+            mock_app = MagicMock()
+            mock_app.config = {"SECRET_KEY": os.getenv("SECRET_KEY")}
+            mock_create_app.return_value = mock_app
 
-        with patch("superset.app.config") as mock_config:
-            mock_config.return_value = {
-                "SECRET_KEY": os.getenv("SECRET_KEY"),
-            }
+            with patch("superset.app.config") as mock_config:
+                mock_config.return_value = {
+                    "SECRET_KEY": os.getenv("SECRET_KEY"),
+                }
 
-            secret_key = os.getenv("SECRET_KEY")
-            assert len(secret_key) >= 16
+                secret_key = os.getenv("SECRET_KEY")
+                assert len(secret_key) >= 16
 
     def test_superset_secret_key_not_default(self):
         """Test SECRET_KEY is not default value."""
@@ -66,15 +69,18 @@ class TestSecretKeyConfiguration:
 
     def test_secret_key_in_app_config(self):
         """Test SECRET_KEY in app configuration."""
-        from superset.app import create_app
+        with patch("superset.app.create_app") as mock_create_app:
+            mock_app = MagicMock()
+            mock_app.config = {"SECRET_KEY": "test"}
+            mock_create_app.return_value = mock_app
 
-        with patch("flask.app.App") as mock_app:
-            mock_app.return_value.config = {"SECRET_KEY": "test"}
+            with patch("flask.app.Flask") as mock_flask_app:
+                mock_flask_app.return_value.config = {"SECRET_KEY": "test"}
 
-            with patch("superset.app.config") as mock_config:
-                mock_config.return_value = {"SECRET_KEY": os.getenv("SECRET_KEY")}
+                with patch("superset.app.config") as mock_config:
+                    mock_config.return_value = {"SECRET_KEY": os.getenv("SECRET_KEY")}
 
-                assert os.getenv("SECRET_KEY") is not None
+                    assert os.getenv("SECRET_KEY") is not None
 
 
 class TestSecurityHeaders:
