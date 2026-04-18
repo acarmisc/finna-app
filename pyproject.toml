@@ -1,6 +1,6 @@
 [project]
 name = "finna-app"
-version = "0.1.0"
+version = "0.2.0"
 description = "Multi-cloud FinOps platform — normalize, aggregate, and visualize cost data from GCP, Azure, and LLM gateways"
 readme = "README.md"
 license = "Apache-2.0"
@@ -9,7 +9,9 @@ dependencies = [
     "cryptography>=42.0",
     "python-jose[cryptography]>=3.3",
     "alembic>=1.13",
+    "passlib[bcrypt]>=1.7",
     "psycopg[binary]>=3.1",
+    "psycopg-pool>=3.2",
     "pydantic>=2.0",
     "boto3>=1.28",
     "pyarrow>=14.0",

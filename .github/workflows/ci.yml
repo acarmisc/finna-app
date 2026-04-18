@@ -43,8 +43,8 @@ jobs:
 
       - name: Initialize database
         run: |
-          PGPASSWORD=finna psql -h localhost -U finna -d finna -f resources/sql/init.sql
-          PGPASSWORD=finna psql -h localhost -U finna -d finna -f resources/sql/migrations/001_cloud_config.sql
+          PGPASSWORD=finna psql -h localhost -U finna -d finna -f backend/resources/sql/init.sql
+          PGPASSWORD=finna psql -h localhost -U finna -d finna -f backend/resources/sql/migrations/001_cloud_config.sql
         env:
           PGHOST: localhost
           PGUSER: finna

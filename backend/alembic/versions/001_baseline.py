@@ -89,27 +89,33 @@ def upgrade() -> None:
     """)
 
     # daily_costs — materialized view for dashboard queries
-    op.execute("""
-        CREATE MATERIALIZED VIEW IF NOT EXISTS daily_costs AS
-        SELECT
-            date_trunc('day', usage_start) AS day,
-            provider,
-            project_id,
-            service_category,
-            service_name,
-            model_name,
-            sum(net_cost_usd) AS total_cost,
-            sum(input_tokens) AS total_input_tokens,
-            sum(output_tokens) AS total_output_tokens,
-            count(*) AS record_count
-        FROM cost_records
-        GROUP BY 1, 2, 3, 4, 5, 6
-    """)
+    conn = op.get_bind()
+    res = conn.execute(text("SELECT 1 FROM pg_matviews WHERE matviewname = 'daily_costs'")).fetchone()
+    if not res:
+        op.execute("""
+            CREATE MATERIALIZED VIEW daily_costs AS
+            SELECT
+                date_trunc('day', usage_start) AS day,
+                provider,
+                project_id,
+                service_category,
+                service_name,
+                model_name,
+                sum(net_cost_usd) AS total_cost,
+                sum(input_tokens) AS total_input_tokens,
+                sum(output_tokens) AS total_output_tokens,
+                count(*) AS record_count
+            FROM cost_records
+            GROUP BY 1, 2, 3, 4, 5, 6
+        """)
 
-    op.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_costs_pk
-        ON daily_costs (day, provider, project_id, service_category, service_name, model_name)
-    """)
+    # daily_costs index
+    res = conn.execute(text("SELECT 1 FROM pg_indexes WHERE indexname = 'idx_daily_costs_pk'")).fetchone()
+    if not res:
+        op.execute("""
+            CREATE UNIQUE INDEX idx_daily_costs_pk
+            ON daily_costs (day, provider, project_id, service_category, service_name, model_name)
+        """)
 
     # infra_metrics_agg — pre-aggregated infrastructure metrics
     partition_clause_infra = "PARTITION BY RANGE (window_start)" if HAS_PARTMAN else ""
