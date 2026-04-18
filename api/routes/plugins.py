@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from api.auth import require_auth
-from extractors.plugins import list_plugins
+from extractors.base import list_plugins
 
 router = APIRouter()
 

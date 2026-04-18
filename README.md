@@ -41,7 +41,10 @@ uv run python -m config.auth gcp     # GCP: delegates to gcloud
 # 4. Run an extractor
 EXTRACTOR_TYPE=exchange_rates docker compose --profile extractors up extractor
 
-# 5. Start the frontend (in a separate terminal)
+# 5. Populate sample data (optional - for local testing)
+make seed
+
+# 6. Start the frontend (in a separate terminal)
 npm install && npm run dev
 # → Open http://localhost:5173
 ```

@@ -1,4 +1,4 @@
-import type { Connection, CostRecord, Run, Alert, DayData, FinProject, AppData, Resource } from '../types';
+import type { Connection, CostRecord, Run, Alert, DayData, FinProject, AppData, Resource, Project } from '../types';
 
 const FIN_PROJECTS: FinProject[] = [
   { id: 'p1', name: 'data-platform', slug: 'data-platform', owner: 'Andrea C.', costCenter: 'Engineering', budgetCap: 15000, mtd: 8412, tags: { env: 'prod', team: 'data' }, created: '2025-01-15', note: 'Main analytics platform' },
@@ -58,9 +58,9 @@ const DAYS: DayData[] = Array.from({ length: 30 }, (_, i) => {
   return { day: d, label: `Nov ${d}`, gcp, azure, llm, total: gcp + azure + llm };
 });
 
-const PROJECTS = [
-  { name: 'data-platform', skus: [{ sku: 'Various', mtd: 8412, delta: 42.1, prev: 5917 }] },
-  { name: 'ml-inference', skus: [{ sku: 'GPT-4o + Claude', mtd: 12340, delta: 18.0, prev: 10458 }] },
+const PROJECTS: Project[] = [
+  { prov: 'gcp', name: 'data-platform', skus: [{ sku: 'Various', mtd: 8412, delta: 42.1, prev: 5917 }] },
+  { prov: 'llm', name: 'ml-inference', skus: [{ sku: 'GPT-4o + Claude', mtd: 12340, delta: 18.0, prev: 10458 }] },
 ];
 
 const TAG_VOCAB: Record<string, string[]> = {

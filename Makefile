@@ -1,4 +1,4 @@
-.PHONY: migrate migrate-rollback migrate-create
+.PHONY: migrate migrate-rollback migrate-create seed
 
 migrate:
 	alembic upgrade head
@@ -9,3 +9,6 @@ migrate-rollback:
 migrate-create:
 	@test "$(msg)" || (echo "Usage: make migrate-create msg=\"description\"" && exit 1)
 	alembic revision --autogenerate -m "$(msg)"
+
+seed:
+	python3 scripts/seed.py

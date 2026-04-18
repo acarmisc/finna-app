@@ -9,6 +9,7 @@ Create Date: 2026-04-18
 from typing import Sequence, Union
 
 from alembic import op
+from sqlalchemy import text
 
 revision: str = "001_baseline"
 down_revision: Union[str, None] = None
@@ -17,13 +18,21 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Extensions
-    op.execute("CREATE EXTENSION IF NOT EXISTS pg_partman")
-    op.execute("CREATE EXTENSION IF NOT EXISTS pg_cron")
+    # Check if pg_partman is available before trying to create it
+    conn = op.get_bind()
+    res = conn.execute(text("SELECT 1 FROM pg_available_extensions WHERE name = 'pg_partman'")).fetchone()
+    HAS_PARTMAN = res is not None
+
+    if HAS_PARTMAN:
+        op.execute("CREATE EXTENSION IF NOT EXISTS pg_partman")
+        op.execute("CREATE EXTENSION IF NOT EXISTS pg_cron")
+    else:
+        print("WARNING: pg_partman not available, skipping partitioning setup")
 
     # cost_records — partitioned by month on usage_start
-    op.execute("""
-        CREATE TABLE cost_records (
+    partition_clause = "PARTITION BY RANGE (usage_start)" if HAS_PARTMAN else ""
+    op.execute(f"""
+        CREATE TABLE IF NOT EXISTS cost_records (
             record_id       TEXT PRIMARY KEY,
             provider        TEXT NOT NULL,
             usage_start     TIMESTAMPTZ NOT NULL,
@@ -51,36 +60,37 @@ def upgrade() -> None:
             total_tokens    BIGINT,
             latency_ms      DOUBLE PRECISION,
             trace_id        TEXT,
-            tags            JSONB DEFAULT '{}'
-        ) PARTITION BY RANGE (usage_start)
+            tags            JSONB DEFAULT '{{}}'
+        ) {partition_clause}
     """)
 
-    op.execute("""
-        SELECT partman.create_parent(
-            p_parent_table := 'public.cost_records',
-            p_control := 'usage_start',
-            p_interval := '1 month',
-            p_premake := 3
-        )
-    """)
+    if HAS_PARTMAN:
+        op.execute("""
+            SELECT partman.create_parent(
+                p_parent_table := 'public.cost_records',
+                p_control := 'usage_start',
+                p_interval := '1 month',
+                p_premake := 3
+            )
+        """)
 
     # Indexes
     op.execute("""
-        CREATE INDEX idx_cost_provider_project_time
+        CREATE INDEX IF NOT EXISTS idx_cost_provider_project_time
         ON cost_records (provider, project_id, usage_start)
     """)
     op.execute("""
-        CREATE INDEX idx_cost_service_time
+        CREATE INDEX IF NOT EXISTS idx_cost_service_time
         ON cost_records (service_category, usage_start)
     """)
     op.execute("""
-        CREATE INDEX idx_cost_tags
+        CREATE INDEX IF NOT EXISTS idx_cost_tags
         ON cost_records USING gin (tags)
     """)
 
     # daily_costs — materialized view for dashboard queries
     op.execute("""
-        CREATE MATERIALIZED VIEW daily_costs AS
+        CREATE MATERIALIZED VIEW IF NOT EXISTS daily_costs AS
         SELECT
             date_trunc('day', usage_start) AS day,
             provider,
@@ -97,13 +107,14 @@ def upgrade() -> None:
     """)
 
     op.execute("""
-        CREATE UNIQUE INDEX idx_daily_costs_pk
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_daily_costs_pk
         ON daily_costs (day, provider, project_id, service_category, service_name, model_name)
     """)
 
     # infra_metrics_agg — pre-aggregated infrastructure metrics
-    op.execute("""
-        CREATE TABLE infra_metrics_agg (
+    partition_clause_infra = "PARTITION BY RANGE (window_start)" if HAS_PARTMAN else ""
+    op.execute(f"""
+        CREATE TABLE IF NOT EXISTS infra_metrics_agg (
             window_start    TIMESTAMPTZ NOT NULL,
             window_end      TIMESTAMPTZ NOT NULL,
             provider        TEXT NOT NULL,
@@ -117,26 +128,27 @@ def upgrade() -> None:
             network_in_bytes BIGINT,
             network_out_bytes BIGINT,
             sample_count    INTEGER NOT NULL
-        ) PARTITION BY RANGE (window_start)
+        ) {partition_clause_infra}
     """)
 
-    op.execute("""
-        SELECT partman.create_parent(
-            p_parent_table := 'public.infra_metrics_agg',
-            p_control := 'window_start',
-            p_interval := '1 month',
-            p_premake := 3
-        )
-    """)
+    if HAS_PARTMAN:
+        op.execute("""
+            SELECT partman.create_parent(
+                p_parent_table := 'public.infra_metrics_agg',
+                p_control := 'window_start',
+                p_interval := '1 month',
+                p_premake := 3
+            )
+        """)
 
     op.execute("""
-        CREATE INDEX idx_infra_resource_time
+        CREATE INDEX IF NOT EXISTS idx_infra_resource_time
         ON infra_metrics_agg (resource_id, window_start)
     """)
 
     # exchange_rates — ECB daily rates for currency conversion
     op.execute("""
-        CREATE TABLE exchange_rates (
+        CREATE TABLE IF NOT EXISTS exchange_rates (
             currency       TEXT NOT NULL,
             rate_to_usd    NUMERIC(18,8) NOT NULL,
             rate_date      DATE NOT NULL,
@@ -148,7 +160,7 @@ def upgrade() -> None:
 
     # extractor_health — health tracking for each extractor
     op.execute("""
-        CREATE TABLE extractor_health (
+        CREATE TABLE IF NOT EXISTS extractor_health (
             extractor_name  TEXT PRIMARY KEY,
             last_run_start  TIMESTAMPTZ NOT NULL,
             last_run_end    TIMESTAMPTZ,
@@ -172,6 +184,7 @@ def upgrade() -> None:
             ('NOK', 0.0920, current_date, 'ecb'),
             ('DKK', 0.1450, current_date, 'ecb'),
             ('INR', 0.0120, current_date, 'ecb')
+        ON CONFLICT DO NOTHING
     """)
 
 

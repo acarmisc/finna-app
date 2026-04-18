@@ -199,7 +199,7 @@ export function Console() {
         onNav={setRoute}
         onOpenCmd={() => setCmdOpen(true)}
         collapsed={collapsed}
-        onToggle={() => setCollapsed(c => !c)}
+        onToggle={() => setCollapsed(!collapsed)}
       />
       <main className="fn-main">{screenEl}</main>
 

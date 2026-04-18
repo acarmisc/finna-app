@@ -6,6 +6,7 @@ import { Skeleton } from '../common/Skeleton';
 import { ErrorMessage } from '../common/ErrorMessage';
 import { useConfigs } from '../../api/queries';
 import { useTheme } from '../../hooks/useTheme';
+import type { Theme, Density, Accent } from '../../types';
 
 export function SettingsScreen() {
   const { theme, density, accent, setTheme, setDensity, setAccent } = useTheme();
@@ -55,12 +56,12 @@ export function SettingsScreen() {
 }
 
 function TweaksPanel({ theme, density, accent, setTheme, setDensity, setAccent }: {
-  theme: string;
-  density: string;
-  accent: string;
-  setTheme: (t: string) => void;
-  setDensity: (d: string) => void;
-  setAccent: (a: string) => void;
+  theme: Theme;
+  density: Density;
+  accent: Accent;
+  setTheme: (t: Theme) => void;
+  setDensity: (d: Density) => void;
+  setAccent: (a: Accent) => void;
 }) {
   return (
     <div className="fn-panel">
@@ -79,10 +80,10 @@ function TweaksPanel({ theme, density, accent, setTheme, setDensity, setAccent }
               Compact
             </button>
             <button
-              className={`fn-seg-btn ${density === 'comfortable' ? 'is-active' : ''}`}
-              onClick={() => setDensity('comfortable')}
+              className={`fn-seg-btn ${density === 'cozy' ? 'is-active' : ''}`}
+              onClick={() => setDensity('cozy')}
             >
-              Comfortable
+              Cozy
             </button>
           </div>
         </div>
@@ -112,7 +113,7 @@ function TweaksPanel({ theme, density, accent, setTheme, setDensity, setAccent }
               <button
                 key={ac}
                 className={`fn-seg-btn ${accent === ac ? 'is-active' : ''}`}
-                onClick={() => setAccent(ac)}
+                onClick={() => setAccent(ac as Accent)}
               >
                 <span className="fn-accent-preview"
                   style={{

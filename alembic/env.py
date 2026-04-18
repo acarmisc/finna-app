@@ -21,10 +21,10 @@ def get_url() -> str:
     """Get database URL from PG_DSN env var."""
     dsn = os.getenv("PG_DSN")
     if dsn:
+        if dsn.startswith("postgresql://") and "+psycopg" not in dsn:
+            return dsn.replace("postgresql://", "postgresql+psycopg://", 1)
         return dsn
-    return os.getenv(
-        "DATABASE_URL", "postgresql://finna_user:finna_pass@localhost:5432/finna_db"
-    )
+    return os.getenv("DATABASE_URL", "postgresql+psycopg://finna_user:finna_pass@localhost:5432/finna_db")
 
 
 def run_migrations_offline() -> None:
