@@ -4,260 +4,206 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-Apache_2.0-green.svg)](https://opensource.org/licenses/Apache-2.0)
 
-Multi-cloud FinOps platform — normalize, aggregate, and visualize cost data from GCP, Azure, and LLM gateways (via OTel Collector).
+Multi-cloud FinOps platform — normalize, aggregate, and visualize cost data from GCP, Azure, LLM gateways, and custom sources via a plugin-based extractor system.
 
 ## Architecture
 
-```mermaid
-graph TD
-    GCP["GCP Billing<br/>BigQuery"]
-    AZURE["Azure Cost<br/>Management"]
-    OTEL["OTel Collector<br/>LLM Gateway"]
-    ECB["Exchange Rates<br/>ECB"]
-
-    GCP --> E
-    AZURE --> E
-    OTEL --> E
-    ECB --> E
-
-    subgraph E ["Extractors"]
-        E1[gcp_billing]
-        E2[azure_cost]
-        E3[otel_llm]
-        E4[exchange_rates]
-    end
-
-    E -->|"normalize + write"| PG
-
-    subgraph PG ["PostgreSQL"]
-        T1[cost_records]
-        T2[daily_costs]
-        T3[exchange_rates]
-        T4[extractor_health]
-    end
-
-    PG --> SUP
-
-    SUP["Superset<br/>Dashboards"]
+```
+Sources                    Extractors (plugins)           Storage           Visualization
+─────────                 ─────────────────              ────────          ─────────────
+GCP Billing  ──►  gcp_billing  ──┐
+GCP CSV      ──►  gcp_csv      ──┤
+Azure Cost   ──►  azure_cost   ──┼──► normalize ──► PostgreSQL ──►  Finna UI (React)
+ECB Rates    ──►  exchange_rates──┤    + write         │           ──►  Superset (optional)
+OTel/LLM     ──►  otel_llm *   ──┤                    │
+Your source  ──►  custom_plugin ─┘                ──►  Alert queries
+                                                    ──►  Daily aggregates
+* otel_llm is planned — not yet implemented
 ```
 
 ## Quick Start
 
 ```bash
-# 0. Install dependencies (requires uv — https://docs.astral.sh/uv/)
+# 1. Install dependencies
 uv sync
 
-# 1. Start Postgres
+# 2. Start PostgreSQL
 docker compose up -d postgres
 
-# 2. Authenticate with your cloud provider (no service account needed!)
-uv run python -m config.auth azure   # Azure: browser-based device code login
-uv run python -m config.auth gcp     # GCP: delegates to gcloud auth login
+# 3a. Run the API
+export PG_DSN="postgresql://finops:finops_dev@localhost:5432/finops"
+uv run python -m uvicorn api.main:app --port 8000
 
-# 3. Run an extractor (credentials are auto-discovered)
+# 3b. Authenticate (optional — for cloud extraction)
+uv run python -m config.auth azure    # Azure: browser login
+uv run python -m config.auth gcp     # GCP: delegates to gcloud
+
+# 4. Run an extractor
 EXTRACTOR_TYPE=exchange_rates docker compose --profile extractors up extractor
 
-# 4. Provision dashboards on an existing Superset instance
-export SUPERSET_BASE_URL=http://your-superset:8088
-export SUPERSET_ADMIN_USERNAME=admin
-export ADMIN_PASSWORD=your-password
-export FINOPS_PG_URI=postgresql://finops:finops_dev@postgres:5432/finops
-uv run python superset/bootstrap.py
+# 5. Start the frontend (in a separate terminal)
+npm install && npm run dev
+# → Open http://localhost:5173
 ```
 
-## Extractors
-
-| Type | Source | Auth methods | Env vars needed |
-|------|--------|-------------|-----------------|
-| `gcp_billing` | BigQuery billing export | ADC (`gcloud auth login`), service account key | `GCP_PROJECT`, `BQ_DATASET`, `BQ_TABLE`, `PG_DSN` |
-| `azure_cost` | Cost Management API | OAuth device code (browser), service principal, Azure CLI | `AZURE_SUBSCRIPTION_ID`, `PG_DSN` |
-| `otel_llm` | OTel Collector (planned) | — | `PG_DSN` + OTel pipeline config |
-| `exchange_rates` | ECB daily feed | — | `PG_DSN` only |
-
-All extractors write normalized rows into `cost_records` via `PG_DSN`. Run via `EXTRACTOR_TYPE` env var or the TUI wizard.
-
-### Authentication
-
-**No service account required for local development!** Use OAuth device-code flow:
-
+Smoke test:
 ```bash
-# Azure: authenticates via browser, caches token in OS keyring
-python -m config.auth azure --tenant-id <your-tenant>
-
-# GCP: delegates to gcloud CLI, sets up ADC
-python -m config.auth gcp
+bash scripts/smoke-test.sh
 ```
 
-Credential resolution order for extractors:
-- **Azure**: explicit env vars → keyring cached token → Azure CLI (`az login`) → `DefaultAzureCredential`
-- **GCP**: `GOOGLE_APPLICATION_CREDENTIALS` → `gcloud auth login` ADC → compute metadata
+## Extractor Plugins
 
-## Superset Dashboards
+Finna uses a plugin-based architecture. Each extractor declares:
 
-Dashboards are provisioned via the REST API using `superset/bootstrap.py` — an idempotent script that creates the database connection, datasets, charts, and dashboards. Configuration is in `superset/superset_config.py`.
+- **Metadata**: `display_name`, `description`, `provider`
+- **Auth methods**: What authentication options it supports (e.g. device code, service principal, ADC)
+- **Config fields**: What configuration the frontend should render (text, password, select, etc.)
 
-### Required Environment Variables
+### Built-in plugins
 
-| Variable | Description | Required |
-|----------|------------|----------|
-| `SUPERSET_SECRET_KEY` | Secret key for session encryption (min 32 chars) | Yes |
-| `SUPERSET_BASE_URL` | Superset instance URL | For bootstrap |
-| `SUPERSET_ADMIN_USERNAME` | Admin username | For bootstrap |
-| `ADMIN_PASSWORD` | Admin password (min 12 chars, not common) | For bootstrap |
-| `FINOPS_PG_URI` | PostgreSQL connection string | For bootstrap |
-| `SUPERSET_DATABASE_URI` | Superset metadata DB | No (default provided) |
-| `REDIS_URL` | Redis cache URL | No (default provided) |
+| Type | Provider | Auth | Description |
+|------|----------|------|-------------|
+| `gcp_billing` | GCP | ADC, service account key | BigQuery billing export |
+| `gcp_csv` | GCP | — | CSV billing file |
+| `azure_cost` | Azure | Device code, service principal, Azure CLI | Cost Management API |
+| `exchange_rates` | ECB | None | Daily ECB forex rates |
 
-Generate a secure secret key:
-```bash
-python -c 'import secrets; print(secrets.token_hex(32))'
+### Writing a custom plugin
+
+1. Create `extractors/my_source.py`:
+
+```python
+from extractors.base import ExtractorPlugin, ConfigField, extractor_plugin
+
+@extractor_plugin("my_source", display_name="My Source", description="Extract from My Source API")
+class MySourcePlugin(ExtractorPlugin):
+    def extract(self) -> int:
+        # Your extraction logic here
+        # Config values available via self.config["field_name"]
+        # Write rows to PostgreSQL via self.pg_dsn
+        return 42  # number of records inserted
+
+    def health_name(self) -> str:
+        return "my_source"
+
+    @classmethod
+    def config_fields(cls) -> list[ConfigField]:
+        return [
+            ConfigField(name="api_key", label="API Key", field_type="password"),
+            ConfigField(name="region", label="Region", required=False,
+                        options=[{"value": "us", "label": "US East"}, {"value": "eu", "label": "EU West"}]),
+        ]
+
+    @classmethod
+    def auth_methods(cls) -> list[dict[str, str]]:
+        return [{"id": "apikey", "label": "API Key", "sub": "Static key authentication"}]
+
+    @classmethod
+    def provider_id(cls) -> str:
+        return "my_cloud"
 ```
 
-#### Security enforcement
+2. Register it by adding to `EXTRACTOR_PLUGINS` env var or `extractors/plugins.py` `DISCOVERY_MODULES` list.
 
-- `superset/superset_config.py` will **raise `SystemExit`** if `SUPERSET_SECRET_KEY` is unset, is the default placeholder, or is shorter than 32 characters.
-- `superset/bootstrap.py` **never logs credentials** — passwords are masked in all output.
-- Use `--dry-run` to validate configuration without making changes:
-  ```bash
-  python3 superset/bootstrap.py --dry-run
-  ```
+3. The frontend automatically picks it up via `GET /api/v1/plugins` and renders the correct connection form.
 
-Three dashboards are created:
-- **FinOps Overview** — total cost, cost per provider, daily trends, top projects
-- **LLM Costs** — model cost efficiency, daily LLM spend, LLM share of total
-- **Project Drill-down** — per-project service categories, MTD vs. previous month
+## API Endpoints
 
-Alert queries for cost spikes and budget thresholds are in `sql/alert_queries.sql`.
-
-## Configuration
-
-### Authentication (TUI or CLI)
-
-```bash
-# Interactive TUI with OAuth device code
-python -m config.auth azure
-python -m config.auth gcp
-
-# Or use the full TUI wizard
-python -m config.wizard
-```
-
-Walks you through: authentication → client ID → PostgreSQL → cloud providers (GCP/Azure) → aggregation. OAuth tokens are cached in OS keyring; extractors auto-discover them. Outputs `clients/{id}/config.yaml` + `.env`.
-
-### Multi-subscription YAML
-
-The wizard and schema support multiple GCP projects and Azure subscriptions per client. See `config/schema.py` for the full Pydantic model.
-
-## CI/CD Pipeline
-
-This project uses GitHub Actions for continuous integration:
-
-### Test Coverage
-
-- **pytest** — Unit and integration tests
-- **ruff** — Linting (E, F, W, I rules)
-- **mypy** — Type checking
-
-### Running locally
-
-```bash
-# Install dev dependencies
-uv sync
-
-# Run tests
-uv run pytest
-
-# Run linter
-uv run ruff check .
-
-# Run type checker
-uv run mypy api/ extractors/
-```
-
-### Environment variables for tests
-
-The test job requires PostgreSQL connection parameters:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PGHOST` | PostgreSQL host | `localhost` |
-| `PGPORT` | PostgreSQL port | `5432` |
-| `PGDATABASE` | Database name | `finna` |
-| `PGUSER` | Database user | `finna` |
-| `PGPASSWORD` | Database password | `finna` |
-| `PGSSLMODE` | SSL mode | `disable` |
-
-## Database Schema
-
-`sql/init.sql` creates:
-
-- **`cost_records`** — partitioned by month, holds all normalized cost rows (cloud + LLM)
-- **`daily_costs`** — materialized view for dashboard queries, auto-refreshed every 15 min
-- **`exchange_rates`** — ECB daily rates for multi-currency normalization
-- **`extractor_health`** — tracks last run status per extractor
-- **`infra_metrics_agg`** — pre-aggregated infra metrics (partitioned by month)
-
-90 days of seed data (GCP + Azure + LLM) is inserted on first init.
-
-## Service Accounts
-
-This platform uses **dedicated service accounts** with least-privilege IAM — never use personal credentials.
-
-| Provider | Account Type | Minimum Roles | Configured via |
-|----------|-------------|---------------|----------------|
-| **GCP** | Service Account (JSON key) | `roles/bigquery.dataViewer`, `roles/cloudsql.client`, `roles/secretmanager.secretAccessor` | TUI wizard → `service_account_key_path`, or `GOOGLE_APPLICATION_CREDENTIALS` |
-| **Azure** | Service Principal (App Registration) | `Cost Management Reader` on target subscription | TUI wizard → `tenant_id`, `client_id`, `client_secret` per subscription |
-| **AWS** | IAM User / Role | `ce:GetCostAndUsage` | TUI wizard (planned — see #2) |
-
-> The TUI wizard (`python -m config.wizard`) walks you through credential setup for each provider with masked input for secrets.
-
-## Docker Images (CI/CD)
-
-GitHub Actions builds and pushes to **ghcr.io** on every `v*` tag:
-
-```bash
-git tag v1.0.0 && git push origin v1.0.0
-```
-
-Image: `ghcr.io/acarmisc/finops-extractor`
-
-## LLM Data Sources
-
-LLM cost data is ingested via an **OTel Collector extractor** (planned). This provides a vendor-neutral approach that can ingest LLM telemetry from any OpenTelemetry-compatible source via the OTLP protocol, leveraging the existing `trace_id`, `model_name`, `latency_ms` fields in `cost_records`. See the data model in `models/__init__.py` for the LLM-specific columns already supported.
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/healthz` | Health check |
+| `GET` | `/metrics` | Prometheus metrics |
+| `GET` | `/api/v1/plugins` | List registered extractor plugins |
+| `GET` | `/api/v1/plugins/{type}` | Get single plugin metadata |
+| `GET` | `/api/v1/config` | List cloud configurations |
+| `POST` | `/api/v1/config` | Create configuration |
+| `GET` | `/api/v1/config/{id}` | Get configuration |
+| `PUT` | `/api/v1/config/{id}` | Update configuration |
+| `DELETE` | `/api/v1/config/{id}` | Delete configuration |
+| `POST` | `/api/v1/extractors/run` | Start extractor run |
+| `GET` | `/api/v1/extractors/status` | List recent runs |
+| `GET` | `/api/v1/extractors/status/{id}` | Get run detail |
+| `POST` | `/api/v1/extractors/cancel/{id}` | Cancel running extractor |
+| `GET` | `/api/v1/extractors/health` | Extractor health status |
+| `POST` | `/api/v1/auth/token` | Get JWT token |
+| `POST` | `/api/v1/auth/device-code` | Start device code flow |
+| `POST` | `/api/v1/auth/token/poll` | Poll device code token |
 
 ## Project Structure
 
 ```
-├── aggregation/          # Aggregation pipeline config + models
-├── config/               # Schema, wizard (TUI), key mappings
-├── docs/                 # Operational guide, runbook, alert queries
-├── extractors/           # One Python module per cloud source
-├── models/               # Shared Pydantic models
-├── onboarding/           # Client setup script
-├── sql/                  # DDL + seed data + alert queries
-├── superset/             # Dashboard bootstrap scripts (assumes existing Superset)
-├── tests/                # Test suite
-├── Dockerfile.extractor  # Multi-stage Python image
-└── docker-compose.yml   # Local dev stack
+api/                 FastAPI orchestrator (auth, config, extractors, plugins, metrics)
+config/              CLI auth wizard and Pydantic config schema
+extractors/          Extractor plugins
+  base.py            ExtractorPlugin ABC and @extractor_plugin decorator
+  plugins.py         Built-in plugin registration and discovery
+  gcp_billing.py      GCP BigQuery extractor
+  gcp_csv.py          GCP CSV file extractor
+  azure_cost.py       Azure Cost Management extractor
+  exchange_rates.py    ECB exchange rate extractor
+  gcp_shared.py       GCP normalization utilities
+  health_check.py     Extractor health query utility
+models/              Shared Pydantic models (NormalizedCostRecord)
+sql/                DDL, seed data, migrations, alert queries
+src/                React/TypeScript frontend (Vite)
+  api/               API client layer (fetch hooks, auth, types)
+  components/        UI components (screens, modals, common)
+  hooks/             React hooks (useTheme, useLocalStorage, useAppData)
+  data/              Mock fallback data (used when API is unavailable)
+tests/              pytest suite (12 test files)
+scripts/            Operational scripts (smoke-test.sh)
+superset/           Dashboard bootstrap for existing Superset instance
 ```
 
-## Contributing
+## Configuration
 
-This README doubles as LLM context. When contributing:
+### CLI / TUI
 
-- **Extractors** follow the pattern in `extractors/gcp_billing.py` — read env vars, normalize to `cost_records` columns, batch-insert via psycopg.
-- **Schema changes** go in `config/schema.py` (Pydantic) and `sql/init.sql` (DDL). New fields must be nullable or have defaults.
-- **TUI** lives in `config/wizard.py` — use `questionary` for prompts, `rich` for output.
-- **No secrets in code** — all credentials via env vars or `${VAR}` placeholders in YAML. The `.gitignore` blocks `*credentials*`, `*service-account*`, `*.pem`, `*.key`, `.env*`.
-- **Terraform** was removed from the repo — see [issue #1](https://github.com/acarmisc/finna-app/issues/1) for restoration guidance.
+```bash
+# Interactive wizard
+uv run python -m config.wizard
 
-## Security Notes
+# Direct auth
+uv run python -m config.auth azure --api-url http://localhost:8000 --run
+uv run python -m config.auth gcp --api-url http://localhost:8000 --run
+```
 
-- Docker images run as non-root (`appuser`)
-- Dev defaults (`finops_dev`, `admin`) in `docker-compose.yml` are for local dev only — override via env vars in production
-- GCP uses Application Default Credentials; Azure uses `ClientSecretCredential`
-- Superset secret key must be overridden via `SUPERSET_SECRET_KEY` env var
+### Environment Variables
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `PG_DSN` | PostgreSQL connection string | Yes |
+| `ENCRYPTION_KEY` | Fernet key for secret encryption | Yes (API) |
+| `JWT_SECRET` | JWT signing key | Yes (API) |
+| `EXTRACTOR_TYPE` | Which extractor to run | Yes (Docker) |
+| `EXTRACTOR_PLUGINS` | Comma-separated Python modules for third-party plugins | No |
+| `AUTO_MIGRATE` | Run Alembic migrations on startup | No (default: false) |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OpenTelemetry collector endpoint | No |
+
+### Database
+
+`sql/init.sql` creates partitioned tables, materialized views, and 90 days of seed data. See `alembic/` for migrations.
+
+## Testing
+
+```bash
+uv run pytest                    # Unit + integration tests
+uv run ruff check .              # Lint
+uv run mypy api/ extractors/      # Type check
+```
+
+## Docker
+
+```bash
+docker compose up -d                    # Postgres only
+docker compose --profile extractors up  # + extractors
+```
+
+Build and push:
+```bash
+git tag v1.0.0 && git push origin v1.0.0  # Builds finops-api + finops-extractor
+```
 
 ## License
 
-[Apache License 2.0](LICENSE) — see [NOTICE](NOTICE) for third-party attributions.
+[Apache License 2.0](LICENSE)
