@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `api/models.py` - Pydantic schemas for request/response
   - `api/routes/config.py` - CRUD endpoints for cloud configurations
   - `api/routes/extractors.py` - Run, status, and health endpoints
-  - `api/routes/auth.py` - Device code flow endpoints (not fully tested)
+  - `api/routes/auth.py` - Device code flow endpoints
   - `api/runner.py` - Subprocess executor with status tracking
   - `sql/migrations/001_cloud_config.sql` - DB schema for `cloud_config` and `extractor_runs` tables
   - `Dockerfile.api` - API container definition
@@ -37,9 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Known Issues
 
-- Auth proxy (`api/routes/auth.py`) not fully tested
 - K8s manifests not yet implemented (Fase 7 of implementation plan)
-- Records count shows 0 in API response even when records were extracted (parsing issue in runner.py)
 
 ---
 

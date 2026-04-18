@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -23,6 +24,27 @@ _process_lock = threading.Lock()
 
 def _get_pg_dsn() -> str:
     return os.getenv("PG_DSN", "")
+
+
+_RECORD_PATTERNS = (
+    re.compile(r"(\d+)\s+records?\s+inserted", re.IGNORECASE),
+    re.compile(r"(\d+)\s+records?$", re.IGNORECASE),
+    re.compile(r"(\d+)\s+rates", re.IGNORECASE),
+    re.compile(r"Inserted\s+(\d+)\s+", re.IGNORECASE),
+)
+
+
+def _parse_records_from_lines(lines: list[str]) -> int:
+    """Parse record count from extractor stdout lines."""
+    for line in lines:
+        for pattern in _RECORD_PATTERNS:
+            match = pattern.search(line)
+            if match:
+                try:
+                    return int(match.group(1))
+                except (ValueError, IndexError):
+                    pass
+    return 0
 
 
 def _get_extractor_type(provider: str) -> str:
@@ -194,17 +216,7 @@ def start_extractor(
             status = "success"
             error = None
             # Try to extract record count from output
-            records = 0
-            for line in output_lines:
-                if "Inserted" in line and "records" in line:
-                    try:
-                        import re
-
-                        match = re.search(r"(\d+)\s+records?", line)
-                        if match:
-                            records = int(match.group(1))
-                    except Exception:
-                        pass
+            records = _parse_records_from_lines(output_lines)
         else:
             status = "failed"
             error = f"Exit code: {proc.returncode}"
