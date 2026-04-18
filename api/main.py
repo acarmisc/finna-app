@@ -12,8 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger("api.main")
@@ -131,8 +131,9 @@ async def lifespan(app: FastAPI) -> None:
         # Auto-migrate if enabled
         if os.getenv("AUTO_MIGRATE", "false").lower() == "true":
             try:
-                from alembic import command
                 from alembic.config import Config
+
+                from alembic import command
 
                 alembic_cfg = Config("alembic.ini")
                 command.upgrade(alembic_cfg, "head")
@@ -184,7 +185,7 @@ app.add_middleware(
 @app.get("/healthz")
 async def healthz() -> JSONResponse:
     """Health check endpoint."""
-    from api.db import get_pg_dsn, get_connection, release_connection
+    from api.db import get_connection, release_connection
 
     status = {
         "status": "ok",
@@ -217,7 +218,8 @@ async def db_stats() -> JSONResponse:
 
 
 # Mount routers
-from api.routes import auth, config as config_router, extractors  # noqa: E402
+from api.routes import auth, extractors  # noqa: E402
+from api.routes import config as config_router  # noqa: E402
 
 app.include_router(config_router.router, prefix="/api/v1", tags=["config"])
 app.include_router(extractors.router, prefix="/api/v1", tags=["extractors"])

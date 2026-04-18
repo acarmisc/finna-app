@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -12,8 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from api.auth import require_auth
-from api.db import execute, insert_and_return, query_one
-from api.models import Provider
+from api.db import insert_and_return
 
 logger = logging.getLogger("api.auth")
 
@@ -69,7 +67,7 @@ async def start_device_code(request: DeviceCodeStartRequest) -> dict[str, Any]:
 
     try:
         # Create credential to initiate flow
-        cred = DeviceCodeCredential(
+        DeviceCodeCredential(
             client_id=client_id,
             tenant_id=request.tenant_id,
         )
@@ -109,7 +107,6 @@ async def start_device_code(request: DeviceCodeStartRequest) -> dict[str, Any]:
 )
 async def poll_device_code(request: DeviceCodePollRequest) -> dict[str, Any]:
     """Poll for device code completion."""
-    from azure.identity import DeviceCodeCredential
     from msal import Application
 
     device_code = request.device_code
@@ -138,7 +135,7 @@ async def poll_device_code(request: DeviceCodePollRequest) -> dict[str, Any]:
             now = datetime.now(timezone.utc)
 
             # Extract token for storage
-            access_token = token_result.get("access_token")
+            token_result.get("access_token")
 
             # For device code, we don't get client_secret
             # We store the token result differently

@@ -2,27 +2,12 @@
 
 from __future__ import annotations
 
-import os
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from api.auth import require_auth
-from api.db import query_one, query_all
-from api.models import (
-    ExtractorRunRequest,
-    ExtractorRunResponse,
-    ExtractorStatusResponse,
-)
-from api.runner import cancel_run, get_run_status, list_runs, start_extractor
-
-router = APIRouter()
-
-
-
-from api.auth import require_auth
-from api.db import query_one, query_all
 from api.models import (
     ExtractorRunRequest,
     ExtractorRunResponse,
@@ -37,7 +22,6 @@ router = APIRouter()
 async def run_extractor(request: ExtractorRunRequest) -> dict[str, Any]:
     """Start an extractor run."""
     from api.db import get_connection
-    from api.runner import _get_pg_dsn
 
     # Get config_id from request or find first config for provider
     config_id = request.config_id
@@ -76,9 +60,7 @@ async def run_extractor(request: ExtractorRunRequest) -> dict[str, Any]:
 
 
 @router.get("/extractors/status", response_model=list[ExtractorStatusResponse], dependencies=[Depends(require_auth)])
-async def get_status(
-    limit: int = 50, provider: Optional[str] = None
-) -> list[dict[str, Any]]:
+async def get_status(limit: int = 50, provider: Optional[str] = None) -> list[dict[str, Any]]:
     """Get recent extractor runs."""
     runs = list_runs(limit=limit, provider=provider)
     return [
