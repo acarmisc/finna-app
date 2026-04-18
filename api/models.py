@@ -49,9 +49,7 @@ class GCPConfigInput(BaseModel):
     """GCP configuration input."""
 
     project_id: str = Field(..., description="GCP project ID")
-    billing_account_id: Optional[str] = Field(
-        None, description="GCP billing account ID"
-    )
+    billing_account_id: Optional[str] = Field(None, description="GCP billing account ID")
     bigquery_dataset: Optional[str] = Field(None, description="BigQuery dataset")
     bigquery_table: Optional[str] = Field(None, description="BigQuery table name")
     environment: Optional[str] = Field(None, description="prod / staging / dev")
@@ -142,9 +140,7 @@ class DeviceCodeStartRequest(BaseModel):
     """Request schema for starting device code flow."""
 
     tenant_id: str = Field(default="organizations", description="Azure AD tenant ID")
-    client_id: Optional[str] = Field(
-        None, description="Client ID (defaults to known public client)"
-    )
+    client_id: Optional[str] = Field(None, description="Client ID (defaults to known public client)")
 
 
 class DeviceCodeStartResponse(BaseModel):
@@ -170,6 +166,25 @@ class DeviceCodePollResponse(BaseModel):
 
     status: str  # "pending" | "completed" | "expired" | "failed"
     config_id: Optional[str] = None  # Only when completed
+
+
+# ============================================================================
+# Token schemas
+# ============================================================================
+
+
+class TokenRequest(BaseModel):
+    """Request schema for token endpoint."""
+
+    username: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    """Response schema for token endpoint."""
+
+    access_token: str
+    token_type: str = "bearer"
 
 
 # ============================================================================

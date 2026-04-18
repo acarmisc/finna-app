@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from api.auth import require_auth
 from api.db import execute, insert_and_return, query_one
 from api.models import Provider
 
@@ -50,7 +52,7 @@ class DeviceCodePollResponse(BaseModel):
 AZURE_DEVICE_CODE_CLIENT = "04b07795-a71b-4e6a-8f4e-d9e78e1a5c0e"
 
 
-@router.post("/auth/azure/device-code", response_model=DeviceCodeStartResponse)
+@router.post("/auth/azure/device-code", response_model=DeviceCodeStartResponse, dependencies=[Depends(require_auth)])
 async def start_device_code(request: DeviceCodeStartRequest) -> dict[str, Any]:
     """Start Azure device code flow."""
     from azure.identity import DeviceCodeCredential
@@ -81,13 +83,9 @@ async def start_device_code(request: DeviceCodeStartRequest) -> dict[str, Any]:
             authority=f"https://login.microsoftonline.com/{request.tenant_id}",
         )
 
-        flow = app.initiate_device_flow(
-            scopes=["https://management.azure.com/.default"]
-        )
+        flow = app.initiate_device_flow(scopes=["https://management.azure.com/.default"])
 
-        verification_uri = flow.get(
-            "verification_uri", "https://microsoft.com/devicelogin"
-        )
+        verification_uri = flow.get("verification_uri", "https://microsoft.com/devicelogin")
         user_code = flow.get("user_code", "")
 
         return {
@@ -101,12 +99,14 @@ async def start_device_code(request: DeviceCodeStartRequest) -> dict[str, Any]:
 
     except Exception as e:
         logger.error(f"Failed to start device code flow: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to start device code flow: {e}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to start device code flow: {e}")
 
 
-@router.post("/auth/azure/device-code/poll", response_model=DeviceCodePollResponse)
+@router.post(
+    "/auth/azure/device-code/poll",
+    response_model=DeviceCodePollResponse,
+    dependencies=[Depends(require_auth)],
+)
 async def poll_device_code(request: DeviceCodePollRequest) -> dict[str, Any]:
     """Poll for device code completion."""
     from azure.identity import DeviceCodeCredential
@@ -146,9 +146,7 @@ async def poll_device_code(request: DeviceCodePollRequest) -> dict[str, Any]:
                 "tenant_id": tenant_id,
                 "client_id": client_id,
                 "auth_method": "device_code",
-                "token_result": {
-                    k: v for k, v in token_result.items() if k != "access_token"
-                },
+                "token_result": {k: v for k, v in token_result.items() if k != "access_token"},
             }
 
             sql = """
@@ -192,7 +190,7 @@ class GCPRegisterRequest(BaseModel):
     key_file_content: Optional[str] = None
 
 
-@router.post("/auth/gcp/register")
+@router.post("/auth/gcp/register", dependencies=[Depends(require_auth)])
 async def register_gcp(request: GCPRegisterRequest) -> dict[str, Any]:
     """Register GCP credentials."""
     import uuid
@@ -208,9 +206,7 @@ async def register_gcp(request: GCPRegisterRequest) -> dict[str, Any]:
     if request.key_file_content:
         import base64
 
-        config["key_file_base64"] = base64.b64encode(
-            request.key_file_content.encode()
-        ).decode()
+        config["key_file_base64"] = base64.b64encode(request.key_file_content.encode()).decode()
 
     sql = """
         INSERT INTO cloud_config (id, provider, name, credential_type, config, created_at, updated_at)
