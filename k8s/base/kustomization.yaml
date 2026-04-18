@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: finops
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - api-deployment.yaml
+  - api-service.yaml
+  - cronjob-gcp.yaml
+  - cronjob-azure.yaml
+  - cronjob-exchange-rates.yaml
+
+commonLabels:
+  app.kubernetes.io/name: finops
+  app.kubernetes.io/part-of: finops-app
+
+images:
+  - name: finops-api
+    newTag: latest
+  - name: finops-extractor
+    newTag: latest
