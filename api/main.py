@@ -6,11 +6,53 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger("api.main")
+
+limiter = Limiter(key_func=get_remote_address)
+
+
+def rate_limit_from_env(var_name: str, default: int) -> int:
+    """Parse rate limit from environment variable."""
+    value = os.getenv(var_name)
+    if value is not None:
+        try:
+            return int(value)
+        except ValueError:
+            pass
+    return default
+
+
+RATE_LIMIT_PER_MINUTE = rate_limit_from_env("RATE_LIMIT_PER_MINUTE", 60)
+RATE_LIMIT_PER_HOUR = rate_limit_from_env("RATE_LIMIT_PER_HOUR", 1000)
+
+EXTRACTOR_LIMIT_PER_MINUTE = rate_limit_from_env("EXTRACTOR_LIMIT_PER_MINUTE", 30)
+EXTRACTOR_LIMIT_PER_HOUR = rate_limit_from_env("EXTRACTOR_LIMIT_PER_HOUR", 200)
+
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    """Custom rate limit middleware to handle 429 responses properly."""
+
+    async def dispatch(self, request: Request, call_next):
+        try:
+            return await call_next(request)
+        except RateLimitExceeded as e:
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "error": "rate_limit_exceeded",
+                    "message": str(e),
+                    "detail": "Too many requests. Please try again later.",
+                },
+            )
 
 
 @asynccontextmanager
@@ -18,6 +60,7 @@ async def lifespan(app: FastAPI) -> None:
     """Application lifecycle: startup and shutdown."""
     # Startup: initialize connection pool
     from api.db import get_pg_dsn
+    from api.metrics import config_count
 
     if get_pg_dsn():
         try:
@@ -40,6 +83,38 @@ async def lifespan(app: FastAPI) -> None:
                 f"Could not initialize DB: {e}. Will retry on first request."
             )
 
+        # Initialize config_count metric
+        try:
+            from api.db import query_all
+
+            rows = query_all(
+                "SELECT provider, COUNT(*) as count FROM cloud_config GROUP BY provider"
+            )
+            for row in rows:
+                config_count.labels(provider=row["provider"]).set(row["count"])
+        except Exception as e:
+            logger.warning(f"Could not initialize config_count metric: {e}")
+
+        # Auto-migrate if enabled
+        if os.getenv("AUTO_MIGRATE", "false").lower() == "true":
+            try:
+                from alembic import command
+                from alembic.config import Config
+
+                alembic_cfg = Config("alembic.ini")
+                command.upgrade(alembic_cfg, "head")
+                logger.info("Alembic migrations applied successfully")
+            except Exception as e:
+                logger.warning(f"Could not run migrations: {e}")
+
+    # Initialize Prometheus metrics instrumentator
+    instrumentator = Instrumentator(
+        should_group_routes=True,
+        should_ignore_health_status=True,
+        excluded_handlers=["/metrics", "/healthz"],
+    )
+    instrumentator.instrument(app).expose(app, include_in_schema=False)
+
     yield
 
     # Shutdown: close connection pools
@@ -55,6 +130,9 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_middleware(RateLimitMiddleware)
 
 # CORS middleware for CLI (local development)
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
