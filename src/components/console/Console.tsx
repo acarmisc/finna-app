@@ -207,7 +207,7 @@ export function Console() {
         open={newConn}
         onClose={() => { setNewConn(false); setNewConnForProject(null); }}
         onCreate={c => {
-          pushToast({ tone: 'ok', title: `Created ${c.name}`, body: `${c.prov.toUpperCase()} · dry-run scheduled` });
+          pushToast({ tone: 'ok', title: `Created ${c.name}`, body: `${c.provider.toUpperCase()} · dry-run scheduled` });
         }}
       />
       <NewProjectModal

@@ -48,7 +48,18 @@ def _parse_records_from_lines(lines: list[str]) -> int:
 
 
 def _get_extractor_type(provider: str) -> str:
-    """Map provider to default extractor type."""
+    """Map provider to default extractor type.
+
+    First checks the plugin registry, then falls back to a hardcoded mapping.
+    """
+    from extractors.base import get_plugin
+
+    # Try common naming convention: provider -> provider_cost
+    for candidate in [f"{provider}_cost", f"{provider}_billing", provider]:
+        if get_plugin(candidate):
+            return candidate
+
+    # Hardcoded fallback for backwards compatibility
     mapping = {
         "azure": "azure_cost",
         "gcp": "gcp_billing",

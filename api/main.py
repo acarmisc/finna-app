@@ -289,9 +289,11 @@ async def db_stats() -> JSONResponse:
 # Mount routers
 from api.routes import auth, extractors  # noqa: E402
 from api.routes import config as config_router  # noqa: E402
+from api.routes import plugins as plugins_router  # noqa: E402
 
 app.include_router(config_router.router, prefix="/api/v1", tags=["config"])
 app.include_router(extractors.router, prefix="/api/v1", tags=["extractors"])
+app.include_router(plugins_router.router, prefix="/api/v1", tags=["plugins"])
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 
 # ---------------------------------------------------------------------------

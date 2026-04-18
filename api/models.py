@@ -12,6 +12,9 @@ from pydantic import BaseModel, Field
 class Provider(str, Enum):
     AZURE = "azure"
     GCP = "gcp"
+    AWS = "aws"
+    LLM = "llm"
+    ECB = "ecb"
 
 
 class CredentialType(str, Enum):
