@@ -26,7 +26,17 @@ def _get_encryption_key() -> str:
     return key_str
 
 
-_fernet = Fernet(_get_encryption_key())
+class FernetWrapper:
+    """Lazy-loading Fernet wrapper to defer initialization."""
+
+    _instance = None
+
+    @classmethod
+    def get_fernet(cls) -> Fernet:
+        """Get or create Fernet instance lazily."""
+        if cls._instance is None:
+            cls._instance = Fernet(_get_encryption_key())
+        return cls._instance
 
 
 def encrypt(plaintext: str) -> str:
@@ -37,7 +47,8 @@ def encrypt(plaintext: str) -> str:
         plaintext_bytes = plaintext.encode()
     else:
         plaintext_bytes = plaintext
-    ciphertext = _fernet.encrypt(plaintext_bytes)
+    fernet = FernetWrapper.get_fernet()
+    ciphertext = fernet.encrypt(plaintext_bytes)
     return base64.urlsafe_b64encode(ciphertext).decode()
 
 
@@ -47,7 +58,8 @@ def decrypt(ciphertext: str) -> str:
         return ciphertext
     try:
         data = base64.urlsafe_b64decode(ciphertext.encode())
-        return _fernet.decrypt(data).decode()
+        fernet = FernetWrapper.get_fernet()
+        return fernet.decrypt(data).decode()
     except (InvalidToken, ValueError):
         return ciphertext
 
