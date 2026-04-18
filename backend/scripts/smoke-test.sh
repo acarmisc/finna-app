@@ -11,7 +11,7 @@ if ! command -v docker &> /dev/null; then
 fi
 
 echo "1. Starting PostgreSQL..."
-docker compose up -d postgres
+docker compose -f deploy/docker-compose.yml up -d postgres
 echo "   Waiting for PostgreSQL to be ready..."
 sleep 5
 
@@ -21,7 +21,7 @@ uv sync --quiet 2>/dev/null || pip install -e . --quiet
 echo "3. Starting API server..."
 export PG_DSN="${PG_DSN:-postgresql://finops:finops_dev@localhost:5432/finops}"
 export AUTO_MIGRATE=true
-uv run python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 &
+uv run python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 &
 API_PID=$!
 sleep 3
 

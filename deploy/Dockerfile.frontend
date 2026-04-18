@@ -1,0 +1,39 @@
+# ---------------------------------------------------------------------------
+# FinOps Frontend — Production Build
+#
+# Build:  docker build -f deploy/Dockerfile.frontend -t finops-frontend .
+# Run:    docker run --rm -p 80:80 finops-frontend
+# ---------------------------------------------------------------------------
+
+# ---- Stage 1: Build ----
+FROM node:20-slim AS builder
+
+WORKDIR /build
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install
+COPY frontend/src/ ./src/
+COPY frontend/tsconfig.json frontend/tsconfig*.json* frontend/vite.config.* frontend/index.html ./
+RUN npm run build
+
+# ---- Stage 2: Runtime (Nginx) ----
+FROM nginx:alpine
+
+COPY --from=builder /build/dist /usr/share/nginx/html
+# Add a custom nginx config for SPA support if needed, but default is often fine for basic usage
+# For SPA routing, we usually need a try_files directive.
+
+RUN echo 'server { \
+    listen 80; \
+    location / { \
+        root /usr/share/nginx/html; \
+        index index.html; \
+        try_files $uri $uri/ /index.html; \
+    } \
+    location /api { \
+        proxy_pass http://api:8000; \
+    } \
+}' > /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

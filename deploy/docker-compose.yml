@@ -1,4 +1,13 @@
 services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+
   api:
     build:
       context: ..
@@ -6,9 +15,10 @@ services:
     ports:
       - "8000:8000"
     environment:
-      PG_DSN: ${PG_DSN:-postgres://finops:finops_dev@postgres:5432/finops}
+      PG_DSN: ${PG_DSN:-postgresql://finops:finops_dev@postgres:5432/finops}
       HOST: "0.0.0.0"
       PORT: "8000"
+      AUTO_MIGRATE: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -25,16 +35,11 @@ services:
       dockerfile: deploy/Dockerfile.extractor
     environment:
       EXTRACTOR_TYPE: ${EXTRACTOR_TYPE:-exchange_rates}
-      PG_DSN: ${PG_DSN:-postgres://finops:finops_dev@postgres:5432/finops}
-
+      PG_DSN: ${PG_DSN:-postgresql://finops:finops_dev@postgres:5432/finops}
       BATCH_SIZE: "500"
-      GCP_CSV_PATH: ${GCP_CSV_PATH:-}
-      GCP_INGESTION_MODE: ${GCP_INGESTION_MODE:-bigquery}
     depends_on:
       postgres:
         condition: service_healthy
-    volumes:
-      - ${GCP_CSV_PATH:-../resources/data}:/app/csv:ro
     profiles:
       - extractors
 

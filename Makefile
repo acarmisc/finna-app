@@ -11,7 +11,7 @@ migrate-create:
 	cd backend && alembic revision --autogenerate -m "$(msg)"
 
 seed:
-	python3 scripts/seed.py
+	python3 backend/scripts/seed.py
 
 build-frontend:
 	cd frontend && npm run build
@@ -21,3 +21,6 @@ dev-frontend:
 
 run-api:
 	uv run python -m uvicorn backend.app.main:app --port 8000 --reload
+
+smoke-test:
+	bash backend/scripts/smoke-test.sh

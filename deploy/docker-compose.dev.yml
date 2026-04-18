@@ -1,0 +1,13 @@
+services:
+  seed:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    environment:
+      PG_DSN: ${PG_DSN:-postgresql://finops:finops_dev@postgres:5432/finops}
+    depends_on:
+      api:
+        condition: service_healthy
+    command: ["python", "backend/scripts/seed.py"]
+    profiles:
+      - seed
