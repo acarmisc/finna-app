@@ -1,0 +1,223 @@
+/* Finna Console styles */
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Instrument+Serif:ital@0;1&display=swap');
+
+:root {
+  /* Neutrals */
+  --bg: oklch(0.992 0.003 80);
+  --bg-surface: #ffffff;
+  --bg-muted: oklch(0.965 0.004 80);
+  --bg-accent: oklch(0.955 0.006 80);
+
+  --fg: oklch(0.16 0.005 265);
+  --fg-muted: oklch(0.48 0.008 265);
+  --fg-subtle: oklch(0.62 0.008 265);
+  --fg-onPrimary: #ffffff;
+
+  --border: oklch(0.905 0.006 265);
+  --border-subtle: oklch(0.94 0.005 265);
+  --border-strong: oklch(0.82 0.008 265);
+
+  /* Brand */
+  --primary: oklch(0.58 0.14 150);
+  --primary-fg: #ffffff;
+  --ring: oklch(0.58 0.14 150);
+
+  --success: oklch(0.62 0.14 150);
+  --success-weak: oklch(0.95 0.045 150);
+  --warning: oklch(0.76 0.15 75);
+  --warning-weak: oklch(0.96 0.05 85);
+  --danger: oklch(0.55 0.20 25);
+  --danger-weak: oklch(0.96 0.04 25);
+  --info: oklch(0.58 0.14 240);
+  --info-weak: oklch(0.96 0.03 240);
+
+  /* Providers */
+  --gcp: #4285F4;
+  --azure: #0078D4;
+  --aws: #FF9900;
+  --llm: oklch(0.55 0.18 300);
+
+  /* Typography */
+  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --font-serif: 'Instrument Serif', 'Times New Roman', Georgia, serif;
+
+  --fs-11: 11px;
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-16: 16px;
+  --fs-18: 18px;
+  --fs-20: 20px;
+  --fs-24: 24px;
+  --fs-32: 32px;
+
+  --lh-tight: 1.1;
+  --lh-snug: 1.25;
+  --lh-body: 1.45;
+
+  --fw-reg: 400;
+  --fw-med: 500;
+  --fw-semi: 600;
+  --fw-bold: 700;
+
+  /* Spacing */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 40px;
+  --s-9: 48px;
+  --s-10: 64px;
+
+  /* Radii */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 0 0 rgb(0 0 0 / 0.03);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05), 0 1px 3px 0 rgb(0 0 0 / 0.04);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 12px 32px -8px rgb(0 0 0 / 0.12), 0 4px 8px -4px rgb(0 0 0 / 0.06);
+  --shadow-focus: 0 0 0 3px oklch(0.58 0.14 150 / 0.25);
+
+  /* Layout */
+  --sidebar-w: 232px;
+  --sidebar-w-collapsed: 52px;
+  --topbar-h: 48px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-med: 180ms;
+  --dur-slow: 240ms;
+}
+
+.dark, [data-theme="dark"] {
+  --bg: oklch(0.17 0.006 265);
+  --bg-surface: oklch(0.21 0.006 265);
+  --bg-muted: oklch(0.23 0.006 265);
+  --bg-accent: oklch(0.26 0.008 265);
+
+  --fg: oklch(0.97 0.003 80);
+  --fg-muted: oklch(0.72 0.008 265);
+  --fg-subtle: oklch(0.58 0.008 265);
+
+  --border: oklch(0.30 0.008 265);
+  --border-subtle: oklch(0.26 0.006 265);
+  --border-strong: oklch(0.40 0.010 265);
+
+  --primary: oklch(0.68 0.14 150);
+  --primary-fg: oklch(0.14 0.01 150);
+
+  --success-weak: oklch(0.28 0.07 150);
+  --warning-weak: oklch(0.30 0.08 75);
+  --danger-weak: oklch(0.30 0.10 25);
+  --info-weak: oklch(0.28 0.08 240);
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--fs-13);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'ss01', 'cv11';
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+button {
+  font: inherit;
+}
+
+.fn-app {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  height: 100vh;
+  overflow: hidden;
+  transition: grid-template-columns var(--dur-med) var(--ease-out);
+}
+
+.fn-app.is-collapsed {
+  grid-template-columns: var(--sidebar-w-collapsed) 1fr;
+}
+
+.fn-main {
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+.fn-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: var(--s-5) var(--s-7) var(--s-4);
+  border-bottom: 1px solid var(--border-subtle);
+  background: color-mix(in oklch, var(--bg) 94%, transparent);
+  backdrop-filter: blur(8px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  gap: var(--s-4);
+}
+
+.fn-topbar-title {
+  font-size: var(--fs-24);
+  font-weight: var(--fw-semi);
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+}
+
+.fn-topbar-sub {
+  font-size: var(--fs-12);
+  color: var(--fg-subtle);
+  margin-top: 4px;
+}
+
+.fn-screen > *:not(.fn-topbar) {
+  padding-left: var(--s-7);
+  padding-right: var(--s-7);
+}
+
+.fn-screen > *:not(.fn-topbar):not(:last-child) {
+  margin-bottom: var(--s-5);
+}
+
+.fn-screen > *:last-child {
+  padding-bottom: var(--s-9);
+}
+
+/* Density compact */
+.density-compact .fn-table td,
+.density-compact .fn-table thead th {
+  padding: 6px var(--s-4);
+}
+
+.density-compact .fn-stat {
+  padding: var(--s-3) var(--s-4);
+}
+
+.density-compact .fn-stat-val {
+  font-size: var(--fs-24);
+}
+
+.density-compact .fn-panel:not(.fn-panel-flush) {
+  padding: var(--s-3) var(--s-4) var(--s-4);
+}
