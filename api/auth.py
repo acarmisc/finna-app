@@ -11,15 +11,22 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-JWT_SECRET = os.getenv("JWT_SECRET")
+JWT_SECRET=os.getenv("JWT_SECRET", "default-secret-key-change-in-production")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXPIRATION_MINUTES = int(os.getenv("JWT_EXPIRATION_MINUTES", "60"))
+
+# Simple in-memory user storage (for demo purposes)
+USERS_TABLE = {
+    "admin": {
+        "password_hash": "placeholder",
+        "username": "admin",
+        "email": "admin@finops.local"
+    }
+}
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
-
-USERS_TABLE = {}
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

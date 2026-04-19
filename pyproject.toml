@@ -29,6 +29,7 @@ dependencies = [
     "msal>=1.30",
     "prometheus-fastapi-instrumentator>=7.0",
     "slowapi>=0.1",
+    "passlib>=1.7.4",
 ]
 
 [project.optional-dependencies]
