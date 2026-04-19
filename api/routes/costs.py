@@ -1,0 +1,244 @@
+"""Cost data endpoints for FinOps dashboard."""
+
+from __future__ import annotations
+
+from datetime import datetime, timedelta
+from typing import Any, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+
+from api.auth import require_auth
+from api.db import query_all
+
+router = APIRouter()
+
+
+class CostFilter(BaseModel):
+    """Filter parameters for cost queries."""
+    provider: Optional[str] = None
+    project: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    granularity: str = "daily"
+
+
+@router.get("/costs", dependencies=[Depends(require_auth)])
+async def list_costs(
+    provider: Optional[str] = Query(None, description="Filter by provider: gcp, azure, llm"),
+    project: Optional[str] = Query(None, description="Filter by project name"),
+    start_date: Optional[str] = Query(None, description="Start date in ISO format"),
+    end_date: Optional[str] = Query(None, description="End date in ISO format"),
+) -> dict[str, Any]:
+    """Get cost records with optional filtering."""
+    
+    # Build query with filters
+    conditions = []
+    params = []
+    
+    if provider:
+        conditions.append("provider = %s")
+        params.append(provider)
+    
+    if project:
+        conditions.append("project_name = %s")
+        params.append(project)
+    
+    # Default to last 30 days if no date range specified
+    end_date = end_date or datetime.now()
+    start_date = start_date or (end_date - timedelta(days=30))
+    
+    conditions.append("cost_date >= %s")
+    conditions.append("cost_date <= %s")
+    params.extend([start_date, end_date])
+    
+    where_clause = ""
+    if conditions:
+        where_clause = "WHERE " + " AND ".join(conditions)
+    
+    sql = f"""
+        SELECT 
+            id,
+            provider,
+            project_name,
+            sku_name,
+            cost_date,
+            cost_amount,
+            currency,
+           Tags,
+            created_at
+        FROM cost_records
+        {where_clause}
+        ORDER BY cost_date DESC, cost_amount DESC
+        LIMIT 1000
+    """
+    
+    results = query_all(sql, tuple(params))
+    
+    # Transform results to match frontend expectations
+    costs = []
+    for row in results:
+        costs.append({
+            "id": row["id"],
+            "prov": row["provider"],
+            "name": row["project_name"],
+            "sku": row["sku_name"],
+            "mtd": float(row["cost_amount"]),
+            "delta": 0.0,  # Would need comparison logic
+            "prev": 0.0,
+            "tags": row["tags"] or {},
+            "date": row["cost_date"].isoformat() if row["cost_date"] else None,
+        })
+    
+    # Calculate MTD totals by provider for frontend
+    provider_totals = {}
+    for cost in costs:
+        prov = cost["prov"]
+        if prov not in provider_totals:
+            provider_totals[prov] = 0
+        provider_totals[prov] += cost["mtd"]
+    
+    return {
+        "costs": costs,
+        "totals": provider_totals,
+        "filtered": len(costs) > 0,
+        "startDate": start_date.isoformat(),
+        "endDate": end_date.isoformat(),
+    }
+
+
+@router.get("/costs/totals", dependencies=[Depends(require_auth)])
+async def get_cost_totals(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+) -> dict[str, Any]:
+    """Get aggregated cost totals."""
+    end_date = end_date or datetime.now()
+    start_date = start_date or (end_date - timedelta(days=30))
+    
+    sql = """
+        SELECT 
+            provider,
+            SUM(cost_amount) as total,
+            COUNT(*) as record_count
+        FROM cost_records
+        WHERE cost_date >= %s AND cost_date <= %s
+        GROUP BY provider
+    """
+    
+    results = query_all(sql, (start_date, end_date))
+    
+    totals = {}
+    for row in results:
+        totals[row["provider"]] = {
+            "total": float(row["total"]),
+            "records": row["record_count"],
+        }
+    
+    return {
+        "totals": totals,
+        "startDate": start_date.isoformat(),
+        "endDate": end_date.isoformat(),
+    }
+
+
+@router.get("/costs/by-sku", dependencies=[Depends(require_auth)])
+async def get_costs_by_sku(
+    provider: Optional[str] = Query(None),
+    limit: int = Query(50, le=100),
+) -> dict[str, Any]:
+    """Get costs aggregated by SKU."""
+    conditions = []
+    params = []
+    
+    if provider:
+        conditions.append("provider = %s")
+        params.append(provider)
+    
+    where_clause = ""
+    if conditions:
+        where_clause = "WHERE " + " AND ".join(conditions)
+    
+    sql = f"""
+        SELECT 
+            provider,
+            project_name,
+            sku_name,
+            SUM(cost_amount) as mtd,
+            COUNT(*) as instances
+        FROM cost_records
+        {where_clause}
+        GROUP BY provider, project_name, sku_name
+        ORDER BY mtd DESC
+        LIMIT %s
+    """
+    
+    results = query_all(sql, tuple(params) + (limit,))
+    
+    costs = []
+    for row in results:
+        costs.append({
+            "prov": row["provider"],
+            "name": row["project_name"],
+            "sku": row["sku_name"],
+            "mtd": float(row["mtd"]),
+            "delta": 0.0,
+            "prev": 0.0,
+            "instances": row["instances"],
+        })
+    
+    return {"costs": costs, "totalRows": len(costs)}
+
+
+@router.get("/costs/daily", dependencies=[Depends(require_auth)])
+async def get_daily_costs(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    provider: Optional[str] = Query(None),
+) -> dict[str, Any]:
+    """Get daily cost breakdown for chart visualization."""
+    end_date = end_date or datetime.now()
+    start_date = start_date or (end_date - timedelta(days=30))
+    
+    conditions = ["DATE(cost_date) >= %s", "DATE(cost_date) <= %s"]
+    params = [start_date.date(), end_date.date()]
+    
+    if provider:
+        conditions.append("provider = %s")
+        params.append(provider)
+    
+    sql = f"""
+        SELECT 
+            DATE(cost_date) as date,
+            provider,
+            SUM(cost_amount) as amount
+        FROM cost_records
+        WHERE {" AND ".join(conditions)}
+        GROUP BY DATE(cost_date), provider
+        ORDER BY date DESC
+    """
+    
+    results = query_all(sql, tuple(params))
+    
+    # Build daily series by provider
+    daily_data = {}
+    for row in results:
+        date_str = row["date"].isoformat() if row["date"] else None
+        if not date_str:
+            continue
+            
+        if date_str not in daily_data:
+            daily_data[date_str] = {"date": date_str}
+        
+        prov = row["provider"]
+        daily_data[date_str][prov] = float(row["amount"])
+    
+    # Convert to list and sort by date descending
+    days = list(daily_data.values())
+    days.sort(key=lambda x: x["date"], reverse=True)
+    
+    return {
+        "days": days,
+        "startDate": start_date.isoformat(),
+        "endDate": end_date.isoformat(),
+    }
