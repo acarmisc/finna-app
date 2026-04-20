@@ -1,0 +1,73 @@
+{
+  "connections": [
+    {
+      "id": "c1",
+      "name": "acme-prod",
+      "provider": "azure",
+      "status": "ok"
+    },
+    {
+      "id": "c2",
+      "name": "gcp-production",
+      "provider": "gcp",
+      "status": "ok"
+    },
+    {
+      "id": "c3",
+      "name": "llm-gateway",
+      "provider": "llm",
+      "status": "ok"
+    }
+  ],
+  "costs": [
+    {
+      "id": "cost1",
+      "provider": "azure",
+      "project": "prod",
+      "sku": "VM",
+      "amount": 1500.5
+    },
+    {
+      "id": "cost2",
+      "provider": "gcp",
+      "project": "prod",
+      "sku": "Compute",
+      "amount": 800.0
+    },
+    {
+      "id": "cost3",
+      "provider": "llm",
+      "project": "ml",
+      "sku": "Tokens",
+      "amount": 250.0
+    }
+  ],
+  "alerts": [
+    {
+      "id": "alert1",
+      "severity": "warn",
+      "title": "Cost spike detected",
+      "firing": true
+    },
+    {
+      "id": "alert2",
+      "severity": "ok",
+      "title": "All systems normal",
+      "firing": false
+    }
+  ],
+  "runs": [
+    {
+      "id": "run1",
+      "type": "gcp_billing",
+      "status": "success",
+      "rows": 1200
+    },
+    {
+      "id": "run2",
+      "type": "azure_cost",
+      "status": "success",
+      "rows": 850
+    }
+  ]
+}
