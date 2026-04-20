@@ -68,7 +68,7 @@ class TokenVerificationMiddleware(BaseHTTPMiddleware):
             if auth_header and auth_header.startswith("Bearer "):
                 token = auth_header.split(" ")[1]
                 try:
-                    from api.auth import decode_token
+                    from .auth import decode_token
 
                     decode_token(token)
                 except HTTPException:
@@ -98,12 +98,12 @@ class TokenVerificationMiddleware(BaseHTTPMiddleware):
 async def lifespan(app: FastAPI) -> None:
     """Application lifecycle: startup and shutdown."""
     # Startup: initialize connection pool
-    from api.db import get_pg_dsn
-    from api.metrics import config_count
+    from .db import get_pg_dsn
+    from .metrics import config_count
 
     if get_pg_dsn():
         try:
-            from api.db import init_sync_pool
+            from .db import init_sync_pool
 
             init_sync_pool()
             logger.info("Connection pool initialized")
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI) -> None:
             logger.warning(f"Could not initialize connection pool: {e}. Will retry on first request.")
 
         try:
-            from api.db import init_db
+            from .db import init_db
 
             init_db()
             logger.info("Database initialized")
@@ -120,7 +120,7 @@ async def lifespan(app: FastAPI) -> None:
 
         # Initialize config_count metric
         try:
-            from api.db import query_all
+            from .db import query_all
 
             rows = query_all("SELECT provider, COUNT(*) as count FROM cloud_config GROUP BY provider")
             for row in rows:
@@ -141,18 +141,10 @@ async def lifespan(app: FastAPI) -> None:
             except Exception as e:
                 logger.warning(f"Could not run migrations: {e}")
 
-    # Initialize Prometheus metrics instrumentator
-    instrumentator = Instrumentator(
-        should_group_routes=True,
-        should_ignore_health_status=True,
-        excluded_handlers=["/metrics", "/healthz"],
-    )
-    instrumentator.instrument(app).expose(app, include_in_schema=False)
-
     yield
 
     # Shutdown: close connection pools
-    from api.db import close_pools
+    from .db import close_pools
 
     close_pools()
     logger.info("Connection pools closed")
@@ -185,7 +177,7 @@ app.add_middleware(
 @app.get("/healthz")
 async def healthz() -> JSONResponse:
     """Health check endpoint."""
-    from api.db import get_connection, release_connection
+    from .db import get_connection, release_connection
 
     status = {
         "status": "ok",
@@ -212,19 +204,25 @@ async def healthz() -> JSONResponse:
 @app.get("/api/v1/db/stats")
 async def db_stats() -> JSONResponse:
     """Get database connection pool stats."""
-    from api.db import get_pool_stats
+    from .db import get_pool_stats
 
     return JSONResponse(get_pool_stats())
 
 
 # Mount routers
-from api.routes import auth, config, extractors, costs, alerts  # noqa: E402
+from .routes import auth, config, extractors, costs, alerts  # noqa: E402
 
 app.include_router(config.router, prefix="/api/v1", tags=["config"])
 app.include_router(extractors.router, prefix="/api/v1", tags=["extractors"])
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(costs.router, prefix="/api/v1", tags=["costs"])
 app.include_router(alerts.router, prefix="/api/v1", tags=["alerts"])
+
+
+# Initialize Prometheus metrics instrumentator (must be after middleware)
+instrumentator = Instrumentator()
+instrumentator.instrument(app)
+instrumentator.expose(app, include_in_schema=False)
 
 
 if __name__ == "__main__":

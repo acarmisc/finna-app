@@ -30,6 +30,7 @@ dependencies = [
     "prometheus-fastapi-instrumentator>=7.0",
     "slowapi>=0.1",
     "passlib>=1.7.4",
+    "psycopg-pool>=3.3.0",
 ]
 
 [project.optional-dependencies]

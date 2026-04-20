@@ -2,26 +2,30 @@
 
 from __future__ import annotations
 
+import sys
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from api.auth import require_auth
-from api.db import execute, insert_and_return, query_all, query_one
-from api.models import (
+from ..db import insert_and_return, query_all, query_one, execute
+from .. import auth as auth_module
+require_auth = auth_module.require_auth
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".."))
+from utils.encryption import decrypt_config, encrypt_config
+
+from ..models import (
     CloudConfigCreate,
     CloudConfigResponse,
     CloudConfigUpdate,
 )
-from utils.encryption import decrypt_config, encrypt_config
 
 router = APIRouter()
 
 
 def _mask_secrets(config: dict[str, Any]) -> dict[str, Any]:
-    """Mask sensitive fields in config for response."""
     masked = config.copy()
     sensitive_fields = ["client_secret", "key_file_content"]
     for field in sensitive_fields:
@@ -36,7 +40,6 @@ def _mask_secrets(config: dict[str, Any]) -> dict[str, Any]:
     dependencies=[Depends(require_auth)],
 )
 async def list_configs() -> list[dict[str, Any]]:
-    """List all cloud configurations."""
     sql = """
         SELECT id, provider, name, credential_type, config, created_at, updated_at
         FROM cloud_config
@@ -64,7 +67,6 @@ async def list_configs() -> list[dict[str, Any]]:
     dependencies=[Depends(require_auth)],
 )
 async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
-    """Create a new cloud configuration."""
     config_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
 
@@ -102,7 +104,6 @@ async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
     dependencies=[Depends(require_auth)],
 )
 async def get_config(config_id: str) -> dict[str, Any]:
-    """Get a cloud configuration by ID."""
     sql = """
         SELECT id, provider, name, credential_type, config, created_at, updated_at
         FROM cloud_config
@@ -129,8 +130,6 @@ async def get_config(config_id: str) -> dict[str, Any]:
     dependencies=[Depends(require_auth)],
 )
 async def update_config(config_id: str, data: CloudConfigUpdate) -> dict[str, Any]:
-    """Update a cloud configuration."""
-    # Build dynamic update
     updates = []
     params = []
 
@@ -179,7 +178,6 @@ async def update_config(config_id: str, data: CloudConfigUpdate) -> dict[str, An
     dependencies=[Depends(require_auth)],
 )
 async def delete_config(config_id: str) -> None:
-    """Delete a cloud configuration."""
     sql = "DELETE FROM cloud_config WHERE id = %s"
     execute(sql, (config_id,))
 
@@ -190,7 +188,6 @@ async def delete_config(config_id: str) -> None:
     dependencies=[Depends(require_auth)],
 )
 async def list_configs_by_provider(provider: str) -> list[dict[str, Any]]:
-    """List configurations for a specific provider."""
     sql = """
         SELECT id, provider, name, credential_type, config, created_at, updated_at
         FROM cloud_config
@@ -210,3 +207,4 @@ async def list_configs_by_provider(provider: str) -> list[dict[str, Any]]:
         }
         for r in results
     ]
+
