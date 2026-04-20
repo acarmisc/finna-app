@@ -47,3 +47,11 @@ superset_data/
 *service-account*
 *.pem
 *.key
+
+# Node frontend
+backend/frontend/node_modules/
+backend/frontend/package-lock.json
+backend/frontend/e2e/node_modules/
+backend/frontend/e2e/package-lock.json
+backend/frontend/playwright-test/node_modules/
+backend/frontend/playwright-test/package-lock.json

@@ -12,7 +12,7 @@ from typing import Any, Optional
 
 from psycopg.rows import dict_row
 
-from api.metrics import extractor_run_total
+from .metrics import extractor_run_total
 
 logger = logging.getLogger("api.runner")
 
@@ -73,7 +73,7 @@ def _update_run_status(
     log_output: Optional[str] = None,
 ) -> None:
     """Update extractor_runs table."""
-    from api.db import get_connection
+    from .db import get_connection
 
     conn = get_connection()
     try:
@@ -113,7 +113,7 @@ def start_extractor(
 
     Returns the run_id.
     """
-    from api.db import get_connection, insert_and_return
+    from .db import get_connection, insert_and_return
 
     if pg_dsn is None:
         pg_dsn = _get_pg_dsn()
@@ -227,7 +227,7 @@ def start_extractor(
 
 def get_run_status(run_id: str) -> Optional[dict[str, Any]]:
     """Get status of a run."""
-    from api.db import query_one
+    from .db import query_one
 
     sql = """
         SELECT id, config_id, provider, extractor_type, status,
@@ -240,7 +240,7 @@ def get_run_status(run_id: str) -> Optional[dict[str, Any]]:
 
 def list_runs(limit: int = 50, provider: Optional[str] = None) -> list[dict[str, Any]]:
     """List recent runs."""
-    from api.db import query_all
+    from .db import query_all
 
     if provider:
         sql = """

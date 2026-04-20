@@ -824,3 +824,94 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# Azure Service Account Authentication (CLI)  
+# ---------------------------------------------------------------------------
+
+
+def azure_service_account_auth(
+    tenant_id: str,
+    client_id: str,
+    client_secret: str,
+    subscription_id: str | None = None,
+    auto_select: bool = False,
+) -> dict[str, Any]:
+    """Authenticate Azure using service account (client secret).
+
+    This is the non-interactive method for production use.
+
+    Args:
+        tenant_id: Azure AD tenant ID
+        client_id: Application/client ID
+        client_secret: Application client secret
+        subscription_id: Optional subscription ID
+        auto_select: Auto-select all subscriptions if no subscription_id provided
+
+    Returns:
+        dict with credential metadata and subscription selections
+    """
+    from azure.identity import ClientSecretCredential
+
+    console.rule("[bold blue]Azure Service Account Authentication[/bold blue]")
+
+    console.print("[dim]Building ClientSecretCredential...[/dim]")
+    credential = ClientSecretCredential(
+        tenant_id=tenant_id,
+        client_id=client_id,
+        client_secret=client_secret,
+    )
+
+    # Verify credentials
+    try:
+        token = credential.get_token(AZURE_DEFAULT_SCOPE)
+        console.print("[bold green]Azure service account authentication successful![/bold green]")
+    except Exception as exc:
+        console.print(f"[red]Authentication failed: {exc}[/red]")
+        raise
+
+    meta = {
+        "tenant_id": tenant_id,
+        "client_id": client_id,
+        "auth_method": "service_account",
+        "scope": AZURE_DEFAULT_SCOPE,
+    }
+
+    # Discover subscriptions if auto_select
+    if auto_select:
+        subscriptions = _discover_azure_subscriptions(credential)
+        if not subscriptions:
+            console.print("[yellow]No accessible Azure subscriptions found.[/yellow]")
+            return meta
+
+        console.print(f"[dim]Auto-selecting all {len(subscriptions)} subscription(s)[/dim]")
+        selected = subscriptions
+
+        rg_selections = {}
+        for sub in selected:
+            rgs = _discover_azure_resource_groups(credential, sub["subscription_id"])
+            if rgs:
+                console.print(
+                    f"[dim]Auto-selecting all {len(rgs)} resource group(s) for {sub['subscription_id']}[/dim]"
+                )
+                rg_selections[sub["subscription_id"]] = rgs
+
+        meta["subscriptions"] = [
+            {
+                "subscription_id": s["subscription_id"],
+                "display_name": s.get("display_name", ""),
+                "resource_groups": rg_selections.get(s["subscription_id"], []),
+            }
+            for s in selected
+        ]
+
+        if subscription_id:
+            meta["subscription_id"] = subscription_id
+    else:
+        if subscription_id:
+            meta["subscription_id"] = subscription_id
+
+    console.print(f"\n[bold green]Service account configured successfully![/bold green]")
+
+    return meta

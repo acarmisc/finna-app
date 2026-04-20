@@ -8,8 +8,9 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from api.auth import require_auth
-from api.db import query_all
+from .. import auth as auth_module
+require_auth = auth_module.require_auth
+from ..db import query_all
 
 router = APIRouter()
 
@@ -65,7 +66,7 @@ async def list_costs(
             cost_date,
             cost_amount,
             currency,
-           Tags,
+            tags,
             created_at
         FROM cost_records
         {where_clause}

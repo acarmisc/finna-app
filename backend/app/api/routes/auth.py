@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -10,8 +11,15 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from api.auth import require_auth
-from api.db import insert_and_return
+import sys
+import os
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".."))
+from utils.encryption import decrypt_config, encrypt_config
+from ..db import insert_and_return, query_one, query_all, execute
+
+# Import auth module from parent package
+from .. import auth as api_auth
+require_auth = api_auth.require_auth
 
 logger = logging.getLogger("api.auth")
 
@@ -190,8 +198,6 @@ class GCPRegisterRequest(BaseModel):
 @router.post("/auth/gcp/register", dependencies=[Depends(require_auth)])
 async def register_gcp(request: GCPRegisterRequest) -> dict[str, Any]:
     """Register GCP credentials."""
-    import uuid
-
     config_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
 
@@ -201,8 +207,6 @@ async def register_gcp(request: GCPRegisterRequest) -> dict[str, Any]:
 
     # If key file provided, encode it
     if request.key_file_content:
-        import base64
-
         config["key_file_base64"] = base64.b64encode(request.key_file_content.encode()).decode()
 
     sql = """
@@ -216,3 +220,49 @@ async def register_gcp(request: GCPRegisterRequest) -> dict[str, Any]:
     )
 
     return {"config_id": config_id, "project_id": request.project_id}
+
+
+# Azure Service Account Register Endpoint
+class AzureServiceAccountRegisterRequest(BaseModel):
+    tenant_id: str
+    client_id: str
+    client_secret: Optional[str] = None
+    subscription_id: Optional[str] = None
+
+
+@router.post("/auth/azure/service-account", dependencies=[Depends(require_auth)])
+async def register_azure_service_account(
+    request: AzureServiceAccountRegisterRequest,
+) -> dict[str, Any]:
+    """Register Azure service account credentials."""
+    config_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+
+    config = {
+        "tenant_id": request.tenant_id,
+        "client_id": request.client_id,
+        "auth_method": "service_account",
+    }
+
+    if request.client_secret:
+        config["client_secret"] = request.client_secret
+    if request.subscription_id:
+        config["subscription_id"] = request.subscription_id
+
+    sql = """
+        INSERT INTO cloud_config (id, provider, name, credential_type, config, created_at, updated_at)
+        VALUES (%s, 'azure', %s, 'service_account', %s, %s, %s)
+        RETURNING id
+    """
+    insert_and_return(
+        sql,
+        (
+            config_id,
+            f"Azure Service Account ({request.tenant_id[:8]}...)" if len(request.tenant_id) > 8 else f"Azure Service Account ({request.tenant_id})",
+            config,
+            now,
+            now,
+        ),
+    )
+
+    return {"config_id": config_id, "message": "Azure service account registered successfully"}

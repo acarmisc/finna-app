@@ -59,8 +59,10 @@ async def init_async_pool() -> AsyncConnectionPool:
         dsn,
         min_size=config["min_size"],
         max_size=config["max_size"],
-        row_factory=dict_row,
-        kwargs={"connect_timeout": 10},
+        kwargs={
+            "connect_timeout": 10,
+            "row_factory": dict_row,
+        },
     )
 
     await _async_pool.wait(timeout=30)
@@ -87,8 +89,10 @@ def init_sync_pool() -> ConnectionPool:
         dsn,
         min_size=config["min_size"],
         max_size=config["max_size"],
-        row_factory=dict_row,
-        kwargs={"connect_timeout": 10},
+        kwargs={
+            "connect_timeout": 10,
+            "row_factory": dict_row,
+        },
     )
 
     _sync_pool.wait(timeout=30)
