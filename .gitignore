@@ -48,6 +48,14 @@ superset_data/
 *.pem
 *.key
 
+# GCP service account JSON keys (contains private key material)
+*sa*.json
+gcp-sa*.json
+
+# Temporary test scripts that may contain secrets or DB connection strings
+write_sa.py
+test_gcp_sa.py
+
 # Node frontend (moved to finna-app-ui repo)
 node_modules/
 package-lock.json
