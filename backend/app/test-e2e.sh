@@ -1,11 +1,11 @@
 #!/bin/bash
-# Fast E2E Test Runner for FinOps Console
+# Fast E2E Test Runner for FinOps Backend API
 # Tests backend API endpoints without UI
 
 set -e
 
 echo "========================================"
-echo "FinOps Console E2E Tests (Backend API)"
+echo "FinOps Backend E2E Tests"
 echo "========================================"
 echo ""
 
@@ -18,119 +18,128 @@ NC='\033[0m'
 PASSED=0
 FAILED=0
 ISSUES=()
+API_BASE="http://localhost:8000"
 
-# Test 1: Backend health check
-echo -n "Test 1: Health check... "
-if curl -s http://localhost:8000/healthz | grep -q '"status":"ok"'; then
+# Wait for API to be ready (max 30s)
+echo -n "Waiting for API... "
+for i in {1..30}; do
+    if curl -s "${API_BASE}/healthz" | grep -q '"status":"ok"'; then
+        echo -e "${GREEN}READY${NC}"
+        break
+    fi
+    sleep 1
+    if [ $i -eq 30 ]; then
+        echo -e "${RED}TIMEOUT${NC}"
+        echo "API not responding after 30s"
+        exit 1
+    fi
+done
+
+# Authenticate first
+echo -n "Test 1: Auth token endpoint... "
+TOKEN_RESPONSE=$(curl -s --max-time 10 "${API_BASE}/api/v1/auth/token" \
+    -X POST -H "Content-Type: application/json" \
+    -d '{"username":"admin","password":"admin"}')
+if echo "$TOKEN_RESPONSE" | grep -q '"token"'; then
     echo -e "${GREEN}PASSED${NC}"
+    TOKEN=$(echo "$TOKEN_RESPONSE" | sed 's/.*"token": "//;s/".*//')
     ((PASSED++))
 else
-    echo -e "${RED}FAILED${NC} - Backend not running or returning errors"
-    ISSUES+=("Backend health check failing")
+    echo -e "${RED}FAILED${NC}"
+    ISSUES+=("Auth token endpoint not working")
     ((FAILED++))
 fi
 
+AUTH_HEADER="Authorization: Bearer ${TOKEN}"
+
 # Test 2: Costs endpoint
 echo -n "Test 2: Costs API... "
-if curl -s http://localhost:8000/api/v1/costs 2>/dev/null | grep -q "costs"; then
+if curl -s --max-time 10 "${API_BASE}/api/v1/costs" -H "$AUTH_HEADER" | grep -q '"costs"'; then
     echo -e "${GREEN}PASSED${NC}"
     ((PASSED++))
 else
-    echo -e "${YELLOW}PENDING - Requires authentication${NC}"
-    ISSUES+=("Costs endpoint requires auth")
+    echo -e "${RED}FAILED${NC}"
+    ISSUES+=("Costs endpoint returning errors")
     ((FAILED++))
 fi
 
 # Test 3: Alerts endpoint
 echo -n "Test 3: Alerts API... "
-if curl -s http://localhost:8000/api/v1/alerts 2>/dev/null | grep -q "alerts"; then
+if curl -s --max-time 10 "${API_BASE}/api/v1/alerts" -H "$AUTH_HEADER" | grep -q '"alerts"'; then
     echo -e "${GREEN}PASSED${NC}"
     ((PASSED++))
 else
-    echo -e "${YELLOW}PENDING - Requires authentication${NC}"
-    ISSUES+=("Alerts endpoint requires auth")
+    echo -e "${RED}FAILED${NC}"
+    ISSUES+=("Alerts endpoint returning errors")
     ((FAILED++))
 fi
 
 # Test 4: Config endpoint
 echo -n "Test 4: Config API... "
-if curl -s http://localhost:8000/api/v1/config 2>/dev/null | grep -q "\["; then
+if curl -s --max-time 10 "${API_BASE}/api/v1/config" -H "$AUTH_HEADER" | grep -q '\['; then
     echo -e "${GREEN}PASSED${NC}"
     ((PASSED++))
 else
-    echo -e "${YELLOW}PENDING - Requires authentication${NC}"
-    ISSUES+=("Config endpoint requires auth")
+    echo -e "${RED}FAILED${NC}"
+    ISSUES+=("Config endpoint returning errors")
     ((FAILED++))
 fi
 
-# Test 5: API documentation
-echo -n "Test 5: API docs... "
-if curl -s http://localhost:8000/docs | grep -q "FinOps"; then
+# Test 5: Projects endpoint
+echo -n "Test 5: Projects API... "
+if curl -s --max-time 10 "${API_BASE}/api/v1/config/projects" -H "$AUTH_HEADER" | grep -q '\['; then
     echo -e "${GREEN}PASSED${NC}"
     ((PASSED++))
 else
-    echo -e "${YELLOW}PENDING - API docs not loading${NC}"
+    echo -e "${RED}FAILED${NC}"
+    ISSUES+=("Projects endpoint returning errors")
+    ((FAILED++))
+fi
+
+# Test 6: Costs daily endpoint
+echo -n "Test 6: Costs daily API... "
+if curl -s --max-time 10 "${API_BASE}/api/v1/costs/daily" -H "$AUTH_HEADER" | grep -q '"days"'; then
+    echo -e "${GREEN}PASSED${NC}"
+    ((PASSED++))
+else
+    echo -e "${RED}FAILED${NC}"
+    ISSUES+=("Costs daily endpoint returning errors")
+    ((FAILED++))
+fi
+
+# Test 7: Extractors endpoint
+echo -n "Test 7: Extractors API... "
+if curl -s --max-time 10 "${API_BASE}/api/v1/extractors/status" -H "$AUTH_HEADER" | grep -q '"runs"'; then
+    echo -e "${GREEN}PASSED${NC}"
+    ((PASSED++))
+else
+    echo -e "${RED}FAILED${NC}"
+    ISSUES+=("Extractors endpoint returning errors")
+    ((FAILED++))
+fi
+
+# Test 8: Costs by SKU
+echo -n "Test 8: Costs by SKU API... "
+if curl -s --max-time 10 "${API_BASE}/api/v1/costs/by-sku" -H "$AUTH_HEADER" | grep -q '"costs"'; then
+    echo -e "${GREEN}PASSED${NC}"
+    ((PASSED++))
+else
+    echo -e "${RED}FAILED${NC}"
+    ISSUES+=("Costs by SKU endpoint returning errors")
+    ((FAILED++))
+fi
+
+# Test 9: API docs
+echo -n "Test 9: API docs... "
+if curl -s --max-time 10 "${API_BASE}/docs" | grep -q "FinOps"; then
+    echo -e "${GREEN}PASSED${NC}"
+    ((PASSED++))
+else
+    echo -e "${YELLOW}PENDING${NC}"
     ISSUES+=("API documentation not loading")
     ((FAILED++))
 fi
 
-# Test 6: Extractors endpoint
-echo -n "Test 6: Extractors API... "
-if curl -s http://localhost:8000/api/v1/extractors/status 2>/dev/null; then
-    echo -e "${GREEN}PASSED${NC}"
-    ((PASSED++))
-else
-    echo -e "${YELLOW}PENDING - Requires authentication${NC}"
-    ISSUES+=("Extractors endpoint requires auth")
-    ((FAILED++))
-fi
-
-# Test 7: Routes registered
-echo -n "Test 7: Routes registered... "
-if grep -q "costs.router" /root/projects/finna-app/api/main.py && \
-   grep -q "alerts.router" /root/projects/finna-app/api/main.py; then
-    echo -e "${GREEN}PASSED${NC}"
-    ((PASSED++))
-else
-    echo -e "${RED}FAILED${NC} - Routes not registered"
-    ISSUES+=("API routes not registered in main.py")
-    ((FAILED++))
-fi
-
-# Test 8: Mock data exists
-echo -n "Test 8: Mock data... "
-if [ -f /root/projects/finna-app/src/data/mock_api_data.json ]; then
-    echo -e "${GREEN}PASSED${NC}"
-    ((PASSED++))
-else
-    echo -e "${RED}FAILED${NC} - Mock data missing"
-    ISSUES+=("Mock data not created")
-    ((FAILED++))
-fi
-
-# Test 9: Frontend client exists
-echo -n "Test 9: Frontend client... "
-if [ -f /root/projects/finna-app/src/services/apiClient.ts ]; then
-    echo -e "${GREEN}PASSED${NC}"
-    ((PASSED++))
-else
-    echo -e "${RED}FAILED${NC} - API client missing"
-    ISSUES+=("Frontend API client missing")
-    ((FAILED++))
-fi
-
-# Test 10: React hooks exist
-echo -n "Test 10: React hooks... "
-if [ -f /root/projects/finna-app/src/hooks/useApi.ts ]; then
-    echo -e "${GREEN}PASSED${NC}"
-    ((PASSED++))
-else
-    echo -e "${RED}FAILED${NC} - React hooks missing"
-    ISSUES+=("React hooks not created")
-    ((FAILED++))
-fi
-
-# Summary
 echo ""
 echo "========================================"
 echo "Test Summary"
@@ -139,57 +148,19 @@ echo -e "${GREEN}Passed: $PASSED${NC}"
 echo -e "${RED}Failed: $FAILED${NC}"
 echo ""
 
-# Report issues that need GitHub issues
 if [ ${#ISSUES[@]} -gt 0 ]; then
-    echo -e "${YELLOW}Issues to create on GitHub:${NC}"
-    echo "Repository: acarmisc/finna-app"
-    echo "Labels: bug, e2e-test-failed"
-    echo ""
-    
+    echo -e "${YELLOW}Issues found:${NC}"
     for i in "${!ISSUES[@]}"; do
         issue_num=$((i + 1))
-        echo "Issue #$issue_num: ${ISSUES[$i]}"
-        echo "  Priority: Medium"
-        echo "  Solution: Fix the identified issue"
-        echo ""
+        echo "  Issue #$issue_num: ${ISSUES[$i]}"
     done
-    
-    # Create GitHub issues if gh CLI is available
-    if command -v gh > /dev/null 2>&1; then
-        echo -e "${GREEN}Creating GitHub issues...${NC}"
-        
-        for issue in "${ISSUES[@]}"; do
-            title=$(echo "$issue" | cut -c1-60)
-            issue_id=$(gh issue create --title "$title" \
-                --body "Issue found during E2E testing:
-
-$issue
-
-Reproduction:
-1. Run: ./e2e-test.sh
-2. Test will fail on this issue
-
-Expected: All tests should pass
-Actual: Test failed with: $issue
-" 2>/dev/null | tail -1)
-            
-            if [ -n "$issue_id" ]; then
-                echo "  Created: $issue_id"
-            fi
-        done
-    else
-        echo -e "${YELLOW}GitHub CLI not found. Please create issues manually:${NC}"
-        echo "Run: gh issue create --title 'E2E Test Issue' --body 'Description'"
-    fi
-else
-    echo -e "${GREEN}✓ All tests passed!${NC}"
 fi
 
-# Final status
 if [ $FAILED -gt 0 ]; then
-    echo -e "${YELLOW}⚠ E2E tests completed with $FAILED failures${NC}"
+    echo ""
+    echo -e "${RED}E2E tests completed with $FAILED failures${NC}"
     exit 1
 else
-    echo -e "${GREEN}✓ All E2E tests passed!${NC}"
+    echo -e "${GREEN}All E2E tests passed!${NC}"
     exit 0
 fi
