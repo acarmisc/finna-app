@@ -98,6 +98,110 @@ async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
     }
 
 
+# ─── Projects endpoints ──────────────────────────────────────────────────────
+
+
+@router.get(
+    "/config/projects",
+    dependencies=[Depends(require_auth)],
+)
+async def list_projects() -> list[dict[str, Any]]:
+    """List all projects."""
+    sql = "SELECT id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note FROM fin_projects ORDER BY name"
+    rows = query_all(sql)
+    return [
+        {
+            "id": r["id"],
+            "name": r["name"],
+            "slug": r["slug"],
+            "owner": r["owner"],
+            "cost_center": r["cost_center"],
+            "budget_cap": float(r["budget_cap"]) if r["budget_cap"] else None,
+            "mtd": float(r["mtd"]) if r["mtd"] else 0.0,
+            "tags": r["tags"] or {},
+            "created": r["created_at"].isoformat() if r["created_at"] else None,
+            "note": r.get("note", ""),
+        }
+        for r in rows
+    ]
+
+
+@router.post(
+    "/config/projects",
+    status_code=201,
+    dependencies=[Depends(require_auth)],
+)
+async def create_project(data: dict[str, Any]) -> dict[str, Any]:
+    """Create a new project."""
+    from ..db import insert_and_return
+    config_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    name = data.get("name", "Untitled")
+    sql = """
+        INSERT INTO fin_projects (id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
+    """
+    slug = data.get("slug", name.lower().replace(" ", "-")[:20])
+    insert_and_return(
+        sql,
+        (
+            config_id,
+            name,
+            slug,
+            data.get("owner", ""),
+            data.get("cost_center", ""),
+            data.get("budget_cap", 0),
+            0,
+            data.get("tags", {}),
+            now,
+            data.get("note", ""),
+        ),
+    )
+    return {
+        "id": config_id,
+        "name": name,
+        "slug": slug,
+        "owner": data.get("owner", ""),
+        "cost_center": data.get("cost_center", ""),
+        "budget_cap": data.get("budget_cap", 0),
+        "mtd": 0.0,
+        "tags": data.get("tags", {}),
+        "created": now.isoformat(),
+        "note": data.get("note", ""),
+    }
+
+
+@router.get(
+    "/config/provider/{provider}",
+    response_model=list[CloudConfigResponse],
+    dependencies=[Depends(require_auth)],
+)
+async def list_configs_by_provider(provider: str) -> list[dict[str, Any]]:
+    sql = """
+        SELECT id, provider, name, credential_type, config, created_at, updated_at
+        FROM cloud_config
+        WHERE provider = %s
+        ORDER BY name
+    """
+    results = query_all(sql, (provider,))
+    return [
+        {
+            "id": r["id"],
+            "provider": r["provider"],
+            "name": r["name"],
+            "credential_type": r["credential_type"],
+            "config": _mask_secrets(decrypt_config(r["config"])),
+            "created_at": r["created_at"],
+            "updated_at": r["updated_at"],
+        }
+        for r in results
+    ]
+
+
+# ─── Config by ID endpoints (must come after specific routes) ────────────────
+
+
 @router.get(
     "/config/{config_id}",
     response_model=CloudConfigResponse,
@@ -180,31 +284,4 @@ async def update_config(config_id: str, data: CloudConfigUpdate) -> dict[str, An
 async def delete_config(config_id: str) -> None:
     sql = "DELETE FROM cloud_config WHERE id = %s"
     execute(sql, (config_id,))
-
-
-@router.get(
-    "/config/provider/{provider}",
-    response_model=list[CloudConfigResponse],
-    dependencies=[Depends(require_auth)],
-)
-async def list_configs_by_provider(provider: str) -> list[dict[str, Any]]:
-    sql = """
-        SELECT id, provider, name, credential_type, config, created_at, updated_at
-        FROM cloud_config
-        WHERE provider = %s
-        ORDER BY name
-    """
-    results = query_all(sql, (provider,))
-    return [
-        {
-            "id": r["id"],
-            "provider": r["provider"],
-            "name": r["name"],
-            "credential_type": r["credential_type"],
-            "config": _mask_secrets(decrypt_config(r["config"])),
-            "created_at": r["created_at"],
-            "updated_at": r["updated_at"],
-        }
-        for r in results
-    ]
 

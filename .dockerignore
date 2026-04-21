@@ -2,6 +2,12 @@
 .git
 .gitignore
 
+# Node frontend (moved to finna-app-ui repo)
+node_modules/
+frontend/node_modules/
+*.log
+npm-debug.log*
+
 # Documentation
 docs/
 *.md

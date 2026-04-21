@@ -23,8 +23,8 @@ async def list_alerts(
     """Get alerts with filtering."""
     sql = """
     SELECT * FROM alerts
-    WHERE (%s IS NULL OR status = %s)
-      AND (%s IS NULL OR severity = %s)
+    WHERE (%s::TEXT IS NULL OR status = %s)
+      AND (%s::TEXT IS NULL OR severity = %s)
     ORDER BY created_at DESC
     LIMIT %s
     """

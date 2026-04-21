@@ -23,7 +23,34 @@ require_auth = api_auth.require_auth
 
 logger = logging.getLogger("api.auth")
 
+
+class TokenRequest(BaseModel):
+    username: str
+    password: str
+
+
 router = APIRouter()
+
+
+@router.post("/auth/token")
+async def login_token(req: TokenRequest) -> dict[str, Any]:
+    """Authenticate user and return JWT token."""
+    from ..auth import create_access_token, pwd_context
+
+    # Query the user from DB
+    sql = "SELECT id, username, hashed_password, is_active, is_admin FROM auth_users WHERE username = %s"
+    row = query_one(sql, (req.username,))
+    if not row or not row.get("hashed_password"):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not pwd_context.verify(req.password, row["hashed_password"]):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not row.get("is_active"):
+        raise HTTPException(status_code=403, detail="Account is disabled")
+
+    token = create_access_token(data={"sub": row["username"], "is_admin": bool(row.get("is_admin", False))})
+    return {"token": token}
 
 # In-memory store for pending device code flows
 # Structure: {device_code: {"tenant_id": ..., "client_id": ..., "expires_at": ...}}

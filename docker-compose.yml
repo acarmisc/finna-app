@@ -4,53 +4,34 @@ services:
       context: .
       dockerfile: Dockerfile.api
     ports:
-      - "8001:8000"
+      - "8000:8000"
     environment:
-      PG_DSN: ${PG_DSN:-postgres://finops:finops_dev@postgres:5432/finops}
+      PG_DSN: "postgresql://finops:finops_dev@postgres:5432/finops"
       HOST: "0.0.0.0"
       PORT: "8000"
-      POSTGRES_DB: finops
-      POSTGRES_USER: finops
-      POSTGRES_PASSWORD: finops_dev
+      JWT_SECRET: "dev-secret-key-change-in-production"
+      AUTO_MIGRATE: "true"
+      ALLOWED_ORIGINS: "*"
     depends_on:
       postgres:
         condition: service_healthy
-
-  extractor:
-    build:
-      context: .
-      dockerfile: Dockerfile.extractor
-    environment:
-      EXTRACTOR_TYPE: ${EXTRACTOR_TYPE:-exchange_rates}
-      PG_DSN: ${PG_DSN:-postgres://finops:finops_dev@postgres:5432/finops}
-      BATCH_SIZE: "500"
-      GCP_CSV_PATH: ${GCP_CSV_PATH:-}
-      GCP_INGESTION_MODE: ${GCP_INGESTION_MODE:-bigquery}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    volumes:
-      - ${GCP_CSV_PATH:-./data}:/app/csv:ro
-    profiles:
-      - extractors
 
   postgres:
     image: postgres:16-alpine
     ports:
-      - "5433:5432"
+      - "5432:5432"
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-finops}
-      POSTGRES_USER: ${POSTGRES_USER:-finops}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-finops_dev}
+      POSTGRES_DB: finops
+      POSTGRES_USER: finops
+      POSTGRES_PASSWORD: finops_dev
     volumes:
       - pg_data:/var/lib/postgresql/data
-      - ./sql/init_docker.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./sql/init_docker.sql:/docker-entrypoint-initdb.d/00-schema.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U finops"]
       interval: 5s
       timeout: 5s
       retries: 5
-
 
 volumes:
   pg_data:

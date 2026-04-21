@@ -131,10 +131,7 @@ async def get_cost_totals(
     
     totals = {}
     for row in results:
-        totals[row["provider"]] = {
-            "total": float(row["total"]),
-            "records": row["record_count"],
-        }
+        totals[row["provider"]] = float(row["total"])
     
     return {
         "totals": totals,
