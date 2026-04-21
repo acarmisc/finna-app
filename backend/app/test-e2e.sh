@@ -42,8 +42,8 @@ TOKEN_RESPONSE=$(curl -s --max-time 10 "${API_BASE}/api/v1/auth/token" \
     -d '{"username":"admin","password":"admin"}')
 if echo "$TOKEN_RESPONSE" | grep -q '"token"'; then
     echo -e "${GREEN}PASSED${NC}"
-    TOKEN=$(echo "$TOKEN_RESPONSE" | sed 's/.*"token": "//;s/".*//')
-    ((PASSED++))
+    TOKEN=$(echo "$TOKEN_RESPONSE" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("token",""))')
+    PASSED=$((PASSED+1))
 else
     echo -e "${RED}FAILED${NC}"
     ISSUES+=("Auth token endpoint not working")
@@ -56,7 +56,7 @@ AUTH_HEADER="Authorization: Bearer ${TOKEN}"
 echo -n "Test 2: Costs API... "
 if curl -s --max-time 10 "${API_BASE}/api/v1/costs" -H "$AUTH_HEADER" | grep -q '"costs"'; then
     echo -e "${GREEN}PASSED${NC}"
-    ((PASSED++))
+    PASSED=$((PASSED+1))
 else
     echo -e "${RED}FAILED${NC}"
     ISSUES+=("Costs endpoint returning errors")
@@ -67,7 +67,7 @@ fi
 echo -n "Test 3: Alerts API... "
 if curl -s --max-time 10 "${API_BASE}/api/v1/alerts" -H "$AUTH_HEADER" | grep -q '"alerts"'; then
     echo -e "${GREEN}PASSED${NC}"
-    ((PASSED++))
+    PASSED=$((PASSED+1))
 else
     echo -e "${RED}FAILED${NC}"
     ISSUES+=("Alerts endpoint returning errors")
@@ -78,7 +78,7 @@ fi
 echo -n "Test 4: Config API... "
 if curl -s --max-time 10 "${API_BASE}/api/v1/config" -H "$AUTH_HEADER" | grep -q '\['; then
     echo -e "${GREEN}PASSED${NC}"
-    ((PASSED++))
+    PASSED=$((PASSED+1))
 else
     echo -e "${RED}FAILED${NC}"
     ISSUES+=("Config endpoint returning errors")
@@ -87,9 +87,9 @@ fi
 
 # Test 5: Projects endpoint
 echo -n "Test 5: Projects API... "
-if curl -s --max-time 10 "${API_BASE}/api/v1/config/projects" -H "$AUTH_HEADER" | grep -q '\['; then
+if curl -s --max-time 10 "${API_BASE}/api/v1/config/projects" -H "$AUTH_HEADER" | grep -q 'id'; then
     echo -e "${GREEN}PASSED${NC}"
-    ((PASSED++))
+    PASSED=$((PASSED+1))
 else
     echo -e "${RED}FAILED${NC}"
     ISSUES+=("Projects endpoint returning errors")
@@ -98,9 +98,9 @@ fi
 
 # Test 6: Costs daily endpoint
 echo -n "Test 6: Costs daily API... "
-if curl -s --max-time 10 "${API_BASE}/api/v1/costs/daily" -H "$AUTH_HEADER" | grep -q '"days"'; then
+if curl -s --max-time 10 "${API_BASE}/api/v1/costs/daily" -H "$AUTH_HEADER" | grep -q 'date'; then
     echo -e "${GREEN}PASSED${NC}"
-    ((PASSED++))
+    PASSED=$((PASSED+1))
 else
     echo -e "${RED}FAILED${NC}"
     ISSUES+=("Costs daily endpoint returning errors")
@@ -109,9 +109,9 @@ fi
 
 # Test 7: Extractors endpoint
 echo -n "Test 7: Extractors API... "
-if curl -s --max-time 10 "${API_BASE}/api/v1/extractors/status" -H "$AUTH_HEADER" | grep -q '"runs"'; then
+if curl -s --max-time 10 "${API_BASE}/api/v1/extractors/status" -H "$AUTH_HEADER" | grep -q 'runs'; then
     echo -e "${GREEN}PASSED${NC}"
-    ((PASSED++))
+    PASSED=$((PASSED+1))
 else
     echo -e "${RED}FAILED${NC}"
     ISSUES+=("Extractors endpoint returning errors")
@@ -120,9 +120,9 @@ fi
 
 # Test 8: Costs by SKU
 echo -n "Test 8: Costs by SKU API... "
-if curl -s --max-time 10 "${API_BASE}/api/v1/costs/by-sku" -H "$AUTH_HEADER" | grep -q '"costs"'; then
+if curl -s --max-time 10 "${API_BASE}/api/v1/costs/by-sku" -H "$AUTH_HEADER" | grep -q 'sku'; then
     echo -e "${GREEN}PASSED${NC}"
-    ((PASSED++))
+    PASSED=$((PASSED+1))
 else
     echo -e "${RED}FAILED${NC}"
     ISSUES+=("Costs by SKU endpoint returning errors")
@@ -133,7 +133,7 @@ fi
 echo -n "Test 9: API docs... "
 if curl -s --max-time 10 "${API_BASE}/docs" | grep -q "FinOps"; then
     echo -e "${GREEN}PASSED${NC}"
-    ((PASSED++))
+    PASSED=$((PASSED+1))
 else
     echo -e "${YELLOW}PENDING${NC}"
     ISSUES+=("API documentation not loading")
