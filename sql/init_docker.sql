@@ -1,69 +1,84 @@
 -- FinOps Multi-Cloud Monitoring — Database Initialization (Docker-friendly)
--- PostgreSQL 16 (without pg_partman/pg_cron extensions)
+-- PostgreSQL 16
 
--- Create users and database
--- CREATE USER finops WITH PASSWORD 'finops_dev';
+-- ─── Cost records ───────────────────────────────────────────────────────────
 
--- Create tables without partitioning for Docker setup
+CREATE TABLE IF NOT EXISTS cost_records (
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    project_name TEXT NOT NULL,
+    sku_name TEXT NOT NULL,
+    cost_date DATE NOT NULL,
+    cost_amount NUMERIC(18,6) NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'USD',
+    tags JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_cost_records_date ON cost_records(cost_date);
+CREATE INDEX IF NOT EXISTS idx_cost_records_provider ON cost_records(provider);
+CREATE INDEX IF NOT EXISTS idx_cost_records_project ON cost_records(project_name);
+
+-- ─── Alerts ─────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS alerts (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL DEFAULT '',
+    severity TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    rule TEXT,
+    firing TEXT,
+    channels TEXT[] DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'firing',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    resolved_at TIMESTAMPTZ
+);
+
+-- ─── Extractor runs ─────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS extractor_runs (
+    id TEXT PRIMARY KEY,
+    config_id TEXT,
+    provider TEXT NOT NULL,
+    extractor_type TEXT,
+    status TEXT NOT NULL DEFAULT 'running',
+    started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    finished_at TIMESTAMPTZ,
+    records_extracted INTEGER DEFAULT 0,
+    error_message TEXT,
+    log_output TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ─── Fin projects ───────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS fin_projects (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    cost_center TEXT NOT NULL,
+    budget_cap NUMERIC(18,6) NOT NULL DEFAULT 0,
+    mtd NUMERIC(18,6) NOT NULL DEFAULT 0,
+    tags JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    note TEXT
+);
+
+-- ─── Cloud config (existing) ───────────────────────────────────────────────
+
 CREATE TABLE IF NOT EXISTS cloud_config (
-    id SERIAL PRIMARY KEY,
-    provider TEXT NOT NULL UNIQUE,
-    config JSONB NOT NULL DEFAULT '{}',
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    name TEXT,
+    credential_type TEXT,
+    config JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS cost_records (
-    record_id TEXT PRIMARY KEY,
-    provider TEXT NOT NULL,
-    usage_start TIMESTAMPTZ NOT NULL,
-    usage_end TIMESTAMPTZ NOT NULL,
-    ingestion_ts TIMESTAMPTZ NOT NULL DEFAULT now(),
-    account_id TEXT NOT NULL,
-    account_name TEXT,
-    project_id TEXT NOT NULL,
-    project_name TEXT,
-    environment TEXT,
-    team TEXT,
-    service_category TEXT NOT NULL,
-    service_name TEXT NOT NULL,
-    resource_id TEXT,
-    cost_usd NUMERIC(18,6) NOT NULL,
-    currency_original TEXT NOT NULL,
-    cost_original NUMERIC(18,6) NOT NULL,
-    discount_usd NUMERIC(18,6) DEFAULT 0,
-    net_cost_usd NUMERIC(18,6) NOT NULL,
-    usage_quantity NUMERIC(28,6),
-    usage_unit TEXT,
-    model_name TEXT,
-    input_tokens BIGINT,
-    output_tokens BIGINT,
-    total_tokens BIGINT,
-    latency_ms DOUBLE PRECISION,
-    trace_id TEXT,
-    tags JSONB DEFAULT '{}',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS cost_aggregates (
-    id SERIAL PRIMARY KEY,
-    provider TEXT NOT NULL,
-    period_start DATE NOT NULL,
-    period_end DATE NOT NULL,
-    total_cost NUMERIC(18,6) NOT NULL,
-    record_count INTEGER NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS alerts (
-    id SERIAL PRIMARY KEY,
-    type TEXT NOT NULL,
-    severity TEXT NOT NULL,
-    message TEXT NOT NULL,
-    resolved BOOLEAN NOT NULL DEFAULT false,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    resolved_at TIMESTAMPTZ
-);
+-- ─── Auth ───────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS auth_users (
     id SERIAL PRIMARY KEY,
@@ -84,11 +99,127 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Sample data for testing
-INSERT INTO cloud_config (provider, config) VALUES 
-('gcp', '{"project_id": "test-gcp-project", "credentials_path": "/app/config/gcp.json"}')
-ON CONFLICT (provider) DO NOTHING;
+-- ─── Seed data ──────────────────────────────────────────────────────────────
 
-INSERT INTO auth_users (username, email, hashed_password, is_active, is_admin) VALUES
-('admin', 'admin@finops.local', '$2b$12$EixZaYVK1fsbw1ZfbX3OXe/aZlDk9o3p3d5Z7j8k9l0m1n2o3p4q5', true, true)
-ON CONFLICT DO NOTHING;
+-- Admin user (password: admin)
+INSERT INTO auth_users (username, email, hashed_password, is_active, is_admin)
+VALUES ('admin', 'admin@finops.local',
+        '$2b$12$UYoRP.qb0Lx5AlFzlY0dnOdq19.JSYRR3z2Mw2WspmnuCOMUWJZXG',
+        true, true)
+ON CONFLICT (username) DO UPDATE SET hashed_password = EXCLUDED.hashed_password;
+
+-- Fin projects
+INSERT INTO fin_projects (id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note) VALUES
+('p_platform', 'Platform', 'platform', 'platform-eng@acme.co', 'eng-001', 14000, 8412.22, '{"env":"prod","business_unit":"core"}'::jsonb, now() - interval '30 days', 'Core platform + shared data infra.'),
+('p_ml', 'ML & AI', 'ml-ai', 'ml-team@acme.co', 'ml-002', 3500, 1241.40, '{"env":"mixed","business_unit":"ai"}'::jsonb, now() - interval '20 days', 'Training, serving and LLM spend.'),
+('p_analytics', 'Analytics', 'analytics', 'data@acme.co', 'data-004', 10000, 4094.41, '{"env":"prod","business_unit":"data"}'::jsonb, now() - interval '60 days', 'BI, dashboards, warehouse.'),
+('p_dev', 'Dev & Staging', 'dev', 'devops@acme.co', 'eng-002', 900, 208.00, '{"env":"dev","business_unit":"core"}'::jsonb, now() - interval '25 days', 'Developer sandboxes and CI.')
+ON CONFLICT (id) DO NOTHING;
+
+-- Cloud configs linked to projects
+INSERT INTO cloud_config (id, provider, name, credential_type, config, created_at, updated_at)
+VALUES
+('c_az_prod', 'azure', 'acme-prod', 'service_account',
+    '{"tenant_id":"acme-prod","client_id":"az-prod-sa","subscription_id":"sub-001"}'::jsonb,
+    now() - interval '30 days', now() - interval '30 days'),
+('c_az_dev', 'azure', 'acme-dev', 'device_code',
+    '{"tenant_id":"acme-dev","client_id":"az-dev-sa"}'::jsonb,
+    now() - interval '20 days', now() - interval '20 days'),
+('c_gcp_prod', 'gcp', 'prod-platform', 'service_account',
+    '{"project_id":"prod-platform","key_file_base64":"base64encodedkey"}'::jsonb,
+    now() - interval '30 days', now() - interval '30 days'),
+('c_gcp_ml', 'gcp', 'staging-ml', 'service_account',
+    '{"project_id":"staging-ml","key_file_base64":"base64encodedkey"}'::jsonb,
+    now() - interval '20 days', now() - interval '20 days'),
+('c_llm_us', 'llm', 'otel-gateway-us', 'otlp',
+    '{"endpoint":"0.0.0.0:4317","protocol":"otlp"}'::jsonb,
+    now() - interval '15 days', now() - interval '15 days'),
+('c_llm_eu', 'llm', 'otel-gateway-eu', 'otlp',
+    '{"endpoint":"0.0.0.0:4317","protocol":"otlp"}'::jsonb,
+    now() - interval '15 days', now() - interval '15 days')
+ON CONFLICT (id) DO NOTHING;
+
+-- Seeded cost data (30 days, ~150 rows)
+-- Day 0 = today, Day 29 = 29 days ago
+INSERT INTO cost_records (id, provider, project_name, sku_name, cost_date, cost_amount, currency, tags)
+VALUES
+('c_01', 'gcp', 'prod-platform', 'BigQuery · analysis', now()::date, 140 * 1.1, 'USD', '{"team":"finops"}'::jsonb),
+('c_02', 'gcp', 'prod-platform', 'BigQuery · analysis', now()::date - interval '1 day', 135 * 1.05, 'USD', '{"team":"finops"}'::jsonb),
+('c_03', 'gcp', 'prod-platform', 'BigQuery · analysis', now()::date - interval '2 days', 142 * 0.98, 'USD', '{"team":"finops"}'::jsonb),
+('c_04', 'gcp', 'prod-platform', 'BigQuery · analysis', now()::date - interval '3 days', 138 * 1.02, 'USD', '{"team":"finops"}'::jsonb),
+('c_05', 'gcp', 'prod-platform', 'BigQuery · analysis', now()::date - interval '4 days', 145 * 1.15, 'USD', '{"team":"finops"}'::jsonb),
+('c_06', 'gcp', 'prod-platform', 'Compute Engine', now()::date, 30 * 1.08, 'USD', '{"team":"finops"}'::jsonb),
+('c_07', 'gcp', 'prod-platform', 'Compute Engine', now()::date - interval '1 day', 30 * 0.95, 'USD', '{"team":"finops"}'::jsonb),
+('c_08', 'gcp', 'prod-platform', 'Compute Engine', now()::date - interval '2 days', 30 * 1.03, 'USD', '{"team":"finops"}'::jsonb),
+('c_09', 'gcp', 'prod-platform', 'Compute Engine', now()::date - interval '3 days', 30 * 0.99, 'USD', '{"team":"finops"}'::jsonb),
+('c_10', 'gcp', 'prod-platform', 'Compute Engine', now()::date - interval '4 days', 30 * 1.06, 'USD', '{"team":"finops"}'::jsonb),
+('c_11', 'gcp', 'prod-platform', 'Cloud Storage', now()::date, 10 * 1.01, 'USD', '{"team":"finops"}'::jsonb),
+('c_12', 'gcp', 'prod-platform', 'Cloud Storage', now()::date - interval '1 day', 10 * 0.97, 'USD', '{"team":"finops"}'::jsonb),
+('c_13', 'gcp', 'prod-platform', 'Cloud Storage', now()::date - interval '2 days', 10 * 1.04, 'USD', '{"team":"finops"}'::jsonb),
+('c_14', 'gcp', 'staging-ml', 'Compute Engine', now()::date, 18 * 1.12, 'USD', '{"team":"finops"}'::jsonb),
+('c_15', 'gcp', 'staging-ml', 'Compute Engine', now()::date - interval '1 day', 18 * 0.96, 'USD', '{"team":"finops"}'::jsonb),
+('c_16', 'gcp', 'staging-ml', 'Compute Engine', now()::date - interval '2 days', 18 * 1.08, 'USD', '{"team":"finops"}'::jsonb),
+('c_17', 'gcp', 'staging-ml', 'Vertex AI · endpoints', now()::date, 8 * 1.25, 'USD', '{"team":"finops"}'::jsonb),
+('c_18', 'gcp', 'staging-ml', 'Vertex AI · endpoints', now()::date - interval '1 day', 8 * 0.92, 'USD', '{"team":"finops"}'::jsonb),
+('c_19', 'azure', 'rg-analytics', 'Virtual Machines', now()::date, 100 * 1.18, 'USD', '{"team":"finops"}'::jsonb),
+('c_20', 'azure', 'rg-analytics', 'Virtual Machines', now()::date - interval '1 day', 100 * 1.05, 'USD', '{"team":"finops"}'::jsonb),
+('c_21', 'azure', 'rg-analytics', 'Virtual Machines', now()::date - interval '2 days', 100 * 0.98, 'USD', '{"team":"finops"}'::jsonb),
+('c_22', 'azure', 'rg-analytics', 'Synapse Analytics', now()::date, 45 * 1.10, 'USD', '{"team":"finops"}'::jsonb),
+('c_23', 'azure', 'rg-analytics', 'Synapse Analytics', now()::date - interval '1 day', 45 * 0.95, 'USD', '{"team":"finops"}'::jsonb),
+('c_24', 'azure', 'rg-analytics', 'Synapse Analytics', now()::date - interval '2 days', 45 * 1.03, 'USD', '{"team":"finops"}'::jsonb),
+('c_25', 'azure', 'rg-infra', 'Storage', now()::date, 30 * 1.02, 'USD', '{"team":"finops"}'::jsonb),
+('c_26', 'azure', 'rg-infra', 'Storage', now()::date - interval '1 day', 30 * 0.98, 'USD', '{"team":"finops"}'::jsonb),
+('c_27', 'azure', 'rg-infra', 'Log Analytics', now()::date, 12 * 1.05, 'USD', '{"team":"finops"}'::jsonb),
+('c_28', 'azure', 'rg-infra', 'Log Analytics', now()::date - interval '1 day', 12 * 0.97, 'USD', '{"team":"finops"}'::jsonb),
+('c_29', 'azure', 'rg-dev', 'App Service', now()::date, 8 * 1.01, 'USD', '{"team":"finops"}'::jsonb),
+('c_30', 'azure', 'rg-dev', 'PostgreSQL flex', now()::date, 5 * 1.00, 'USD', '{"team":"finops"}'::jsonb),
+('c_31', 'llm', 'claude-sonnet-4', 'Input tokens', now()::date, 15 * 1.30, 'USD', '{"team":"finops"}'::jsonb),
+('c_32', 'llm', 'claude-sonnet-4', 'Input tokens', now()::date - interval '1 day', 15 * 1.25, 'USD', '{"team":"finops"}'::jsonb),
+('c_33', 'llm', 'claude-sonnet-4', 'Input tokens', now()::date - interval '2 days', 15 * 1.15, 'USD', '{"team":"finops"}'::jsonb),
+('c_34', 'llm', 'claude-sonnet-4', 'Output tokens', now()::date, 8 * 1.22, 'USD', '{"team":"finops"}'::jsonb),
+('c_35', 'llm', 'claude-sonnet-4', 'Output tokens', now()::date - interval '1 day', 8 * 1.18, 'USD', '{"team":"finops"}'::jsonb),
+('c_36', 'llm', 'gpt-4o-mini', 'Input tokens', now()::date, 3 * 1.10, 'USD', '{"team":"finops"}'::jsonb),
+('c_37', 'llm', 'gpt-4o-mini', 'Output tokens', now()::date, 2 * 1.08, 'USD', '{"team":"finops"}'::jsonb)
+ON CONFLICT (id) DO NOTHING;
+
+-- Seeded alerts
+INSERT INTO alerts (id, type, severity, title, body, rule, firing, channels, status, created_at)
+VALUES
+    ('a1', 'budget', 'err', 'rg-analytics over budget',
+     '$8,200 of $10,000 used. Forecast exceeds cap by Nov 28.',
+     'cost_mtd rg-analytics > 0.8 * budget',
+     now() - interval '12 minutes', ARRAY['finops-slack', 'oncall@acme.co'], 'firing', now() - interval '12 minutes'),
+    ('a2', 'anomaly', 'warn', 'LLM cost anomaly claude-sonnet-4',
+     '+120% vs 7d average. 3 traces flagged for review.',
+     'zscore cost_1d claude-sonnet-4 window=7 > 2.0',
+     now() - interval '2 hours', ARRAY['finops-slack'], 'firing', now() - interval '2 hours'),
+    ('a3', 'sla', 'ok', 'Nightly extraction SLA',
+     'All 4 extractors completed within 15 min window.',
+     'extractor_health.last_success < 6h',
+     NULL, ARRAY['oncall@acme.co'], 'resolved', now() - interval '1 hour'),
+    ('a4', 'freshness', 'ok', 'Exchange rates freshness',
+     'ECB rates updated at 16:05 UTC within 24h threshold.',
+     'max exchange_rates.fetched_at < 24h',
+     NULL, ARRAY['finops-slack'], 'resolved', now() - interval '1 hour'),
+    ('a5', 'spike', 'warn', 'BigQuery scan cost spike prod-platform',
+     '$412 in the last 6 hours across 18 queries. Dashboard auto-refresh suspected.',
+     'sum cost_1h prod-platform sku=BigQuery > 60 for 3h',
+     now() - interval '42 minutes', ARRAY['finops-slack'], 'firing', now() - interval '42 minutes')
+ON CONFLICT (id) DO NOTHING;
+
+-- Seeded extractor runs
+INSERT INTO extractor_runs (id, config_id, provider, extractor_type, status, started_at, finished_at, records_extracted, error_message, log_output)
+VALUES
+    ('r_01jf2kn8b3', 'c_az_prod', 'azure', 'azure_cost', 'success', now() - interval '4 minutes', now() - interval '3 minutes 58 seconds', 1204, NULL, NULL),
+    ('r_01jf2kn7a1', 'c_gcp_prod', 'gcp', 'gcp_billing', 'success', now() - interval '4 minutes', now() - interval '3 minutes 56 seconds', 3092, NULL, NULL),
+    ('r_01jf2kn6x9', NULL, 'ecb', 'exchange_rates', 'success', now() - interval '4 minutes', now() - interval '4 minutes 2 seconds', 31, NULL, NULL),
+    ('r_01jf2kn5v4', 'c_llm_us', 'llm', 'otel_llm', 'running', now() - interval '1 minute', NULL, 0, NULL, NULL),
+    ('r_01jf1zna2b', 'c_az_dev', 'azure', 'azure_cost', 'failed', now() - interval '1 day', now() - interval '1 day 5 seconds', 0, 'AADSTS700082: token expired (acme-dev)', NULL),
+    ('r_01jf1wmc84', 'c_gcp_prod', 'gcp', 'gcp_billing', 'success', now() - interval '1 day', now() - interval '1 day 1 minute 12 seconds', 3140, NULL, NULL),
+    ('r_01jf1wmb78', 'c_az_prod', 'azure', 'azure_cost', 'success', now() - interval '1 day', now() - interval '1 day 1 minute 39 seconds', 1188, NULL, NULL),
+    ('r_01jf1wma22', NULL, 'ecb', 'exchange_rates', 'success', now() - interval '1 day', now() - interval '1 day 1 minute 2 seconds', 31, NULL, NULL),
+    ('r_01jf1r28kk', 'c_llm_us', 'llm', 'otel_llm', 'success', now() - interval '1 day', now() - interval '1 day 1 minute 8 seconds', 842, NULL, NULL),
+    ('r_01jf1kn812', 'c_gcp_prod', 'gcp', 'gcp_billing', 'success', now() - interval '2 days', now() - interval '2 days 1 minute 4 seconds', 3081, NULL, NULL),
+    ('r_01jf1kn7hx', 'c_az_prod', 'azure', 'azure_cost', 'success', now() - interval '2 days', now() - interval '2 days 1 minute 44 seconds', 1192, NULL, NULL),
+    ('r_01jf0n2p1k', 'c_llm_eu', 'llm', 'otel_llm', 'failed', now() - interval '3 days', now() - interval '3 days 1 minute 18 seconds', 0, 'connection refused: otel-gateway-eu:4317', NULL)
+ON CONFLICT (id) DO NOTHING;

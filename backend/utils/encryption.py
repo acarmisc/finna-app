@@ -17,6 +17,8 @@ def encrypt_config(config: dict) -> str:
     return base64.b64encode(json.dumps(config).encode()).decode()
 
 
-def decrypt_config(encrypted: str) -> dict:
-    """Decrypt an encrypted config string."""
+def decrypt_config(encrypted: str | dict) -> dict:
+    """Decrypt an encrypted config string, or return dict as-is."""
+    if isinstance(encrypted, dict):
+        return encrypted
     return json.loads(base64.b64decode(encrypted.encode()).decode())
