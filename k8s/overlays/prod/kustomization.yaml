@@ -5,9 +5,17 @@ namespace: finops
 
 resources:
   - ../../base
+  - hpa.yaml
+  - pdb.yaml
 
 commonLabels:
   environment: prod
+
+images:
+  - name: finops-api
+    newTag: prod-latest
+  - name: finops-extractor
+    newTag: prod-latest
 
 patches:
   - patch: |-
