@@ -193,6 +193,29 @@ Cost records normalized across providers:
 | `usage_unit` | text | Unit label |
 | `tags` | jsonb | Labels / tags including `location`, `resource_type` |
 
+## Database Migrations
+
+Migrations are managed with [Alembic](https://alembic.sqlalchemy.org/). Auto-migrations run on startup if `AUTO_MIGRATE=true` (default in Docker).
+
+```bash
+# Run all pending migrations
+alembic upgrade head
+
+# Create a new migration (generates migration file in alembic/versions/)
+alembic revision -m "description"
+
+# Rollback one step
+alembic downgrade -1
+
+# Check current revision
+alembic current
+
+# Show migration history
+alembic history
+```
+
+Migrations are idempotent (use `IF NOT EXISTS` / `IF EXISTS` guards). The baseline (`001_baseline`) creates core tables and extensions; follow-up migrations add/modify columns and tables.
+
 ## Development
 
 ```bash
