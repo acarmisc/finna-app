@@ -1,61 +1,40 @@
 # Finna — FinOps Backend
 
-FastAPI backend for the FinOps platform — cloud cost extraction, aggregation, and API.
+FastAPI backend for the FinOps platform — multi-cloud cost extraction, aggregation, and API.
 
 > The frontend lives in the sibling repo [finna-app-ui](https://github.com/acarmisc/finna-app-ui).
 
 ## Quick Start
 
-### Backend only (with mock data)
-
 ```bash
-# Terminal — Mock API server
-bun backend/frontend/mock-server.ts
+./startup.sh
 ```
 
-→ http://localhost:8000/docs (Swagger UI)
+→ http://localhost:8000 (API) · http://localhost:8000/docs (Swagger)
 
-### Backend only (with real database)
-
-```bash
-# Terminal — Real API backend
-cd backend
-python -m app.api.main
-```
-
-→ http://localhost:8000 (API)
-
-### Docker Compose
+Or manually:
 
 ```bash
-docker-compose up --build
+docker compose up -d
 ```
-
-→ http://localhost:8000 (API), http://localhost:3000 (frontend from finna-app-ui)
 
 ## Project Structure
 
 ```
 finna-app/
-├── backend/
-│   ├── app/api/              # FastAPI app + routes
-│   │   ├── main.py           # FastAPI app entry
-│   │   ├── auth.py           # JWT auth
-│   │   ├── costs.py          # Cost data CRUD
-│   │   ├── config.py         # Connections CRUD
-│   │   ├── alerts.py         # Alert management
-│   │   └── extractors.py     # Extractor orchestration
-│   └── frontend/
-│       └── mock-server.ts    # Bun mock API server (for dev)
-├── extractors/               # Cloud cost extractors (GCP, Azure, LLM)
-├── aggregation/              # Cost aggregation engine
-├── alembic/                  # Database migrations
-├── sql/                      # SQL init scripts & migrations
-├── tests/                    # Python tests
-├── k8s/                      # Kubernetes manifests
-├── pyproject.toml            # Python dependencies (uv)
+├── backend/app/api/          # FastAPI app
+│   ├── main.py               # Entry point
+│   ├── auth.py               # JWT authentication
+│   ├── runner.py             # Extractor subprocess management
+│   └── routes/               # API route handlers
+├── extractors/               # Cloud cost extractors
+│   ├── azure_cost.py         # Azure Cost Management
+│   └── gcp_billing.py        # GCP BigQuery billing
+├── models/                   # Shared Pydantic models
+├── sql/                      # DB schema (init_docker.sql)
+├── config/                   # Auth helpers
+├── utils/                    # Shared utilities
 ├── Dockerfile.api            # API container
-├── Dockerfile.extractor      # Extractor container
 └── docker-compose.yml        # Local dev stack
 ```
 
@@ -63,43 +42,54 @@ finna-app/
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| POST | `/api/v1/auth/token` | No | Login, returns JWT |
+| POST | `/api/v1/auth/token` | No | Login → JWT |
 | GET | `/healthz` | No | Health check |
 | GET | `/api/v1/costs` | Yes | Cost records |
 | GET | `/api/v1/costs/totals` | Yes | Aggregated totals |
-| GET | `/api/v1/costs/daily` | Yes | Daily breakdown for chart |
-| GET | `/api/v1/costs/by-sku` | Yes | SKU-level costs |
-| GET | `/api/v1/config` | Yes | Connections list |
+| GET | `/api/v1/costs/daily` | Yes | Daily breakdown |
+| GET | `/api/v1/costs/by-sku` | Yes | SKU-level breakdown |
+| GET | `/api/v1/config` | Yes | List connections |
 | POST | `/api/v1/config` | Yes | Create connection |
-| DELETE | `/api/v1/config/:id` | Yes | Delete connection |
+| GET | `/api/v1/config/{id}` | Yes | Get connection |
+| PUT | `/api/v1/config/{id}` | Yes | Update connection |
+| DELETE | `/api/v1/config/{id}` | Yes | Delete connection |
+| POST | `/api/v1/config/{id}/test` | Yes | Test credentials |
+| GET | `/api/v1/config/projects` | Yes | List projects |
 | GET | `/api/v1/alerts` | Yes | All alerts |
-| GET | `/api/v1/alerts/active` | Yes | Firing alerts only |
+| GET | `/api/v1/alerts/active` | Yes | Firing alerts |
 | GET | `/api/v1/extractors/status` | Yes | Run history |
 | POST | `/api/v1/extractors/run` | Yes | Trigger extractor |
-| GET | `/api/v1/config/projects` | Yes | Projects list |
+| GET | `/api/v1/extractors/run/{id}` | Yes | Run status + logs |
+| POST | `/api/v1/extractors/run/{id}/cancel` | Yes | Cancel run |
 
 ## Authentication
 
 Default credentials: `admin` / `admin`
-
-Returns a JWT token stored in the frontend's `localStorage` as `finna-auth-token`.
-
-## Credential Setup & Azure Extractor Walkthrough
-
-### 1. Get a JWT token
 
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/token \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
-
-echo $TOKEN   # verify it printed a JWT
 ```
 
-### 2. Register Azure credentials
+## Azure Extractor Setup
 
-You need a service principal with the **Cost Management Reader** role on the target subscription.
+### Prerequisites
+
+Service principal with **Cost Management Reader** on each target resource group:
+
+```bash
+az role assignment create \
+  --assignee <CLIENT_ID> \
+  --role "Cost Management Reader" \
+  --scope "/subscriptions/<SUB_ID>/resourceGroups/<RG_NAME>"
+
+# Verify roles
+az role assignment list --assignee <CLIENT_ID> --all --output table
+```
+
+### 1. Register credentials
 
 ```bash
 curl -s -X POST http://localhost:8000/api/v1/config \
@@ -107,124 +97,101 @@ curl -s -X POST http://localhost:8000/api/v1/config \
   -H "Content-Type: application/json" \
   -d '{
     "provider": "azure",
-    "name": "My Azure Sub",
+    "name": "My Azure Config",
     "credential_type": "service_principal",
     "config": {
-      "tenant_id":       "<AZURE_TENANT_ID>",
-      "client_id":       "<AZURE_CLIENT_ID>",
-      "client_secret":   "<AZURE_CLIENT_SECRET>",
-      "subscription_id": "<AZURE_SUBSCRIPTION_ID>",
-      "scope":           "subscription",
-      "resource_groups": []
+      "tenant_id":       "<TENANT_ID>",
+      "client_id":       "<CLIENT_ID>",
+      "client_secret":   "<CLIENT_SECRET>",
+      "subscription_id": "<SUBSCRIPTION_ID>",
+      "scope":           "resourceGroups",
+      "resource_groups": ["RG-ONE", "RG-TWO"]
     }
-  }' | python3 -m json.tool
+  }'
+# → copy the "id" as CONFIG_ID
 ```
 
-Copy the `"id"` field from the response — that is `CONFIG_ID`.
-
-To list all registered credentials:
+### 2. Test credentials
 
 ```bash
-curl -s http://localhost:8000/api/v1/config \
+curl -s -X POST http://localhost:8000/api/v1/config/<CONFIG_ID>/test \
   -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+# → {"ok": true, "checks": {"auth": "ok", "cost_management_api": "ok", ...}}
 ```
 
-### 3. Trigger the Azure extractor
+### 3. Trigger extraction
 
 ```bash
 curl -s -X POST http://localhost:8000/api/v1/extractors/run \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{
-    "provider":        "azure",
-    "extractor_type":  "azure",
-    "config_id":       "<CONFIG_ID>"
-  }' | python3 -m json.tool
+  -d '{"provider":"azure","extractor_type":"azure","config_id":"<CONFIG_ID>"}' \
+  | python3 -m json.tool
 # → {"run_id": "...", "status": "started"}
 ```
 
-### 4. Verify the extractor ran
-
-Poll the run status:
+### 4. Poll status
 
 ```bash
-RUN_ID=<run_id from above>
-
-curl -s "http://localhost:8000/api/v1/extractors/run/$RUN_ID" \
+curl -s "http://localhost:8000/api/v1/extractors/run/<RUN_ID>" \
   -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
 ```
 
-Check recent extractor history:
+### Environment variables
 
-```bash
-curl -s "http://localhost:8000/api/v1/extractors/status?provider=azure" \
-  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
-```
-
-Verify cost records were ingested:
-
-```bash
-curl -s "http://localhost:8000/api/v1/costs/totals" \
-  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
-```
-
-If `total_cost` is non-zero, the extractor pulled real data.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOOKBACK_DAYS` | `30` | Days of history to fetch |
+| `DATE_FROM` / `DATE_TO` | — | Override date range (YYYY-MM-DD) |
+| `RG_API_DELAY_SECS` | `max(15, n_rgs)` | Delay between per-RG API calls |
+| `RATE_LIMIT_WAIT_1/2/3` | `20/40/60` | 429 retry waits in seconds |
+| `BATCH_SIZE` | `500` | DB insert batch size |
 
 ### Troubleshooting
 
-| Symptom | Likely cause |
-|---------|-------------|
-| `401 Unauthorized` | Token expired — re-run step 1 |
-| `400 config_id is required` | Missing `config_id` in run payload |
-| Run status `failed` | Invalid credentials or missing Cost Management Reader role |
-| `0` records ingested | No billing data in the date range (defaults to last 30 days) |
+| Symptom | Cause |
+|---------|-------|
+| `401` on token | Token expired — re-auth |
+| `RBACAccessDenied` | SP missing Cost Management Reader on RG |
+| `429` exhausted | Azure rate limit — run retry waits apply automatically |
+| `0` records | No billing data in date range, or wrong scope |
+| Run stuck `running` | Check logs via `GET /api/v1/extractors/run/{id}` |
 
-## Mock Server
+## Data Model
 
-The mock server (`backend/frontend/mock-server.ts`) provides:
-- Full API schema matching the real backend
-- Seed data: 7 connections, 15 cost records, 5 runs, 4 alerts, 30 days of daily costs
-- JWT auth with `admin/admin` or `user/password`
+Cost records normalized across providers:
 
-Start: `bun backend/frontend/mock-server.ts`
+| Field | Type | Description |
+|-------|------|-------------|
+| `record_id` | text PK | Deterministic SHA-256 hash |
+| `provider` | text | `azure` / `gcp` |
+| `usage_start/end` | timestamptz | Billing period |
+| `account_id` | text | Subscription / project ID |
+| `project_id` | text | Cost center / project label |
+| `service_category` | text | `compute` / `storage` / `network` / `database` / `ml` |
+| `service_name` | text | Meter sub-category or SKU |
+| `resource_id` | text | Resource group (Azure) / resource name (GCP) |
+| `resource_type` | text | e.g. `microsoft.compute/virtualmachines` |
+| `region` | text | e.g. `eu west`, `us-central1` |
+| `charge_type` | text | `Usage` / `Tax` / `Credit` |
+| `cost_usd` | numeric | Cost in USD |
+| `cost_original` | numeric | Cost in billing currency |
+| `currency_original` | text | Billing currency |
+| `discount_usd` | numeric | Credits / discounts (GCP) |
+| `net_cost_usd` | numeric | After discounts |
+| `usage_quantity` | numeric | e.g. hours, GB, requests |
+| `usage_unit` | text | Unit label |
+| `tags` | jsonb | Labels / tags including `location`, `resource_type` |
 
 ## Development
 
-### Run tests
-
 ```bash
-pytest
-```
-
-### Run linter
-
-```bash
-ruff check .
-```
-
-### Run type checker
-
-```bash
-mypy backend/ extractors/ || exit 0
+pytest                        # run tests
+ruff check .                  # lint
+mypy backend/ extractors/     # type check
 ```
 
 ## CI/CD
 
-- **CI**: Runs pytest, ruff, mypy on every push/PR to `main`
-- **Docker**: Builds and pushes extractor image to GHCR on `v*` tags
-
-## Docker
-
-### API
-
-```bash
-docker build -f Dockerfile.api -t finna-api .
-docker run --rm -p 8000:8000 -e PG_DSN=... finna-api
-```
-
-### Extractor
-
-```bash
-docker build -f Dockerfile.extractor -t finna-extractor .
-docker run --rm -e EXTRACTOR_TYPE=gcp_billing finna-extractor
-```
+- **CI**: pytest + ruff + mypy on every push/PR to `main`
+- **Docker**: builds and pushes on `v*` tags
