@@ -1,6 +1,15 @@
 """Pytest fixtures for API integration tests."""
 
+from __future__ import annotations
+
 import os
+import sys
+from pathlib import Path
+
+# Set up path to import from backend
+backend_path = Path(__file__).parent.parent / "backend" / "app"
+if str(backend_path) not in sys.path:
+    sys.path.insert(0, str(backend_path))
 
 os.environ["PG_DSN"] = "postgresql://test:test@localhost/testdb"
 os.environ["POOL_MIN_CONNS"] = "1"
