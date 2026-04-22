@@ -37,36 +37,15 @@ This guide covers common operational tasks for the FinOps multi-cloud monitoring
 
 ---
 
-## Updating Dashboards
+## Queries & Insights
 
-Dashboards are provisioned in Apache Superset via the `superset/bootstrap.py` script:
+Ready-to-run SQL queries for metrics, trends, and anomaly detection are in [`queries/QUERIES.md`](../queries/QUERIES.md).
 
-- **FinOps Overview** — High-level cost overview
-- **LLM Costs** — LLM-specific cost and token metrics
-- **Project Drill-down** — Per-project cost drilldown
+Connect any SQL client or BI tool directly to the PostgreSQL database:
 
-### To update a dashboard
-
-1. Edit the chart definitions in `superset/bootstrap.py`.
-2. Re-run the bootstrap script against your Superset instance:
-   ```bash
-   export SUPERSET_BASE_URL=http://your-superset:8088
-   export SUPERSET_ADMIN_USERNAME=admin
-   export ADMIN_PASSWORD=your-password
-   export FINOPS_PG_URI=postgresql://finops:finops_dev@postgres:5432/finops
-   python3 superset/bootstrap.py
-   ```
-   The script is idempotent — it checks by name before creating resources.
-
-### To add a new dashboard
-
-1. Add a new dashboard definition dict in `superset/bootstrap.py`.
-2. Add chart creation calls and the `ensure_dashboard()` call in `main()`.
-3. Re-run the bootstrap script.
-
-### Datasource
-
-The FinOps PostgreSQL connection is created automatically by the bootstrap script. If the connection string changes, update `FINOPS_PG_URI` and re-run.
+```bash
+psql $PG_DSN
+```
 
 ---
 
