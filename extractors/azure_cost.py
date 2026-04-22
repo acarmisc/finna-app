@@ -40,6 +40,7 @@ from typing import Any
 import psycopg
 from azure.mgmt.costmanagement import CostManagementClient
 from azure.mgmt.costmanagement.models import (
+    QueryAggregation,
     QueryDataset,
     QueryDefinition,
     QueryGrouping,
@@ -50,8 +51,11 @@ from pydantic import ValidationError
 from tenacity import (
     before_sleep_log,
     retry,
+    retry_if_exception,
     retry_if_exception_type,
     stop_after_attempt,
+    wait_chain,
+    wait_fixed,
     wait_exponential,
 )
 
@@ -114,9 +118,13 @@ AZURE_QUERY_COLUMNS = [
     "UsageDate",
     "SubscriptionId",
     "ResourceGroup",
+    "ResourceType",
+    "ResourceLocation",
     "MeterCategory",
     "MeterSubCategory",
     "Product",
+    "UnitOfMeasure",
+    "ChargeType",
     "CostInBillingCurrency",
     "Currency",
 ]
@@ -172,11 +180,12 @@ def _parse_date(val: str) -> datetime:
 
 
 def _default_date_range() -> tuple[datetime, datetime]:
-    """Return (from, to) defaulting to last 30 days."""
+    """Return (from, to) defaulting to last LOOKBACK_DAYS days (env var, default 30)."""
+    days = int(_env_optional("LOOKBACK_DAYS", "30"))
     to_dt = datetime.now(timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
-    from_dt = to_dt - timedelta(days=30)
+    from_dt = to_dt - timedelta(days=days)
     return from_dt, to_dt
 
 
@@ -255,7 +264,8 @@ def _load_exchange_rates(
             for row in cur.fetchall():
                 rates[row[0]] = Decimal(str(row[1]))
     except psycopg.Error:
-        logger.exception(
+        conn.rollback()
+        logger.warning(
             "Failed to load exchange rates from %s; assuming USD=1 only", table
         )
     return rates
@@ -284,13 +294,14 @@ def _build_scope(
     resource_group: str | None = None,
 ) -> str:
     """Build the Azure resource scope string."""
-    if scope == "resourcegroup":
+    _scope = scope.lower().rstrip("s").replace("_", "")  # normalize variants
+    if _scope == "resourcegroup":
         if not resource_group:
             raise ValueError(
                 "resource_group name required when AZURE_SCOPE=resourcegroup"
             )
         return f"/subscriptions/{subscription_id}/resourceGroups/{resource_group}"
-    if scope == "managementgroup":
+    if _scope == "managementgroup":
         if not mgmt_group_id:
             raise ValueError(
                 "AZURE_MGMT_GROUP_ID is required when AZURE_SCOPE=managementgroup"
@@ -303,7 +314,10 @@ def _build_query_definition(date_from: datetime, date_to: datetime) -> QueryDefi
     """Build the QueryDefinition for the Azure Cost Management API."""
     dataset = QueryDataset(
         granularity="Daily",
-        aggregation={},
+        aggregation={
+            "totalCost": QueryAggregation(name="Cost", function="Sum"),
+            "totalQuantity": QueryAggregation(name="UsageQuantity", function="Sum"),
+        },
         grouping=[
             QueryGrouping(name=col, type="Dimension")
             for col in AZURE_QUERY_COLUMNS
@@ -324,6 +338,48 @@ def _build_query_definition(date_from: datetime, date_to: datetime) -> QueryDefi
     )
 
 
+def _is_rate_limited(exc: BaseException) -> bool:
+    """Return True if the exception is an Azure 429 rate-limit error."""
+    from azure.core.exceptions import HttpResponseError
+    return isinstance(exc, HttpResponseError) and exc.status_code == 429
+
+
+def _retry_after_wait(retry_state: Any) -> float:
+    """Use Azure Retry-After header if present, else fall back to env-configured waits."""
+    import time as _time
+    exc = retry_state.outcome.exception()
+    # Try to read Retry-After from Azure response headers
+    retry_after: float | None = None
+    try:
+        headers = exc.response.headers if exc and exc.response else {}
+        ra = headers.get("Retry-After") or headers.get("x-ms-ratelimit-microsoft.costmanagement-clienttype-retry-after")
+        if ra:
+            retry_after = float(ra)
+    except Exception:
+        pass
+
+    if retry_after:
+        logger.warning("Azure Retry-After: %.0fs", retry_after)
+        return retry_after
+
+    # Fallback: env-configurable waits (shorter for multi-RG runs)
+    attempt = retry_state.attempt_number  # 1 = first retry
+    waits = [
+        int(_env_optional("RATE_LIMIT_WAIT_1", "30")),
+        int(_env_optional("RATE_LIMIT_WAIT_2", "60")),
+        int(_env_optional("RATE_LIMIT_WAIT_3", "120")),
+    ]
+    wait = waits[min(attempt - 1, len(waits) - 1)]
+    return float(wait)
+
+
+@retry(
+    retry=retry_if_exception(_is_rate_limited),
+    wait=_retry_after_wait,
+    stop=stop_after_attempt(4),  # 1 initial + 3 retries
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
 def fetch_cost_rows(
     client: CostManagementClient,
     scope: str,
@@ -332,6 +388,7 @@ def fetch_cost_rows(
 ) -> list[dict[str, Any]]:
     """Fetch all cost rows from Azure Cost Management, handling pagination.
 
+    Retries on 429 with waits of 60s, 120s, 300s before giving up.
     Returns a list of dicts keyed by the AZURE_QUERY_COLUMNS.
     """
     query_def = _build_query_definition(date_from, date_to)
@@ -396,7 +453,11 @@ def transform_row(
     meter_sub_category = str(row.get("MeterSubCategory", "") or "")
     product = str(row.get("Product", "") or "")
     resource_group = str(row.get("ResourceGroup", "") or "")
-    cost_billing = row.get("CostInBillingCurrency", 0) or 0
+    resource_type = str(row.get("ResourceType", "") or "")
+    resource_location = str(row.get("ResourceLocation", "") or "")
+    unit_of_measure = str(row.get("UnitOfMeasure", "") or "")
+    usage_quantity = row.get("UsageQuantity") or row.get("totalQuantity") or None
+    cost_billing = row.get("CostInBillingCurrency") or row.get("Cost", 0) or 0
     currency = str(row.get("Currency", "USD") or "USD").upper()
     tags_raw = row.get("Tags", {})
 
@@ -439,9 +500,14 @@ def transform_row(
         service_category=service_category,
         service_name=service_name,
         resource_id=resource_group or None,
+        resource_type=resource_type or None,
+        region=resource_location or None,
+        charge_type=str(row.get("ChargeType", "") or "") or None,
         cost_usd=cost_usd,
         currency_original=currency,
         cost_original=cost_original,
+        usage_quantity=Decimal(str(usage_quantity)) if usage_quantity is not None else None,
+        usage_unit=unit_of_measure or None,
         tags=tags,
     )
 
@@ -454,7 +520,7 @@ INSERT_SQL = """
 INSERT INTO cost_records (
     record_id, provider, usage_start, usage_end, ingestion_ts,
     account_id, account_name, project_id, project_name, environment, team,
-    service_category, service_name, resource_id,
+    service_category, service_name, resource_id, resource_type, region, charge_type,
     cost_usd, currency_original, cost_original, discount_usd, net_cost_usd,
     usage_quantity, usage_unit,
     model_name, input_tokens, output_tokens, total_tokens, latency_ms, trace_id,
@@ -462,7 +528,7 @@ INSERT INTO cost_records (
 ) VALUES (
     %(record_id)s, %(provider)s, %(usage_start)s, %(usage_end)s, %(ingestion_ts)s,
     %(account_id)s, %(account_name)s, %(project_id)s, %(project_name)s, %(environment)s, %(team)s,
-    %(service_category)s, %(service_name)s, %(resource_id)s,
+    %(service_category)s, %(service_name)s, %(resource_id)s, %(resource_type)s, %(region)s, %(charge_type)s,
     %(cost_usd)s, %(currency_original)s, %(cost_original)s, %(discount_usd)s, %(net_cost_usd)s,
     %(usage_quantity)s, %(usage_unit)s,
     %(model_name)s, %(input_tokens)s, %(output_tokens)s, %(total_tokens)s, %(latency_ms)s, %(trace_id)s,
@@ -769,70 +835,81 @@ def main() -> None:
         grand_total = 0
         for prefix, cfg in multi_subs.items():
             rgs = cfg.get("resource_groups", [])
-            if rgs:
-                cfg["scope"] = "resourcegroup"
-                cfg["resource_group"] = rgs[0]
             health_name = f"azure_{prefix.lower()}"
             logger.info(
-                "Processing Azure subscription prefix=%s id=%s",
-                prefix,
-                cfg["subscription_id"],
+                "Processing Azure subscription prefix=%s id=%s rgs=%d",
+                prefix, cfg["subscription_id"], len(rgs) if rgs else 0,
             )
-            try:
-                total = run_extractor(
-                    subscription_id=cfg["subscription_id"],
-                    tenant_id=cfg["tenant_id"],
-                    client_id=cfg["client_id"],
-                    client_secret=cfg["client_secret"],
-                    scope_type=cfg.get("scope"),
-                    mgmt_group_id=cfg.get("mgmt_group_id") or None,
-                    health_provider=health_name,
-                    resource_groups=cfg.get("resource_groups") or None,
-                    resource_group=cfg.get("resource_group") or None,
-                )
-                grand_total += total
-                logger.info(
-                    "Subscription %s (%s): %d records inserted",
-                    prefix,
-                    cfg["subscription_id"],
-                    total,
-                )
-            except Exception:
-                logger.exception(
-                    "Azure subscription %s (%s) failed",
-                    prefix,
-                    cfg["subscription_id"],
-                )
+
+            # Iterate over every RG; fall back to subscription scope if no RGs
+            rg_targets: list[str | None] = [rg for rg in rgs] if rgs else [None]
+            sub_total = 0
+            rg_delay = int(_env_optional("RG_API_DELAY_SECS", "5"))
+            for rg_idx, rg in enumerate(rg_targets):
+                if rg_idx > 0 and rg_delay > 0:
+                    import time
+                    time.sleep(rg_delay)
                 try:
-                    pg_dsn = _env("PG_DSN")
-                    with psycopg.connect(pg_dsn) as conn:
-                        mark_extractor_unhealthy(
-                            conn,
-                            health_name,
-                            f"Extractor failed for subscription {cfg['subscription_id']} — see logs",
-                        )
-                except Exception:
-                    logger.exception(
-                        "Also failed to mark extractor as unhealthy for %s", health_name
+                    scope = "resourcegroup" if rg else cfg.get("scope", "subscription")
+                    total = run_extractor(
+                        subscription_id=cfg["subscription_id"],
+                        tenant_id=cfg["tenant_id"],
+                        client_id=cfg["client_id"],
+                        client_secret=cfg["client_secret"],
+                        scope_type=scope,
+                        mgmt_group_id=cfg.get("mgmt_group_id") or None,
+                        health_provider=f"{health_name}_{rg.lower().replace('-','_')[:20]}" if rg else health_name,
+                        resource_group=rg,
                     )
+                    sub_total += total
+                    logger.info("  RG %s: %d records inserted", rg or "(subscription)", total)
+                except Exception:
+                    logger.exception("  RG %s failed — skipping", rg or "(subscription)")
+                    try:
+                        pg_dsn = _env("PG_DSN")
+                        with psycopg.connect(pg_dsn) as conn:
+                            mark_extractor_unhealthy(
+                                conn,
+                                health_name,
+                                f"Failed for RG {rg} in subscription {cfg['subscription_id']}",
+                            )
+                    except Exception:
+                        logger.exception("Also failed to mark extractor unhealthy for %s / %s", health_name, rg)
+
+            grand_total += sub_total
+            logger.info("Subscription %s total: %d records", prefix, sub_total)
+
         logger.info(
             "Azure Cost Extractor completed: %d total records inserted", grand_total
         )
     else:
-        try:
-            total = run_extractor()
-            logger.info("Azure Cost Extractor completed: %d records inserted", total)
-        except Exception:
-            logger.exception("Azure Cost Extractor failed")
+        # Single-subscription mode — support AZURE_RESOURCE_GROUPS CSV
+        rgs_env = _env_optional("AZURE_RESOURCE_GROUPS", "")
+        rg_list = [rg.strip() for rg in rgs_env.split(",") if rg.strip()] if rgs_env else []
+        if not rg_list:
+            rg_list = [_env_optional("AZURE_RESOURCE_GROUP")]  # type: ignore[list-item]
+
+        rg_targets = [rg for rg in rg_list if rg] or [None]
+        grand_total = 0
+        rg_delay = int(_env_optional("RG_API_DELAY_SECS", "5"))
+        for idx, rg in enumerate(rg_targets):
+            if idx > 0 and rg_delay > 0:
+                import time
+                time.sleep(rg_delay)
             try:
-                pg_dsn = _env("PG_DSN")
-                with psycopg.connect(pg_dsn) as conn:
-                    mark_extractor_unhealthy(
-                        conn, "azure", "Extractor failed — see logs"
-                    )
+                scope = "resourcegroup" if rg else _env_optional("AZURE_SCOPE", "subscription")
+                total = run_extractor(scope_type=scope, resource_group=rg)
+                grand_total += total
+                logger.info("RG %s: %d records inserted", rg or "(subscription)", total)
             except Exception:
-                logger.exception("Also failed to mark extractor as unhealthy")
-            raise
+                logger.exception("Azure Cost Extractor failed for RG %s — skipping", rg)
+                try:
+                    pg_dsn = _env("PG_DSN")
+                    with psycopg.connect(pg_dsn) as conn:
+                        mark_extractor_unhealthy(conn, "azure", f"Extractor failed for RG {rg} — see logs")
+                except Exception:
+                    logger.exception("Also failed to mark extractor as unhealthy")
+        logger.info("Azure Cost Extractor completed: %d total records inserted", grand_total)
 
 
 if __name__ == "__main__":

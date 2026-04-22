@@ -4,20 +4,43 @@
 -- ─── Cost records ───────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS cost_records (
-    id TEXT PRIMARY KEY,
+    record_id TEXT PRIMARY KEY,
     provider TEXT NOT NULL,
-    project_name TEXT NOT NULL,
-    sku_name TEXT NOT NULL,
-    cost_date DATE NOT NULL,
-    cost_amount NUMERIC(18,6) NOT NULL,
-    currency TEXT NOT NULL DEFAULT 'USD',
+    usage_start TIMESTAMPTZ NOT NULL,
+    usage_end TIMESTAMPTZ NOT NULL,
+    ingestion_ts TIMESTAMPTZ NOT NULL DEFAULT now(),
+    account_id TEXT,
+    account_name TEXT,
+    project_id TEXT,
+    project_name TEXT,
+    environment TEXT,
+    team TEXT,
+    service_category TEXT,
+    service_name TEXT,
+    resource_id TEXT,
+    resource_type TEXT,
+    region TEXT,
+    charge_type TEXT,
+    cost_usd NUMERIC(18,6) NOT NULL DEFAULT 0,
+    currency_original TEXT NOT NULL DEFAULT 'USD',
+    cost_original NUMERIC(18,6) NOT NULL DEFAULT 0,
+    discount_usd NUMERIC(18,6) DEFAULT 0,
+    net_cost_usd NUMERIC(18,6) DEFAULT 0,
+    usage_quantity NUMERIC(18,6),
+    usage_unit TEXT,
+    model_name TEXT,
+    input_tokens BIGINT,
+    output_tokens BIGINT,
+    total_tokens BIGINT,
+    latency_ms INTEGER,
+    trace_id TEXT,
     tags JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_cost_records_date ON cost_records(cost_date);
 CREATE INDEX IF NOT EXISTS idx_cost_records_provider ON cost_records(provider);
-CREATE INDEX IF NOT EXISTS idx_cost_records_project ON cost_records(project_name);
+CREATE INDEX IF NOT EXISTS idx_cost_records_usage_start ON cost_records(usage_start);
+CREATE INDEX IF NOT EXISTS idx_cost_records_project_id ON cost_records(project_id);
 
 -- ─── Alerts ─────────────────────────────────────────────────────────────────
 
@@ -36,6 +59,23 @@ CREATE TABLE IF NOT EXISTS alerts (
 );
 
 -- ─── Extractor runs ─────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS exchange_rates (
+    currency TEXT PRIMARY KEY,
+    rate_to_usd NUMERIC(18,8) NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+INSERT INTO exchange_rates (currency, rate_to_usd) VALUES ('EUR', 1.08), ('GBP', 1.27)
+ON CONFLICT (currency) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS extractor_health (
+    extractor_name TEXT PRIMARY KEY,
+    last_run_ts TIMESTAMPTZ,
+    status TEXT,
+    records_extracted INT DEFAULT 0,
+    error_message TEXT,
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS extractor_runs (
     id TEXT PRIMARY KEY,
@@ -139,48 +179,7 @@ VALUES
     now() - interval '15 days', now() - interval '15 days')
 ON CONFLICT (id) DO NOTHING;
 
--- Seeded cost data (30 days, ~150 rows)
--- Day 0 = today, Day 29 = 29 days ago
-INSERT INTO cost_records (id, provider, project_name, sku_name, cost_date, cost_amount, currency, tags)
-VALUES
-('c_01', 'gcp', 'prod-platform', 'BigQuery · analysis', now()::date, 140 * 1.1, 'USD', '{"team":"finops"}'::jsonb),
-('c_02', 'gcp', 'prod-platform', 'BigQuery · analysis', now()::date - interval '1 day', 135 * 1.05, 'USD', '{"team":"finops"}'::jsonb),
-('c_03', 'gcp', 'prod-platform', 'BigQuery · analysis', now()::date - interval '2 days', 142 * 0.98, 'USD', '{"team":"finops"}'::jsonb),
-('c_04', 'gcp', 'prod-platform', 'BigQuery · analysis', now()::date - interval '3 days', 138 * 1.02, 'USD', '{"team":"finops"}'::jsonb),
-('c_05', 'gcp', 'prod-platform', 'BigQuery · analysis', now()::date - interval '4 days', 145 * 1.15, 'USD', '{"team":"finops"}'::jsonb),
-('c_06', 'gcp', 'prod-platform', 'Compute Engine', now()::date, 30 * 1.08, 'USD', '{"team":"finops"}'::jsonb),
-('c_07', 'gcp', 'prod-platform', 'Compute Engine', now()::date - interval '1 day', 30 * 0.95, 'USD', '{"team":"finops"}'::jsonb),
-('c_08', 'gcp', 'prod-platform', 'Compute Engine', now()::date - interval '2 days', 30 * 1.03, 'USD', '{"team":"finops"}'::jsonb),
-('c_09', 'gcp', 'prod-platform', 'Compute Engine', now()::date - interval '3 days', 30 * 0.99, 'USD', '{"team":"finops"}'::jsonb),
-('c_10', 'gcp', 'prod-platform', 'Compute Engine', now()::date - interval '4 days', 30 * 1.06, 'USD', '{"team":"finops"}'::jsonb),
-('c_11', 'gcp', 'prod-platform', 'Cloud Storage', now()::date, 10 * 1.01, 'USD', '{"team":"finops"}'::jsonb),
-('c_12', 'gcp', 'prod-platform', 'Cloud Storage', now()::date - interval '1 day', 10 * 0.97, 'USD', '{"team":"finops"}'::jsonb),
-('c_13', 'gcp', 'prod-platform', 'Cloud Storage', now()::date - interval '2 days', 10 * 1.04, 'USD', '{"team":"finops"}'::jsonb),
-('c_14', 'gcp', 'staging-ml', 'Compute Engine', now()::date, 18 * 1.12, 'USD', '{"team":"finops"}'::jsonb),
-('c_15', 'gcp', 'staging-ml', 'Compute Engine', now()::date - interval '1 day', 18 * 0.96, 'USD', '{"team":"finops"}'::jsonb),
-('c_16', 'gcp', 'staging-ml', 'Compute Engine', now()::date - interval '2 days', 18 * 1.08, 'USD', '{"team":"finops"}'::jsonb),
-('c_17', 'gcp', 'staging-ml', 'Vertex AI · endpoints', now()::date, 8 * 1.25, 'USD', '{"team":"finops"}'::jsonb),
-('c_18', 'gcp', 'staging-ml', 'Vertex AI · endpoints', now()::date - interval '1 day', 8 * 0.92, 'USD', '{"team":"finops"}'::jsonb),
-('c_19', 'azure', 'rg-analytics', 'Virtual Machines', now()::date, 100 * 1.18, 'USD', '{"team":"finops"}'::jsonb),
-('c_20', 'azure', 'rg-analytics', 'Virtual Machines', now()::date - interval '1 day', 100 * 1.05, 'USD', '{"team":"finops"}'::jsonb),
-('c_21', 'azure', 'rg-analytics', 'Virtual Machines', now()::date - interval '2 days', 100 * 0.98, 'USD', '{"team":"finops"}'::jsonb),
-('c_22', 'azure', 'rg-analytics', 'Synapse Analytics', now()::date, 45 * 1.10, 'USD', '{"team":"finops"}'::jsonb),
-('c_23', 'azure', 'rg-analytics', 'Synapse Analytics', now()::date - interval '1 day', 45 * 0.95, 'USD', '{"team":"finops"}'::jsonb),
-('c_24', 'azure', 'rg-analytics', 'Synapse Analytics', now()::date - interval '2 days', 45 * 1.03, 'USD', '{"team":"finops"}'::jsonb),
-('c_25', 'azure', 'rg-infra', 'Storage', now()::date, 30 * 1.02, 'USD', '{"team":"finops"}'::jsonb),
-('c_26', 'azure', 'rg-infra', 'Storage', now()::date - interval '1 day', 30 * 0.98, 'USD', '{"team":"finops"}'::jsonb),
-('c_27', 'azure', 'rg-infra', 'Log Analytics', now()::date, 12 * 1.05, 'USD', '{"team":"finops"}'::jsonb),
-('c_28', 'azure', 'rg-infra', 'Log Analytics', now()::date - interval '1 day', 12 * 0.97, 'USD', '{"team":"finops"}'::jsonb),
-('c_29', 'azure', 'rg-dev', 'App Service', now()::date, 8 * 1.01, 'USD', '{"team":"finops"}'::jsonb),
-('c_30', 'azure', 'rg-dev', 'PostgreSQL flex', now()::date, 5 * 1.00, 'USD', '{"team":"finops"}'::jsonb),
-('c_31', 'llm', 'claude-sonnet-4', 'Input tokens', now()::date, 15 * 1.30, 'USD', '{"team":"finops"}'::jsonb),
-('c_32', 'llm', 'claude-sonnet-4', 'Input tokens', now()::date - interval '1 day', 15 * 1.25, 'USD', '{"team":"finops"}'::jsonb),
-('c_33', 'llm', 'claude-sonnet-4', 'Input tokens', now()::date - interval '2 days', 15 * 1.15, 'USD', '{"team":"finops"}'::jsonb),
-('c_34', 'llm', 'claude-sonnet-4', 'Output tokens', now()::date, 8 * 1.22, 'USD', '{"team":"finops"}'::jsonb),
-('c_35', 'llm', 'claude-sonnet-4', 'Output tokens', now()::date - interval '1 day', 8 * 1.18, 'USD', '{"team":"finops"}'::jsonb),
-('c_36', 'llm', 'gpt-4o-mini', 'Input tokens', now()::date, 3 * 1.10, 'USD', '{"team":"finops"}'::jsonb),
-('c_37', 'llm', 'gpt-4o-mini', 'Output tokens', now()::date, 2 * 1.08, 'USD', '{"team":"finops"}'::jsonb)
-ON CONFLICT (id) DO NOTHING;
+-- cost_records seed data removed — populated via extractors
 
 -- Seeded alerts
 INSERT INTO alerts (id, type, severity, title, body, rule, firing, channels, status, created_at)

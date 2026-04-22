@@ -84,6 +84,101 @@ Default credentials: `admin` / `admin`
 
 Returns a JWT token stored in the frontend's `localStorage` as `finna-auth-token`.
 
+## Credential Setup & Azure Extractor Walkthrough
+
+### 1. Get a JWT token
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+echo $TOKEN   # verify it printed a JWT
+```
+
+### 2. Register Azure credentials
+
+You need a service principal with the **Cost Management Reader** role on the target subscription.
+
+```bash
+curl -s -X POST http://localhost:8000/api/v1/config \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "azure",
+    "name": "My Azure Sub",
+    "credential_type": "service_principal",
+    "config": {
+      "tenant_id":       "<AZURE_TENANT_ID>",
+      "client_id":       "<AZURE_CLIENT_ID>",
+      "client_secret":   "<AZURE_CLIENT_SECRET>",
+      "subscription_id": "<AZURE_SUBSCRIPTION_ID>",
+      "scope":           "subscription",
+      "resource_groups": []
+    }
+  }' | python3 -m json.tool
+```
+
+Copy the `"id"` field from the response — that is `CONFIG_ID`.
+
+To list all registered credentials:
+
+```bash
+curl -s http://localhost:8000/api/v1/config \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+```
+
+### 3. Trigger the Azure extractor
+
+```bash
+curl -s -X POST http://localhost:8000/api/v1/extractors/run \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider":        "azure",
+    "extractor_type":  "azure",
+    "config_id":       "<CONFIG_ID>"
+  }' | python3 -m json.tool
+# → {"run_id": "...", "status": "started"}
+```
+
+### 4. Verify the extractor ran
+
+Poll the run status:
+
+```bash
+RUN_ID=<run_id from above>
+
+curl -s "http://localhost:8000/api/v1/extractors/run/$RUN_ID" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+```
+
+Check recent extractor history:
+
+```bash
+curl -s "http://localhost:8000/api/v1/extractors/status?provider=azure" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+```
+
+Verify cost records were ingested:
+
+```bash
+curl -s "http://localhost:8000/api/v1/costs/totals" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+```
+
+If `total_cost` is non-zero, the extractor pulled real data.
+
+### Troubleshooting
+
+| Symptom | Likely cause |
+|---------|-------------|
+| `401 Unauthorized` | Token expired — re-run step 1 |
+| `400 config_id is required` | Missing `config_id` in run payload |
+| Run status `failed` | Invalid credentials or missing Cost Management Reader role |
+| `0` records ingested | No billing data in the date range (defaults to last 30 days) |
+
 ## Mock Server
 
 The mock server (`backend/frontend/mock-server.ts`) provides:
