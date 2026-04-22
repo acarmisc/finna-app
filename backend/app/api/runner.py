@@ -52,7 +52,16 @@ def _build_env_from_config(config: dict[str, Any], provider: str, cred_type: str
         env["AZURE_SUBSCRIPTION_ID"] = config.get("subscription_id", "")
         env["AZURE_SCOPE"] = config.get("scope", "resourcegroup")
         if config.get("resource_groups"):
+            env["AZURE_RESOURCE_GROUP"] = config["resource_groups"][0]
             env["AZURE_RESOURCE_GROUPS"] = ",".join(config["resource_groups"])
+            # space out per-RG API calls: 15s default, more RGs = more spacing
+            n_rgs = len(config["resource_groups"])
+            delay = max(15, n_rgs)
+            env["RG_API_DELAY_SECS"] = str(delay)
+            # shorter 429 retry waits for multi-RG runs to avoid hour-long hangs
+            env["RATE_LIMIT_WAIT_1"] = "20"
+            env["RATE_LIMIT_WAIT_2"] = "40"
+            env["RATE_LIMIT_WAIT_3"] = "60"
     elif provider == "gcp":
         env["GCP_PROJECT"] = config.get("project_id", "")
         if config.get("bigquery_dataset"):
@@ -120,8 +129,7 @@ def start_extractor(
     if not pg_dsn:
         raise ValueError("PG_DSN not configured")
 
-    if extractor_type is None:
-        extractor_type = _get_extractor_type(provider)
+    extractor_type = _get_extractor_type(extractor_type or provider)
 
     # Get config from DB
     conn = get_connection()
@@ -180,37 +188,46 @@ def start_extractor(
     # Start background thread to monitor
     def monitor():
         output_lines = []
-        while True:
-            line = proc.stdout.readline()
-            if line:
-                output_lines.append(line)
-            elif proc.poll() is not None:
-                break
+        try:
+            while True:
+                line = proc.stdout.readline()
+                if line:
+                    output_lines.append(line)
+                elif proc.poll() is not None:
+                    break
 
-        output = "".join(output_lines)
+            output = "".join(output_lines)
 
-        # Determine status
-        if proc.returncode == 0:
-            status = "success"
-            error = None
-            # Try to extract record count from output
+            # Determine status
             records = 0
-            for line in output_lines:
-                if "Inserted" in line and "records" in line:
-                    try:
-                        import re
+            if proc.returncode == 0:
+                status = "success"
+                error = None
+                # Extract total record count — prefer "total records inserted" line
+                import re
+                for line in reversed(output_lines):
+                    m = re.search(r"(\d+)\s+total\s+records\s+inserted", line)
+                    if not m:
+                        m = re.search(r"Inserted\s+(\d+)\s+of\s+\d+\s+records", line)
+                    if not m:
+                        m = re.search(r"completed:\s+(\d+)\s+records", line)
+                    if m:
+                        records = int(m.group(1))
+                        break
+            else:
+                status = "failed"
+                error = f"Exit code: {proc.returncode}"
 
-                        match = re.search(r"(\d+)\s+records?", line)
-                        if match:
-                            records = int(match.group(1))
-                    except Exception:
-                        pass
-        else:
+            try:
+                extractor_run_total.labels(provider=provider, status=status).inc()
+            except Exception:
+                logger.warning("Failed to increment extractor_run_total metric")
+
+        except Exception as exc:
+            output = "".join(output_lines)
             status = "failed"
-            error = f"Exit code: {proc.returncode}"
-
-        # Increment extractor run counter on completion
-        extractor_run_total.labels(provider=provider, status=status).inc()
+            error = f"Monitor thread error: {exc}"
+            records = 0
 
         _update_run_status(run_id, status, records, error, output)
 

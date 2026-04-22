@@ -314,13 +314,13 @@ def execute(sql: str, params: tuple | None = None) -> None:
 
 def insert_and_return(sql: str, params: tuple, returning: str = "id") -> str:
     """Insert a row and return the specified column."""
-    import json
+    from psycopg.types.json import Jsonb
 
     conn = get_connection()
     converted = []
     for p in params:
         if isinstance(p, dict):
-            converted.append(json.dumps(p))
+            converted.append(Jsonb(p))
         else:
             converted.append(p)
 
