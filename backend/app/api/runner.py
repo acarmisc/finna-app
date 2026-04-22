@@ -27,6 +27,28 @@ def _get_pg_dsn() -> str:
     return os.getenv("PG_DSN", "")
 
 
+def _sanitize_log(output: str) -> str:
+    """Sanitize log output to prevent credential leakage.
+
+    Redacts:
+    - Authorization Bearer tokens
+    - client_secret values in various formats
+    """
+    # Redact Authorization: Bearer <token>
+    output = re.sub(r"Authorization:\s+Bearer\s+[^\s\n]+", "Authorization: Bearer [REDACTED]", output)
+
+    # Redact client_secret=<value> (URL encoded or plain)
+    output = re.sub(r"client_secret=[^\s&\n]+", "client_secret=[REDACTED]", output)
+
+    # Redact 'client_secret': '<value>' (JSON format)
+    output = re.sub(r"(['\"])client_secret\1:\s*['\"]([^'\"]+)['\"]", r"\1client_secret\1: '[REDACTED]'", output)
+
+    # Redact tenant IDs and subscription IDs in common patterns
+    output = re.sub(r"(?i)(tenant_?id|subscription_?id)=[a-f0-9\-]+", r"\1=[REDACTED]", output)
+
+    return output
+
+
 def _get_extractor_type(provider: str) -> str:
     """Map provider to default extractor type."""
     mapping = {
@@ -220,7 +242,9 @@ def start_extractor(
             error = f"Monitor thread error: {exc}"
             records = 0
 
-        _update_run_status(run_id, status, records, error, output)
+        # Sanitize output before storing in DB
+        sanitized_output = _sanitize_log(output)
+        _update_run_status(run_id, status, records, error, sanitized_output)
 
         with _process_lock:
             _running_processes.pop(run_id, None)
