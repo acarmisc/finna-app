@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import subprocess
 import sys
 import threading
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -131,26 +133,16 @@ def start_extractor(
 
     extractor_type = _get_extractor_type(extractor_type or provider)
 
-    # Get config from DB
+    # Get config + credential_type in one query
     conn = get_connection()
     with conn.cursor(row_factory=dict_row) as cur:
-        cur.execute("SELECT config FROM cloud_config WHERE id = %s", (config_id,))
+        cur.execute("SELECT config, credential_type FROM cloud_config WHERE id = %s", (config_id,))
         row = cur.fetchone()
     if not row:
         raise ValueError(f"Config {config_id} not found")
 
     config = row["config"]
-
-    # Also get credential_type from cloud_config table
-    with conn.cursor(row_factory=dict_row) as cur:
-        cur.execute("SELECT credential_type FROM cloud_config WHERE id = %s", (config_id,))
-        config_row = cur.fetchone()
-    if config_row:
-        cred_type = config_row["credential_type"]
-        config["credential_type"] = cred_type
-
-    # Create run record
-    import uuid
+    config["credential_type"] = row["credential_type"]
 
     run_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
@@ -204,7 +196,6 @@ def start_extractor(
                 status = "success"
                 error = None
                 # Extract total record count — prefer "total records inserted" line
-                import re
                 for line in reversed(output_lines):
                     m = re.search(r"(\d+)\s+total\s+records\s+inserted", line)
                     if not m:
@@ -268,7 +259,7 @@ def list_runs(limit: int = 50, provider: Optional[str] = None) -> list[dict[str,
             ORDER BY started_at DESC
             LIMIT %s
         """
-        return query_all(sql, (provider, str(limit)))
+        return query_all(sql, (provider, limit))
     else:
         sql = """
             SELECT id, config_id, provider, extractor_type, status,
@@ -277,7 +268,7 @@ def list_runs(limit: int = 50, provider: Optional[str] = None) -> list[dict[str,
             ORDER BY started_at DESC
             LIMIT %s
         """
-        return query_all(sql, (str(limit),))
+        return query_all(sql, (limit,))
 
 
 def cancel_run(run_id: str) -> bool:
