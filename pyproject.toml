@@ -45,6 +45,9 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "integration: marks tests that require database connectivity (deselect with '-m \"not integration\"')",
+]
 
 [tool.mypy]
 python_version = "3.11"

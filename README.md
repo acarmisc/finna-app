@@ -18,6 +18,16 @@ Or manually:
 docker compose up -d
 ```
 
+### Load Demo Data (Optional)
+
+To populate the dashboard with realistic sample data for dev/demo without needing cloud credentials:
+
+```bash
+psql $PG_DSN -f sql/seed_demo.sql
+```
+
+This loads 60+ cost records spanning 30 days (Azure VMs, Storage, AKS; GCP Compute, BigQuery, Cloud Storage; LLM API costs), 5 alerts, and extractor run history.
+
 ## Project Structure
 
 ```
