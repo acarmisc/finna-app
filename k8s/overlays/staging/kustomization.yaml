@@ -5,9 +5,16 @@ namespace: finops
 
 resources:
   - ../../base
+  - hpa.yaml
 
 commonLabels:
   environment: staging
+
+images:
+  - name: finops-api
+    newTag: staging-latest
+  - name: finops-extractor
+    newTag: staging-latest
 
 patches:
   - patch: |-

@@ -9,6 +9,12 @@ resources:
 commonLabels:
   environment: dev
 
+images:
+  - name: finops-api
+    newTag: dev-latest
+  - name: finops-extractor
+    newTag: dev-latest
+
 patches:
   - patch: |-
       apiVersion: apps/v1
