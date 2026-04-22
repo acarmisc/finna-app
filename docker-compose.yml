@@ -10,6 +10,7 @@ services:
       HOST: "0.0.0.0"
       PORT: "8000"
       JWT_SECRET: "dev-secret-key-change-in-production"
+      ENCRYPTION_KEY: "dev-key-change-in-production"
       AUTO_MIGRATE: "true"
       ALLOWED_ORIGINS: "*"
     depends_on:
