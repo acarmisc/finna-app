@@ -13,6 +13,7 @@ services:
       ENCRYPTION_KEY: "dev-key-change-in-production"
       AUTO_MIGRATE: "true"
       ALLOWED_ORIGINS: "*"
+      # OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
     depends_on:
       postgres:
         condition: service_healthy

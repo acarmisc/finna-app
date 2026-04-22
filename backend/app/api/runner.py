@@ -8,13 +8,14 @@ import re
 import subprocess
 import sys
 import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 from psycopg.rows import dict_row
 
-from .metrics import extractor_run_total
+from .metrics import extractor_run_total, extractor_duration_seconds
 
 logger = logging.getLogger("api.runner")
 
@@ -201,6 +202,7 @@ def start_extractor(
 
     # Start background thread to monitor
     def monitor():
+        start_time = time.monotonic()
         output_lines = []
         try:
             while True:
@@ -233,6 +235,7 @@ def start_extractor(
 
             try:
                 extractor_run_total.labels(provider=provider, status=status).inc()
+                extractor_duration_seconds.labels(provider=provider, status=status).observe(time.monotonic() - start_time)
             except Exception:
                 logger.warning("Failed to increment extractor_run_total metric")
 
