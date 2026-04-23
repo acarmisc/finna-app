@@ -67,8 +67,8 @@ start_docker_services() {
     
     cd "$(dirname "$0")"
     
-    # Start PostgreSQL and backend
-    docker-compose up -d postgres api
+    # Start PostgreSQL and backend (force-recreate ensures latest image is used)
+    docker-compose up -d --force-recreate postgres api
     
     # Wait for PostgreSQL to be ready
     log_info "Waiting for PostgreSQL to be ready..."

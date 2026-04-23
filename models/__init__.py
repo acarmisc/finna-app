@@ -52,6 +52,9 @@ class NormalizedCostRecord(BaseModel):
     service_category: ServiceCategory
     service_name: str
     resource_id: Optional[str] = None
+    resource_type: Optional[str] = None   # e.g. "microsoft.compute/virtualmachines"
+    region: Optional[str] = None          # e.g. "westeurope", "us-central1"
+    charge_type: Optional[str] = None     # "Usage" | "Tax" | "Credit" | "Adjustment"
 
     # Cost
     cost_usd: Decimal = Decimal("0")

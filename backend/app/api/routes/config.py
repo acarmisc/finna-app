@@ -199,6 +199,127 @@ async def list_configs_by_provider(provider: str) -> list[dict[str, Any]]:
     ]
 
 
+# ─── Config test endpoint ────────────────────────────────────────────────────
+
+
+@router.post(
+    "/config/{config_id}/test",
+    dependencies=[Depends(require_auth)],
+)
+async def test_config(config_id: str) -> dict[str, Any]:
+    """Test cloud credentials without running an extraction."""
+    row = query_one(
+        "SELECT provider, credential_type, config FROM cloud_config WHERE id = %s",
+        (config_id,),
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Configuration not found")
+
+    provider = row["provider"]
+    config = decrypt_config(row["config"])
+
+    if provider == "azure":
+        try:
+            from azure.identity import ClientSecretCredential, AzureCliCredential
+            from azure.core.exceptions import ClientAuthenticationError
+
+            cred_type = row.get("credential_type") or config.get("credential_type", "")
+            if cred_type == "cli":
+                credential = AzureCliCredential()
+            else:
+                tenant_id = config.get("tenant_id", "")
+                client_id = config.get("client_id", "")
+                client_secret = config.get("client_secret", "")
+                if not all([tenant_id, client_id, client_secret]):
+                    return {"ok": False, "provider": "azure", "error": "Missing tenant_id, client_id or client_secret"}
+                credential = ClientSecretCredential(
+                    tenant_id=tenant_id,
+                    client_id=client_id,
+                    client_secret=client_secret,
+                )
+
+            token = credential.get_token("https://management.azure.com/.default")
+            checks: dict[str, Any] = {"auth": "ok"}
+
+            # Check Cost Management API access on the configured scope
+            subscription_id = config.get("subscription_id")
+            if subscription_id:
+                from azure.mgmt.costmanagement import CostManagementClient
+                from azure.mgmt.costmanagement.models import (
+                    QueryDefinition, QueryDataset, QueryTimePeriod, TimeframeType
+                )
+                from datetime import datetime, timedelta, timezone as tz
+
+                cm_client = CostManagementClient(credential=credential, subscription_id=subscription_id)
+
+                resource_groups = config.get("resource_groups") or []
+                scope_type = config.get("scope", "subscription")
+                if resource_groups:
+                    scope = f"/subscriptions/{subscription_id}/resourceGroups/{resource_groups[0]}"
+                    checks["scope"] = scope
+                elif scope_type == "subscription":
+                    scope = f"/subscriptions/{subscription_id}"
+                    checks["scope"] = scope
+                else:
+                    scope = f"/subscriptions/{subscription_id}"
+                    checks["scope"] = scope
+
+                # Minimal 1-day query — just validates permissions, discards rows
+                now = datetime.now(tz.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+                date_from = now - timedelta(days=1)
+                try:
+                    result = cm_client.query.usage(
+                        scope=scope,
+                        parameters=QueryDefinition(
+                            type="ActualCost",
+                            timeframe=TimeframeType.CUSTOM,
+                            time_period=QueryTimePeriod(from_property=date_from, to=now),
+                            dataset=QueryDataset(granularity="Daily", aggregation={}),
+                        ),
+                    )
+                    row_count = len(result.rows) if result.rows else 0
+                    checks["cost_management_api"] = "ok"
+                    checks["sample_rows"] = row_count
+                except Exception as cm_exc:
+                    checks["cost_management_api"] = "failed"
+                    checks["cost_management_error"] = str(cm_exc)
+
+            return {
+                "ok": checks.get("cost_management_api", "ok") != "failed",
+                "provider": "azure",
+                "token_expires_at": token.expires_on,
+                "checks": checks,
+            }
+        except Exception as exc:
+            return {"ok": False, "provider": "azure", "error": str(exc)}
+
+    if provider == "gcp":
+        try:
+            from google.auth import default as google_auth_default
+            from google.auth.transport.requests import Request
+            import google.auth.exceptions
+
+            kwargs: dict[str, Any] = {}
+            project_id = config.get("project_id")
+            if project_id:
+                kwargs["quota_project_id"] = project_id
+
+            creds, project = google_auth_default(
+                scopes=["https://www.googleapis.com/auth/cloud-platform"], **kwargs
+            )
+            if not creds.valid:
+                creds.refresh(Request())
+            return {
+                "ok": True,
+                "provider": "gcp",
+                "details": f"Credentials valid, project={project}",
+            }
+        except Exception as exc:
+            return {"ok": False, "provider": "gcp", "error": str(exc)}
+
+    return {"ok": False, "provider": provider, "error": f"Test not implemented for provider '{provider}'"}
+
+
 # ─── Config by ID endpoints (must come after specific routes) ────────────────
 
 

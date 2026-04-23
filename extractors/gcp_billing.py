@@ -107,17 +107,21 @@ def _build_query(
     """Return parameterised SQL and query params for BigQuery."""
     query = (
         f"SELECT\n"
-        f"    project.id           AS project_id,\n"
-        f"    project.number       AS project_number,\n"
+        f"    project.id              AS project_id,\n"
+        f"    project.number          AS project_number,\n"
         f"    billing_account_id,\n"
-        f"    service.description  AS service_description,\n"
-        f"    sku.description      AS sku_description,\n"
+        f"    service.description     AS service_description,\n"
+        f"    sku.description         AS sku_description,\n"
         f"    usage_start_time,\n"
         f"    usage_end_time,\n"
-        f"    usage.amount          AS usage_amount,\n"
-        f"    usage.unit           AS usage_unit,\n"
+        f"    usage.amount            AS usage_amount,\n"
+        f"    usage.unit              AS usage_unit,\n"
         f"    cost,\n"
+        f"    cost_type,\n"
         f"    currency,\n"
+        f"    location.region         AS region,\n"
+        f"    resource.name           AS resource_name,\n"
+        f"    (SELECT SUM(c.amount) FROM UNNEST(credits) AS c WHERE c.amount < 0) AS discount_amount,\n"
         f"    labels,\n"
         f"    system_labels\n"
         f"FROM `{project}.{dataset}.{table}`\n"
@@ -155,12 +159,22 @@ def normalise_row(
     cost = row.get("cost")
     usage_amount = row.get("usage_amount")
     usage_unit = row.get("usage_unit") or ""
+    region = row.get("region") or None
+    resource_name = row.get("resource_name") or None
+    cost_type = row.get("cost_type") or None
+    discount_amount = row.get("discount_amount")
 
     # Cost — GCP exports cost as a float / string; coerce safely
     try:
         cost_decimal = Decimal(str(cost)) if cost is not None else Decimal("0")
     except Exception:
         cost_decimal = Decimal("0")
+
+    # Discount (credits with negative amounts)
+    try:
+        discount_decimal = abs(Decimal(str(discount_amount))) if discount_amount is not None else Decimal("0")
+    except Exception:
+        discount_decimal = Decimal("0")
 
     # Usage quantity
     try:
@@ -182,12 +196,15 @@ def normalise_row(
         usage_end=usage_end,
         account_id=project_id,
         project_id=label_project or project_id,
-        service_category=resolve_service_category(
-            service_description, service_category_map
-        ),
+        service_category=resolve_service_category(service_description, service_category_map),
         service_name=sku_description,
+        resource_id=resource_name,
+        region=region,
+        charge_type=cost_type,
         cost_usd=cost_decimal,
-        net_cost_usd=cost_decimal,  # GCP export cost is already net for standard export
+        cost_original=cost_decimal,
+        discount_usd=discount_decimal,
+        net_cost_usd=cost_decimal - discount_decimal,
         tags=labels_to_tags(row),
         usage_quantity=usage_decimal,
         usage_unit=usage_unit if usage_unit else None,
@@ -202,9 +219,10 @@ _INSERT_SQL = SQL(
     "INSERT INTO cost_records "
     "(record_id, provider, usage_start, usage_end, ingestion_ts, "
     "account_id, project_id, service_category, service_name, "
-    "cost_usd, currency_original, cost_original, net_cost_usd, "
+    "resource_id, region, charge_type, "
+    "cost_usd, currency_original, cost_original, discount_usd, net_cost_usd, "
     "usage_quantity, usage_unit, tags) "
-    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
     "ON CONFLICT (record_id) DO NOTHING"
 )
 
@@ -243,9 +261,13 @@ def _batch_insert(
             rec.project_id,
             rec.service_category.value,
             rec.service_name,
+            rec.resource_id,
+            rec.region,
+            rec.charge_type,
             rec.cost_usd,
             rec.currency_original,
             rec.cost_original,
+            rec.discount_usd,
             rec.net_cost_usd,
             rec.usage_quantity,
             rec.usage_unit,

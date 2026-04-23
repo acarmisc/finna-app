@@ -224,6 +224,25 @@ instrumentator = Instrumentator()
 instrumentator.instrument(app)
 instrumentator.expose(app, include_in_schema=False)
 
+# Initialize OpenTelemetry tracing
+try:
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
+    provider = TracerProvider()
+    if os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
+        provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+    else:
+        provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
+    trace.set_tracer_provider(provider)
+    FastAPIInstrumentor.instrument_app(app)
+except ImportError:
+    pass
+
 
 if __name__ == "__main__":
     import uvicorn
