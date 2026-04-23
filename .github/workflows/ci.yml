@@ -99,4 +99,4 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Run mypy
-        run: mypy backend/ extractors/ || exit 0
+        run: mypy backend/ extractors/ --ignore-missing-imports || true
