@@ -1,0 +1,1278 @@
+openapi: 3.1.0
+info:
+  title: FinOps Orchestrator API
+  description: >
+    Centralized orchestration API for FinOps cloud cost extractors.
+    Supports multi-cloud cost extraction (Azure, GCP), configuration management,
+    alert monitoring, and cost data queries.
+  version: 0.1.0
+  contact:
+    name: FinOps Team
+    url: https://github.com/acarmisc/finna-app
+  license:
+    name: Apache-2.0
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+  - url: http://95.216.165.97:8000
+    description: Beta environment
+
+tags:
+  - name: health
+    description: Health and status checks
+  - name: auth
+    description: Authentication and credential registration
+  - name: config
+    description: Cloud configuration CRUD and testing
+  - name: extractors
+    description: Extractor run management
+  - name: costs
+    description: Cost data queries
+  - name: alerts
+    description: Alert management
+  - name: internal
+    description: Internal operational endpoints
+
+security: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        JWT token obtained from POST /api/v1/auth/token.
+        Required on all /api/v1/* endpoints except auth/token and healthz.
+
+  schemas:
+    # ── Enums ────────────────────────────────────────────────────────────────
+    Provider:
+      type: string
+      enum: [azure, gcp]
+      description: Cloud provider identifier
+
+    CredentialType:
+      type: string
+      enum: [service_principal, managed_identity, cli, device_code]
+      description: Authentication method for the cloud config
+
+    # ── Auth ─────────────────────────────────────────────────────────────────
+    TokenRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          format: password
+          example: admin
+
+    TokenResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT access token
+
+    GCPRegisterRequest:
+      type: object
+      required: [project_id]
+      properties:
+        project_id:
+          type: string
+          description: GCP project ID
+          example: my-gcp-project
+        key_file_content:
+          type: string
+          description: Optional service account key JSON content
+
+    AzureServiceAccountRegisterRequest:
+      type: object
+      required: [tenant_id, client_id]
+      properties:
+        tenant_id:
+          type: string
+          description: Azure AD tenant ID
+        client_id:
+          type: string
+          description: Application / client ID
+        client_secret:
+          type: string
+          format: password
+          description: Service principal client secret
+        subscription_id:
+          type: string
+          description: Azure subscription ID
+
+    # ── Config ───────────────────────────────────────────────────────────────
+    CloudConfigCreate:
+      type: object
+      required: [provider, name, credential_type, config]
+      properties:
+        provider:
+          $ref: "#/components/schemas/Provider"
+        name:
+          type: string
+          description: Human-readable config name
+          example: Azure Production
+        credential_type:
+          $ref: "#/components/schemas/CredentialType"
+        config:
+          type: object
+          description: Provider-specific configuration (encrypted at rest)
+          additionalProperties: true
+
+    CloudConfigUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        credential_type:
+          $ref: "#/components/schemas/CredentialType"
+        config:
+          type: object
+          additionalProperties: true
+
+    CloudConfigResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider:
+          type: string
+        name:
+          type: string
+        credential_type:
+          type: string
+        config:
+          type: object
+          description: Decrypted config with sensitive fields masked
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProjectResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        owner:
+          type: string
+        cost_center:
+          type: string
+        budget_cap:
+          type: number
+          nullable: true
+        mtd:
+          type: number
+        tags:
+          type: object
+          additionalProperties:
+            type: string
+        created:
+          type: string
+          format: date-time
+          nullable: true
+        note:
+          type: string
+
+    ProjectCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        slug:
+          type: string
+        owner:
+          type: string
+        cost_center:
+          type: string
+        budget_cap:
+          type: number
+        tags:
+          type: object
+          additionalProperties:
+            type: string
+        note:
+          type: string
+
+    ConfigTestResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        provider:
+          type: string
+        token_expires_at:
+          type: integer
+          nullable: true
+          description: Token expiry timestamp (Azure)
+        checks:
+          type: object
+          additionalProperties: true
+          nullable: true
+        error:
+          type: string
+          nullable: true
+
+    # ── Extractors ───────────────────────────────────────────────────────────
+    ExtractorRunRequest:
+      type: object
+      required: [provider, config_id]
+      properties:
+        provider:
+          type: string
+          description: Cloud provider to extract from
+        extractor_type:
+          type: string
+          description: Extractor type override (defaults to provider)
+        config_id:
+          type: string
+          format: uuid
+          description: ID of the cloud config to use
+
+    ExtractorRunResponse:
+      type: object
+      properties:
+        run_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [started, running, completed, failed, cancelled]
+
+    ExtractorStatusResponse:
+      type: object
+      properties:
+        runs:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              provider:
+                type: string
+              extractor_type:
+                type: string
+              status:
+                type: string
+              started_at:
+                type: string
+                format: date-time
+              finished_at:
+                type: string
+                format: date-time
+                nullable: true
+              records_extracted:
+                type: integer
+              error_message:
+                type: string
+                nullable: true
+        count:
+          type: integer
+
+    # ── Costs ────────────────────────────────────────────────────────────────
+    CostRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        prov:
+          type: string
+          description: Cloud provider
+        name:
+          type: string
+          description: Project name
+        sku:
+          type: string
+          description: SKU / service name
+        mtd:
+          type: number
+          description: Month-to-date cost in USD
+        delta:
+          type: number
+          description: Change from previous period
+        prev:
+          type: number
+          description: Previous period cost
+        tags:
+          type: object
+          additionalProperties:
+            type: string
+        date:
+          type: string
+          format: date
+          nullable: true
+
+    CostListResponse:
+      type: object
+      properties:
+        costs:
+          type: array
+          items:
+            $ref: "#/components/schemas/CostRecord"
+        totals:
+          type: object
+          additionalProperties:
+            type: number
+          description: Total cost per provider
+        filtered:
+          type: boolean
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+
+    CostTotalsResponse:
+      type: object
+      properties:
+        totals:
+          type: object
+          additionalProperties:
+            type: number
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+
+    CostBySkuResponse:
+      type: object
+      properties:
+        costs:
+          type: array
+          items:
+            type: object
+            properties:
+              prov:
+                type: string
+              name:
+                type: string
+              sku:
+                type: string
+              mtd:
+                type: number
+              delta:
+                type: number
+              prev:
+                type: number
+              instances:
+                type: integer
+        totalRows:
+          type: integer
+
+    CostDailyResponse:
+      type: object
+      properties:
+        days:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              azure:
+                type: number
+                nullable: true
+              gcp:
+                type: number
+                nullable: true
+              llm:
+                type: number
+                nullable: true
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+
+    # ── Alerts ───────────────────────────────────────────────────────────────
+    AlertRecord:
+      type: object
+      properties: {}
+
+    AlertListResponse:
+      type: object
+      properties:
+        alerts:
+          type: array
+          items:
+            type: object
+        count:
+          type: integer
+
+    AlertStatsResponse:
+      type: object
+      properties:
+        stats:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                type: string
+              severity:
+                type: string
+              count:
+                type: integer
+
+    # ── Errors ──────────────────────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        detail:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: Authentication required or invalid token
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+            example: Bearer
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            missing_token:
+              value:
+                error: missing_token
+                message: Not authenticated
+                detail: Not authenticated
+            invalid_token:
+              value:
+                error: invalid_token
+                message: Invalid or expired token
+                detail: Could not validate credentials
+
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: rate_limit_exceeded
+            message: "60 per 1 minute"
+            detail: "Too many requests. Please try again later."
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            detail: Configuration not found
+
+paths:
+  # ── Health ────────────────────────────────────────────────────────────────
+  /healthz:
+    get:
+      tags: [health]
+      summary: Health check
+      description: Returns API and database connection status. No auth required.
+      operationId: healthz
+      responses:
+        "200":
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  api:
+                    type: string
+                    example: finops-orchestrator
+                  database:
+                    type: string
+                    example: ok
+        "503":
+          description: Service degraded (database unreachable)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: degraded
+                  api:
+                    type: string
+                  database:
+                    type: string
+
+  # ── Auth ──────────────────────────────────────────────────────────────────
+  /api/v1/auth/token:
+    post:
+      tags: [auth]
+      summary: Obtain JWT token
+      description: >
+        Authenticate with username/password and receive a JWT access token.
+        This is the only /api/v1 endpoint that does not require a Bearer token.
+      operationId: authLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenRequest"
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                detail: Invalid credentials
+        "403":
+          description: Account disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                detail: Account is disabled
+
+  /api/v1/auth/gcp/register:
+    post:
+      tags: [auth]
+      summary: Register GCP credentials
+      description: Register GCP project credentials for cost extraction.
+      operationId: registerGcp
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GCPRegisterRequest"
+      responses:
+        "200":
+          description: GCP credentials registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  config_id:
+                    type: string
+                    format: uuid
+                  project_id:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/auth/azure/service-account:
+    post:
+      tags: [auth]
+      summary: Register Azure service principal
+      description: Register Azure service principal credentials for cost extraction.
+      operationId: registerAzureServiceAccount
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AzureServiceAccountRegisterRequest"
+      responses:
+        "200":
+          description: Azure credentials registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  config_id:
+                    type: string
+                    format: uuid
+                  message:
+                    type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Config ───────────────────────────────────────────────────────────────
+  /api/v1/config:
+    get:
+      tags: [config]
+      summary: List cloud configurations
+      description: Returns all cloud provider configurations, ordered by provider and name. Secrets in the config dict are masked.
+      operationId: listConfigs
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of configurations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CloudConfigResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      tags: [config]
+      summary: Create cloud configuration
+      description: Create a new cloud provider configuration. The config dict is encrypted at rest using Fernet.
+      operationId: createConfig
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloudConfigCreate"
+      responses:
+        "201":
+          description: Configuration created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudConfigResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/config/projects:
+    get:
+      tags: [config]
+      summary: List projects
+      description: Returns all FinOps projects with budget and MTD info, ordered by name.
+      operationId: listProjects
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProjectResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      tags: [config]
+      summary: Create project
+      description: Create a new FinOps project for budget tracking.
+      operationId: createProject
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectCreate"
+      responses:
+        "201":
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/config/provider/{provider}:
+    get:
+      tags: [config]
+      summary: List configs by provider
+      description: Filter cloud configurations by provider (azure or gcp).
+      operationId: listConfigsByProvider
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [azure, gcp]
+      responses:
+        "200":
+          description: Filtered configuration list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CloudConfigResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/config/{config_id}:
+    get:
+      tags: [config]
+      summary: Get cloud configuration
+      description: Retrieve a single cloud configuration by ID. Secrets are masked in the response.
+      operationId: getConfig
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: config_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Configuration details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudConfigResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    put:
+      tags: [config]
+      summary: Update cloud configuration
+      description: Update one or more fields of an existing configuration. Config dict is re-encrypted on update.
+      operationId: updateConfig
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: config_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloudConfigUpdate"
+      responses:
+        "200":
+          description: Configuration updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudConfigResponse"
+        "400":
+          description: No fields to update
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                detail: No fields to update
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    delete:
+      tags: [config]
+      summary: Delete cloud configuration
+      description: Permanently delete a cloud configuration.
+      operationId: deleteConfig
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: config_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Configuration deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/config/{config_id}/test:
+    post:
+      tags: [config]
+      summary: Test cloud credentials
+      description: >
+        Validates cloud credentials without running a full extraction.
+        For Azure: checks auth token + optional Cost Management API access.
+        For GCP: validates Application Default Credentials.
+      operationId: testConfig
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: config_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Test result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigTestResult"
+              examples:
+                azure_success:
+                  value:
+                    ok: true
+                    provider: azure
+                    token_expires_at: 1713897600
+                    checks:
+                      auth: ok
+                      scope: /subscriptions/xxx
+                      cost_management_api: ok
+                      sample_rows: 0
+                gcp_success:
+                  value:
+                    ok: true
+                    provider: gcp
+                    details: "Credentials valid, project=my-project"
+                failure:
+                  value:
+                    ok: false
+                    provider: azure
+                    error: "ClientAuthenticationError: ..."
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Extractors ────────────────────────────────────────────────────────────
+  /api/v1/extractors/status:
+    get:
+      tags: [extractors]
+      summary: List extractor runs
+      description: Returns recent extractor run history with optional provider filter.
+      operationId: listExtractorRuns
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: provider
+          in: query
+          schema:
+            type: string
+            nullable: true
+            enum: [azure, gcp]
+      responses:
+        "200":
+          description: Extractor run list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtractorStatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/extractors/run:
+    post:
+      tags: [extractors]
+      summary: Start extractor run
+      description: Trigger a cloud cost extraction run for a given configuration.
+      operationId: startExtractor
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtractorRunRequest"
+      responses:
+        "200":
+          description: Extractor started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtractorRunResponse"
+        "400":
+          description: Missing config_id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                detail: config_id is required
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/extractors/run/{run_id}:
+    get:
+      tags: [extractors]
+      summary: Get extractor run status
+      description: Check the status of a running or completed extractor run.
+      operationId: getExtractorRun
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Run status details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  provider:
+                    type: string
+                  extractor_type:
+                    type: string
+                  status:
+                    type: string
+                  started_at:
+                    type: string
+                    format: date-time
+                  finished_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  records_extracted:
+                    type: integer
+                  error_message:
+                    type: string
+                    nullable: true
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/extractors/run/{run_id}/cancel:
+    post:
+      tags: [extractors]
+      summary: Cancel extractor run
+      description: Cancel a running extractor. No-op if the run has already completed.
+      operationId: cancelExtractorRun
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Run cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: cancelled
+        "404":
+          description: Run not found or already finished
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                detail: Run not found or already finished
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Costs ─────────────────────────────────────────────────────────────────
+  /api/v1/costs:
+    get:
+      tags: [costs]
+      summary: List cost records
+      description: >
+        Retrieve cost records with optional provider, project, and date range filters.
+        Defaults to last 30 days. Returns up to 1000 records.
+      operationId: listCosts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: provider
+          in: query
+          schema:
+            type: string
+            nullable: true
+            enum: [gcp, azure, llm]
+          description: Filter by provider
+        - name: project
+          in: query
+          schema:
+            type: string
+            nullable: true
+          description: Filter by project name
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: Start of date range (ISO format). Defaults to 30 days ago.
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+          description: End of date range. Defaults to now.
+      responses:
+        "200":
+          description: Cost records with provider totals
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CostListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/costs/totals:
+    get:
+      tags: [costs]
+      summary: Get cost totals
+      description: Aggregated cost totals grouped by provider for the given date range.
+      operationId: getCostTotals
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+      responses:
+        "200":
+          description: Cost totals by provider
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CostTotalsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/costs/by-sku:
+    get:
+      tags: [costs]
+      summary: Get costs by SKU
+      description: Aggregated costs grouped by provider, project, and SKU. Ordered by cost descending.
+      operationId: getCostsBySku
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: provider
+          in: query
+          schema:
+            type: string
+            nullable: true
+            enum: [gcp, azure, llm]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        "200":
+          description: Costs aggregated by SKU
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CostBySkuResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/costs/daily:
+    get:
+      tags: [costs]
+      summary: Get daily cost breakdown
+      description: Daily cost series by provider for chart visualization. Defaults to last 30 days.
+      operationId: getDailyCosts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+        - name: provider
+          in: query
+          schema:
+            type: string
+            nullable: true
+      responses:
+        "200":
+          description: Daily cost data by provider
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CostDailyResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Alerts ────────────────────────────────────────────────────────────────
+  /api/v1/alerts:
+    get:
+      tags: [alerts]
+      summary: List alerts
+      description: Retrieve alerts with optional status and severity filters.
+      operationId: listAlerts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            nullable: true
+            enum: [firing, resolved, all]
+        - name: severity
+          in: query
+          schema:
+            type: string
+            nullable: true
+            enum: [err, warn, ok]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        "200":
+          description: Alert list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/alerts/stats:
+    get:
+      tags: [alerts]
+      summary: Get alert statistics
+      description: Return alert counts grouped by status and severity.
+      operationId: getAlertStats
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Alert statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertStatsResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/alerts/active:
+    get:
+      tags: [alerts]
+      summary: Get active (firing) alerts
+      description: Returns all currently firing alerts, ordered by creation date.
+      operationId: getActiveAlerts
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Active alerts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlertListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Internal ──────────────────────────────────────────────────────────────
+  /api/v1/db/stats:
+    get:
+      tags: [internal]
+      summary: Database connection pool stats
+      description: Returns PostgreSQL connection pool statistics for monitoring.
+      operationId: dbStats
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Pool statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
