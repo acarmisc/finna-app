@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import auth as auth_module
 from ..db import query_all, query_one
-from ..openapi_extensions import ERROR_RESPONSE_404, ERROR_RESPONSE_422, PaginationHeadersSchema
+from .openapi_extensions import ERROR_RESPONSE_404, ERROR_RESPONSE_422, PaginationHeadersSchema
 
 require_auth = auth_module.require_auth
 get_current_user = auth_module.get_current_user

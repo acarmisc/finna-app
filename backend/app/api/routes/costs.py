@@ -10,13 +10,9 @@ from pydantic import BaseModel
 
 from .. import auth as auth_module
 from ..db import query_all
-from ..openapi_extensions import ERROR_RESPONSE_404, ERROR_RESPONSE_422, PaginationHeadersSchema
+from .openapi_extensions import ERROR_RESPONSE_404, ERROR_RESPONSE_422, PaginationHeadersSchema
 
 require_auth = auth_module.require_auth
-
-require_auth = auth_module.require_auth
-from ..db import query_all
-from ..openapi_extensions import ERROR_RESPONSE_404, ERROR_RESPONSE_422, PaginationHeadersSchema
 
 router = APIRouter()
 
