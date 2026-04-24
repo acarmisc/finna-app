@@ -235,7 +235,9 @@ def start_extractor(
 
             try:
                 extractor_run_total.labels(provider=provider, status=status).inc()
-                extractor_duration_seconds.labels(provider=provider, status=status).observe(time.monotonic() - start_time)
+                extractor_duration_seconds.labels(
+                    provider=provider, status=status
+                ).observe(time.monotonic() - start_time)
             except Exception:
                 logger.warning("Failed to increment extractor_run_total metric")
 

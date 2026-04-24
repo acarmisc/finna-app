@@ -14,10 +14,10 @@ from .. import auth as auth_module
 from ..db import execute, insert_and_return, query_all, query_one
 
 require_auth = auth_module.require_auth
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".."))
-from utils.encryption import decrypt_config, encrypt_config
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".."))  # noqa: E402
+from utils.encryption import decrypt_config, encrypt_config  # noqa: E402
 
-from ..models import (
+from ..models import (  # noqa: E402, E501
     CloudConfigCreate,
     CloudConfigResponse,
     CloudConfigUpdate,
@@ -108,7 +108,9 @@ async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
 )
 async def list_projects() -> list[dict[str, Any]]:
     """List all projects."""
-    sql = "SELECT id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note FROM fin_projects ORDER BY name"
+    sql = ("SELECT id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note \
+"  # noqa: E501
+"FROM fin_projects ORDER BY name")
     rows = query_all(sql)
     return [
         {
@@ -450,11 +452,14 @@ async def cli_config_get(config_id: str) -> dict[str, Any]:
     }
 
 
-# ─── CLI-compatibility /configs CUD wrappers ────────────────────────────────
+# ─── CLI-compatibility /configs CUD wrappers ────────────────────────────────  # noqa: E402
 
-import uuid as _uuid
-from datetime import datetime as __dt, timezone as __tz
-from pydantic import BaseModel as _BM
+import uuid as _uuid  # noqa: E402
+from datetime import datetime as __dt  # noqa: E402
+from datetime import timezone as __tz  # noqa: E402
+
+from pydantic import BaseModel as _BM  # noqa: E402
+
 
 class _ConfigCreate(_BM):
     provider: str

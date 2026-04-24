@@ -12,7 +12,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from . import db
-from .api import routes
+from . import routes
 from .errors import register_error_handlers
 from .middleware import rate_limit as rate_limit_module
 
@@ -145,6 +145,6 @@ try:
     provider.add_span_processor(processor)
     trace.set_tracer_provider(provider)
 
-    FastAPIInstrumentor().instrument(app)
+    FastAPIInstrumentor().instrument()
 except ImportError:
     pass

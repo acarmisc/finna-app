@@ -20,9 +20,9 @@ import json
 import os
 import sys
 import time
-import urllib.request
 import urllib.error
 import urllib.parse
+import urllib.request
 import warnings
 
 # ---------------------------------------------------------------------------
@@ -47,7 +47,7 @@ def _validate_password(password):
         print(f"ERROR: ADMIN_PASSWORD must be at least 12 characters (got {len(password)}).", file=sys.stderr)
         return False
     if password.lower() in COMMON_PASSWORDS:
-        print(f"ERROR: ADMIN_PASSWORD cannot be a common password.", file=sys.stderr)
+        print("ERROR: ADMIN_PASSWORD cannot be a common password.", file=sys.stderr)
         return False
     return True
 
@@ -143,7 +143,14 @@ class Api:
 def ensure_database(api, name, uri):
     """Create or return the FinOps PostgreSQL database connection."""
     try:
-        result = api.get("/api/v1/database/", {"q": json.dumps({"filters": [{"col": "database_name", "opr": "eq", "value": name}])}})
+        result = api.get(
+            "/api/v1/database/",
+            {
+                "q": json.dumps(
+                    {"filters": [{"col": "database_name", "opr": "eq", "value": name}]}
+                )
+            },
+        )
         if result.get("result"):
             db = result["result"][0]
             print(f"  Database '{name}' already exists (id={db['id']}).")
@@ -532,8 +539,8 @@ def main():
     # -- Datasets ------------------------------------------------------------
     print("\n[2/4] Creating datasets ...")
     ds_daily_costs = ensure_dataset(api, "daily_costs", "public", db_id)
-    ds_cost_records = ensure_dataset(api, "cost_records", "public", db_id)
-    ds_extractor_health = ensure_dataset(api, "extractor_health", "public", db_id)
+    ensure_dataset(api, "cost_records", "public", db_id)
+    ensure_dataset(api, "extractor_health", "public", db_id)
 
     # -- Charts & Dashboards -------------------------------------------------
     print("\n[3/4] Creating dashboards and charts ...")

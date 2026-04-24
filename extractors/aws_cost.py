@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from botocore.exceptions import ClientError
@@ -59,7 +59,6 @@ SERVICE_CODE_MAP: dict[str, ServiceCategory] = {
     "AmazonDynamoDB": ServiceCategory.DATABASE,
     "AmazonCloudFront": ServiceCategory.NETWORK,
     "AmazonVPC": ServiceCategory.NETWORK,
-    "AmazonES": ServiceCategory.COMPUTE,
     "AmazonES": ServiceCategory.COMPUTE,
     "AmazonMQ": ServiceCategory.COMPUTE,
     "AWSGlue": ServiceCategory.COMPUTE,
@@ -188,7 +187,6 @@ def extract_costs(
     # Get AWS credentials from environment
     aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID")
     aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-    aws_region = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
 
     if not aws_access_key_id or not aws_secret_access_key:
         logger.error("AWS credentials not configured")
