@@ -11,6 +11,8 @@ from pydantic import BaseModel
 from .. import auth as auth_module
 require_auth = auth_module.require_auth
 from ..db import query_all
+from ..errors import NotFoundError, ValidationError
+from fastapi.responses import Response
 
 router = APIRouter()
 
@@ -22,6 +24,76 @@ class CostFilter(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     granularity: str = "daily"
+
+
+# OpenAPI response schemas for error documentation
+COSTS_404_RESPONSE = {
+    404: {
+        "description": "Resource not found",
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "error": {"type": "string", "example": "not_found"},
+                        "message": {"type": "string", "example": "Resource 'cost_record' not found"},
+                        "detail": {"type": "object", "example": {"resource_id": "abc123"}},
+                        "path": {"type": "string", "example": "/api/v1/costs/abc123"},
+                        "method": {"type": "string", "example": "GET"}
+                    }
+                }
+            }
+        }
+    }
+}
+
+COSTS_422_RESPONSE = {
+    422: {
+        "description": "Validation error",
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "error": {"type": "string", "example": "validation_error"},
+                        "message": {"type": "string", "example": "Validation failed"},
+                        "detail": {"type": "object", "example": {"errors": ["missing required field"]}},
+                        "path": {"type": "string", "example": "/api/v1/costs"},
+                        "method": {"type": "string", "example": "GET"}
+                    }
+                }
+            }
+        }
+    }
+}
+
+COSTS_429_RESPONSE = {
+    429: {
+        "description": "Rate limit exceeded",
+        "headers": {
+            "Retry-After": {
+                "description": "Seconds to wait before retrying",
+                "schema": {"type": "integer"}
+            },
+            "X-RateLimit-Limit": {"description": "Maximum requests per window"},
+            "X-RateLimit-Remaining": {"description": "Remaining requests in current window"},
+            "X-RateLimit-Reset": {"description": "Unix timestamp when the rate limit resets"}
+        }
+    }
+}
+
+COSTS_200_PAGINATED = {
+    200: {
+        "description": "Cost records retrieved successfully",
+        "headers": {
+            "X-Total-Count": {"description": "Total number of cost records"},
+            "X-Page": {"description": "Current page number"},
+            "X-Page-Count": {"description": "Total number of pages"},
+            "X-Limit": {"description": "Items per page"},
+            "Link": {"description": "Pagination links (prev/next)"}
+        }
+    }
+}
 
 
 @router.get("/costs", dependencies=[Depends(require_auth)])
@@ -280,6 +352,8 @@ async def cost_breakdown(
 ) -> dict[str, Any]:
     """CLI-compatible cost breakdown by SKU endpoint."""
     from ..db import query_all
+from ..errors import NotFoundError, ValidationError
+from fastapi.responses import Response
     conditions = []
     params = []
     if start_date and end_date:
