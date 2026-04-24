@@ -12,6 +12,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from . import auth as auth_module
+from .middleware import rate_limit as rate_limit_module
 from . import db
 from .errors import register_error_handlers
 from .api import routes
@@ -52,6 +53,12 @@ async def shutdown_event() -> None:
 
 
 @app.middleware("http")
+async def rate_limit_middleware_handler(request: Request, call_next: Any) -> Any:
+    """Apply rate limiting middleware."""
+    return await rate_limit_module.rate_limit_middleware(request, call_next)
+
+
+app.middleware("http")
 async def db_session_middleware(request: Request, call_next: Any) -> Any:
     """Attach database connection to request."""
     conn = await db.get_connection()
