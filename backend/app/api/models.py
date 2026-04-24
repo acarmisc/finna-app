@@ -199,3 +199,69 @@ class ExtractorHealthResponse(BaseModel):
     status: str
     last_run: datetime
     records_count: int = 0
+
+
+# ============================================================================#
+# Extractor Registry schemas                                                  #
+# ============================================================================#
+
+
+class ExtractorCreate(BaseModel):
+    """Request schema for creating an extractor."""
+
+    name: str = Field(..., description="Human-readable name")
+    provider: str = Field(..., description="Cloud provider")
+    extractor_type: str = Field(..., description="Extractor type (e.g., azure_cost, gcp_billing)")
+    enabled: bool = Field(default=True, description="Whether the extractor is enabled")
+    schedule: Optional[str] = Field(None, description="Cron expression for scheduled runs")
+    config_id: Optional[str] = Field(None, description="Cloud config ID to use")
+
+
+class ExtractorUpdate(BaseModel):
+    """Request schema for updating an extractor."""
+
+    name: Optional[str] = None
+    enabled: Optional[bool] = None
+    schedule: Optional[str] = None
+    config_id: Optional[str] = None
+
+
+class ExtractorResponse(BaseModel):
+    """Response schema for extractor."""
+
+    id: str
+    name: str
+    provider: str
+    extractor_type: str
+    enabled: bool
+    schedule: Optional[str]
+    config_id: Optional[str]
+    status: str
+    last_run_id: Optional[str]
+    last_run_at: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+
+
+class ExtractorListResponse(BaseModel):
+    """Response schema for extractor list."""
+
+    extractors: list[ExtractorResponse]
+    count: int
+
+
+class ExtractorRunTriggerRequest(BaseModel):
+    """Request schema for triggering an extractor run."""
+
+    config_id: Optional[str] = Field(
+        None,
+        description="Specific config ID to use (defaults to the extractor's config_id)"
+    )
+
+
+class ExtractorRunTriggerResponse(BaseModel):
+    """Response schema for extractor run trigger."""
+
+    run_id: str
+    status: str
+    extractor_id: str
