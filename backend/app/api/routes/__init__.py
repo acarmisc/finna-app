@@ -1,5 +1,6 @@
 """Route exports."""
 
-from . import auth, config, extractors, costs, alerts  # noqa: E402
+from . import auth, config, costs, alerts, db_dev  # noqa: E402
+from . import extractors, extractors_registry  # noqa: E402
 
-__all__ = ["auth", "config", "extractors", "costs", "alerts"]
+__all__ = ["auth", "config", "extractors", "extractors_registry", "costs", "alerts", "db_dev"]

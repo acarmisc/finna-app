@@ -5,11 +5,12 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import auth as auth_module
 require_auth = auth_module.require_auth
-from ..db import query_all
+get_current_user = auth_module.get_current_user
+from ..db import query_all, query_one
 
 router = APIRouter()
 
@@ -45,12 +46,47 @@ async def get_alert_stats() -> dict[str, Any]:
 
 
 @router.get("/alerts/active", dependencies=[Depends(require_auth)])
-async def get_active_alerts() -> dict[str, Any]:
+async def get_active_alerts(
+    user: dict[str, Any] = Depends(require_auth),
+) -> dict[str, Any]:
     """Get active firing alerts."""
     sql = """
     SELECT * FROM alerts
-    WHERE status = 'firing'
+    WHERE status = 'firing' AND acknowledged_at IS NULL
     ORDER BY created_at DESC
     """
     rows = query_all(sql)
     return {"alerts": rows, "count": len(rows)}
+
+
+@router.post("/alerts/{alert_id}/acknowledge", dependencies=[Depends(require_auth)])
+async def acknowledge_alert(
+    alert_id: str,
+    user: dict[str, Any] = Depends(require_auth),
+) -> dict[str, Any]:
+    """Acknowledge a single alert."""
+    sql = """
+    UPDATE alerts
+    SET acknowledged_at = now(), acknowledged_by = %s
+    WHERE id = %s AND acknowledged_at IS NULL
+    RETURNING id
+    """
+    row = query_one(sql, (user.get("username", "unknown"), alert_id))
+    if not row:
+        raise HTTPException(status_code=404, detail="Alert not found or already acknowledged")
+    return {"id": alert_id, "acknowledged": True}
+
+
+@router.post("/alerts/acknowledge-all", dependencies=[Depends(require_auth)])
+async def acknowledge_all_alerts(
+    user: dict[str, Any] = Depends(require_auth),
+) -> dict[str, Any]:
+    """Bulk acknowledge all firing alerts."""
+    sql = """
+    UPDATE alerts
+    SET acknowledged_at = now(), acknowledged_by = %s
+    WHERE status = 'firing' AND acknowledged_at IS NULL
+    RETURNING id
+    """
+    rows = query_all(sql, (user.get("username", "unknown"),))
+    return {"acknowledged_count": len(rows), "ids": [r["id"] for r in rows]}
