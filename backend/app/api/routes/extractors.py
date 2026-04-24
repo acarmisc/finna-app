@@ -2,22 +2,15 @@
 
 from __future__ import annotations
 
-import sys
-import os
-from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
 # Import auth module from parent package
 from .. import auth as auth_module
+
 require_auth = auth_module.require_auth
 
-from ..models import (
-    ExtractorRunRequest,
-    ExtractorRunResponse,
-    ExtractorStatusResponse,
-)
 from ..runner import cancel_run, get_run_status, list_runs, start_extractor
 
 router = APIRouter()

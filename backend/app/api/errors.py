@@ -121,7 +121,7 @@ async def http_exception_handler(
     # Starlette HTTPException has status_code and detail attributes
     status_code = getattr(exc, "status_code", 500)
     detail = getattr(exc, "detail", str(exc))
-    
+
     return JSONResponse(
         status_code=status_code,
         content={
