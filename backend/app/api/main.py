@@ -11,8 +11,7 @@ from fastapi.responses import JSONResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from . import db
-from . import routes
+from . import db, routes
 from .errors import register_error_handlers
 from .middleware import rate_limit as rate_limit_module
 
