@@ -2,21 +2,19 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from . import auth as auth_module
-from .middleware import rate_limit as rate_limit_module
 from . import db
-from .errors import register_error_handlers
 from .api import routes
-from .models import ErrorResponse, HealthStatus, HealthStatusDetail
+from .errors import register_error_handlers
+from .middleware import rate_limit as rate_limit_module
 
 app = FastAPI(
     title="Finna API",
@@ -108,8 +106,16 @@ async def db_stats() -> JSONResponse:
 
 
 # Mount routers
-from .routes import auth, config, extractors, costs, alerts, db_dev, extractors_registry  # noqa: E402
-from .routes import create_rate_limiting_middleware  # noqa: E402
+from .routes import (  # noqa: E402
+    alerts,
+    auth,
+    config,
+    costs,
+    create_rate_limiting_middleware,  # noqa: E402
+    db_dev,
+    extractors,
+    extractors_registry,
+)
 
 # Add rate limiting middleware (must be before routers)
 app.middleware("http")(create_rate_limiting_middleware())
@@ -130,9 +136,9 @@ instrumentator.expose(app, include_in_schema=False)
 # Initialize OpenTelemetry tracing
 try:
     from opentelemetry import trace
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
-    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
     provider = TracerProvider()
     processor = BatchSpanProcessor(ConsoleSpanExporter())

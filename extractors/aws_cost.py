@@ -19,21 +19,17 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
-import boto3
 from botocore.exceptions import ClientError
-from pydantic import ValidationError
 from tenacity import (
     before_sleep_log,
     retry,
-    retry_if_exception,
     stop_after_attempt,
     wait_chain,
     wait_fixed,
-    wait_exponential,
 )
 
 from models import NormalizedCostRecord, Provider, ServiceCategory
