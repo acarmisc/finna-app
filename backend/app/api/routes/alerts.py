@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from ..openapi_extensions import PaginationHeadersSchema, ERROR_RESPONSE_404, ERROR_RESPONSE_422
 
 from .. import auth as auth_module
 require_auth = auth_module.require_auth
@@ -14,8 +15,14 @@ from ..db import query_all, query_one
 
 router = APIRouter()
 
+# Add OpenAPI response documentation
+_alert_responses = {
+    200: {"description": "Alerts retrieved", "headers": PaginationHeadersSchema},
+    404: ERROR_RESPONSE_404,
+    422: ERROR_RESPONSE_422,
+}
 
-@router.get("/alerts", dependencies=[Depends(require_auth)])
+@router.get("/alerts", dependencies=[Depends(require_auth)], responses=_alert_responses)
 async def list_alerts(
     status: Optional[str] = Query(None, description="Filter by status: firing, resolved, all"),
     severity: Optional[str] = Query(None, description="Filter by severity: err, warn, ok"),

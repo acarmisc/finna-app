@@ -98,6 +98,10 @@ async def db_stats() -> JSONResponse:
 
 # Mount routers
 from .routes import auth, config, extractors, costs, alerts, db_dev, extractors_registry  # noqa: E402
+from .routes import create_rate_limiting_middleware  # noqa: E402
+
+# Add rate limiting middleware (must be before routers)
+app.middleware("http")(create_rate_limiting_middleware())
 
 app.include_router(config.router, prefix="/api/v1", tags=["config"])
 app.include_router(extractors.router, prefix="/api/v1", tags=["extractors"])
