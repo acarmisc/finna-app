@@ -7,7 +7,6 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from fastapi.responses import JSONResponse
 
 from .. import auth as auth_module
 require_auth = auth_module.require_auth
@@ -22,8 +21,6 @@ _cost_responses = {
     404: ERROR_RESPONSE_404,
     422: ERROR_RESPONSE_422,
 }
-
-@router.get("/costs", dependencies=[Depends(require_auth)], responses=_cost_responses)
 
 
 class CostFilter(BaseModel):
@@ -41,6 +38,10 @@ async def list_costs(
     project: Optional[str] = Query(None, description="Filter by project name"),
     start_date: Optional[str] = Query(None, description="Start date in ISO format"),
     end_date: Optional[str] = Query(None, description="End date in ISO format"),
+    start: Optional[str] = Query(None, alias="start", include_in_schema=False),
+    end: Optional[str] = Query(None, alias="end", include_in_schema=False),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=1000),
 ) -> dict[str, Any]:
     """Get cost records with optional filtering."""
     
@@ -56,6 +57,11 @@ async def list_costs(
         conditions.append("project_name = %s")
         params.append(project)
     
+    # Allow CLI aliases start=/end=
+    if start and not start_date:
+        start_date = start
+    if end and not end_date:
+        end_date = end
     # Default to last 30 days if no date range specified
     end_date = end_date or datetime.now()
     start_date = start_date or (end_date - timedelta(days=30))
@@ -110,12 +116,20 @@ async def list_costs(
             provider_totals[prov] = 0
         provider_totals[prov] += cost["mtd"]
     
+    total = len(costs)
     return {
         "costs": costs,
         "totals": provider_totals,
-        "filtered": len(costs) > 0,
+        "filtered": total > 0,
         "startDate": start_date.isoformat(),
         "endDate": end_date.isoformat(),
+        # CLI-compatibility wrapper
+        "data": costs,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "has_next": total > page * page_size,
+        "has_prev": page > 1,
     }
 
 
@@ -257,8 +271,14 @@ async def get_daily_costs(
 async def cost_summary(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
+    start: Optional[str] = Query(None, alias="start", include_in_schema=False),
+    end: Optional[str] = Query(None, alias="end", include_in_schema=False),
 ) -> dict[str, Any]:
     """CLI-compatible cost summary endpoint."""
+    if start and not start_date:
+        start_date = start
+    if end and not end_date:
+        end_date = end
     end_date = end_date or datetime.now()
     start_date = start_date or (end_date - timedelta(days=30))
 
@@ -287,10 +307,16 @@ async def cost_summary(
 async def cost_breakdown(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
+    start: Optional[str] = Query(None, alias="start", include_in_schema=False),
+    end: Optional[str] = Query(None, alias="end", include_in_schema=False),
     limit: int = Query(50, le=100),
 ) -> dict[str, Any]:
     """CLI-compatible cost breakdown by SKU endpoint."""
     from ..db import query_all
+    if start and not start_date:
+        start_date = start
+    if end and not end_date:
+        end_date = end
     conditions = []
     params = []
     if start_date and end_date:
