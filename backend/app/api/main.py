@@ -1,202 +1,89 @@
-"""FastAPI application for FinOps orchestrator."""
+# Finna API - FastAPI backend
 
 from __future__ import annotations
 
-import logging
-import os
-from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
+from typing import Any
 
-from fastapi import FastAPI, Request
-from fastapi.exceptions import HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_fastapi_instrumentator import Instrumentator
-from slowapi import Limiter
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
-from starlette.middleware.base import BaseHTTPMiddleware
 
-logger = logging.getLogger("api.main")
-
-limiter = Limiter(key_func=get_remote_address)
-
-
-def rate_limit_from_env(var_name: str, default: int) -> int:
-    """Parse rate limit from environment variable."""
-    value = os.getenv(var_name)
-    if value is not None:
-        try:
-            return int(value)
-        except ValueError:
-            pass
-    return default
-
-
-RATE_LIMIT_PER_MINUTE = rate_limit_from_env("RATE_LIMIT_PER_MINUTE", 60)
-RATE_LIMIT_PER_HOUR = rate_limit_from_env("RATE_LIMIT_PER_HOUR", 1000)
-
-EXTRACTOR_LIMIT_PER_MINUTE = rate_limit_from_env("EXTRACTOR_LIMIT_PER_MINUTE", 30)
-EXTRACTOR_LIMIT_PER_HOUR = rate_limit_from_env("EXTRACTOR_LIMIT_PER_HOUR", 200)
-
-
-class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Custom rate limit middleware to handle 429 responses properly."""
-
-    async def dispatch(self, request: Request, call_next):
-        try:
-            return await call_next(request)
-        except RateLimitExceeded as e:
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "error": "rate_limit_exceeded",
-                    "message": str(e),
-                    "detail": "Too many requests. Please try again later.",
-                },
-            )
-
-
-class TokenVerificationMiddleware(BaseHTTPMiddleware):
-    """Middleware to verify JWT token on all protected routes."""
-
-    async def dispatch(self, request: Request, call_next):
-        if request.url.path.startswith("/api/v1/") and request.url.path not in [
-            "/api/v1/auth/token",
-            "/api/v1/healthz",
-        ]:
-            auth_header = request.headers.get("Authorization")
-            if auth_header and auth_header.startswith("Bearer "):
-                token = auth_header.split(" ")[1]
-                try:
-                    from .auth import decode_token
-
-                    decode_token(token)
-                except HTTPException:
-                    return JSONResponse(
-                        status_code=401,
-                        content={
-                            "error": "invalid_token",
-                            "message": "Invalid or expired token",
-                            "detail": "Could not validate credentials",
-                        },
-                        headers={"WWW-Authenticate": "Bearer"},
-                    )
-            else:
-                return JSONResponse(
-                    status_code=401,
-                    content={
-                        "error": "missing_token",
-                        "message": "Not authenticated",
-                        "detail": "Not authenticated",
-                    },
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-        return await call_next(request)
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> None:
-    """Application lifecycle: startup and shutdown."""
-    # Startup: initialize connection pool
-    from .db import get_pg_dsn
-    from .metrics import config_count
-
-    if get_pg_dsn():
-        try:
-            from .db import init_sync_pool
-
-            init_sync_pool()
-            logger.info("Connection pool initialized")
-        except Exception as e:
-            logger.warning(f"Could not initialize connection pool: {e}. Will retry on first request.")
-
-        try:
-            from .db import init_db
-
-            init_db()
-            logger.info("Database initialized")
-        except Exception as e:
-            logger.warning(f"Could not initialize DB: {e}. Will retry on first request.")
-
-        # Initialize config_count metric
-        try:
-            from .db import query_all
-
-            rows = query_all("SELECT provider, COUNT(*) as count FROM cloud_config GROUP BY provider")
-            for row in rows:
-                config_count.labels(provider=row["provider"]).set(row["count"])
-        except Exception as e:
-            logger.warning(f"Could not initialize config_count metric: {e}")
-
-        # Auto-migrate if enabled
-        if os.getenv("AUTO_MIGRATE", "false").lower() == "true":
-            try:
-                from alembic.config import Config
-
-                from alembic import command
-
-                alembic_cfg = Config("alembic.ini")
-                command.upgrade(alembic_cfg, "head")
-                logger.info("Alembic migrations applied successfully")
-            except Exception as e:
-                logger.warning(f"Could not run migrations: {e}")
-
-    yield
-
-    # Shutdown: close connection pools
-    from .db import close_pools
-
-    close_pools()
-    logger.info("Connection pools closed")
-
+from . import auth as auth_module
+from . import db
+from .api import routes
+from .models import ErrorResponse, HealthStatus, HealthStatusDetail
 
 app = FastAPI(
-    title="FinOps Orchestrator API",
-    description="Centralized orchestration for FinOps extractors",
-    version="0.1.0",
-    lifespan=lifespan,
+    title="Finna API",
+    description="Finna cloud cost management and extraction platform",
+    version="1.0.0",
 )
 
-app.state.limiter = limiter
-app.add_middleware(RateLimitMiddleware)
-
-# Token verification middleware
-app.add_middleware(TokenVerificationMiddleware)
-
-# CORS middleware for CLI (local development)
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Re-export routes module to avoid circular import issues
+__all__ = ["app", "auth", "db", "routes"]
 
-@app.get("/healthz")
-async def healthz() -> JSONResponse:
-    """Health check endpoint."""
-    from .db import get_connection, release_connection
 
-    status = {
-        "status": "ok",
-        "api": "finops-orchestrator",
-    }
+@app.on_event("startup")
+async def startup_event() -> None:
+    """Initialize database connection pool on startup."""
+    await db.init_pool()
 
-    # Check database
+
+@app.on_event("shutdown")
+async def shutdown_event() -> None:
+    """Close database connection pool on shutdown."""
+    await db.close_pool()
+
+
+@app.middleware("http")
+async def db_session_middleware(request: Request, call_next: Any) -> Any:
+    """Attach database connection to request."""
+    conn = await db.get_connection()
+    request.state.db = conn
+    try:
+        response = await call_next(request)
+    finally:
+        await db.release_connection(conn)
+    return response
+
+
+# Health check endpoint
+@app.get("/health")
+async def health() -> dict[str, str]:
+    """Basic health check."""
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+
+@app.get("/api/v1/health")
+async def api_health() -> JSONResponse:
+    """Extended health check with database status."""
+    status: dict[str, Any] = {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+    # Check database connection
     conn = None
     try:
-        conn = get_connection()
-        with conn.cursor() as cur:
-            cur.execute("SELECT 1")
+        conn = await db.get_connection()
+        await conn.fetchrow("SELECT 1")
         status["database"] = "ok"
     except Exception as e:
+        status["error"] = str(e)
         status["database"] = f"error: {e}"
         status["status"] = "degraded"
     finally:
         if conn is not None:
-            release_connection(conn)
+            await db.release_connection(conn)
 
     return JSONResponse(status, status_code=200 if status["status"] == "ok" else 503)
 
@@ -210,16 +97,16 @@ async def db_stats() -> JSONResponse:
 
 
 # Mount routers
-from .routes import auth, config, extractors, costs, alerts, db_dev, extractors_registry  # noqa: E402
+from .routes import auth, config, extractors, extractors_crud, costs, alerts, db_dev, extractors_registry  # noqa: E402
 
 app.include_router(config.router, prefix="/api/v1", tags=["config"])
 app.include_router(extractors.router, prefix="/api/v1", tags=["extractors"])
+app.include_router(extractors_crud.router, prefix="/api/v1", tags=["extractors"])
 app.include_router(extractors_registry.router, prefix="/api/v1", tags=["extractors"])
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(costs.router, prefix="/api/v1", tags=["costs"])
 app.include_router(alerts.router, prefix="/api/v1", tags=["alerts"])
 app.include_router(db_dev.router, prefix="/api/v1", tags=["db"])
-
 
 # Initialize Prometheus metrics instrumentator (must be after middleware)
 instrumentator = Instrumentator()
@@ -234,24 +121,10 @@ try:
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
     provider = TracerProvider()
-    if os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-
-        provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
-    else:
-        provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
+    processor = BatchSpanProcessor(ConsoleSpanExporter())
+    provider.add_span_processor(processor)
     trace.set_tracer_provider(provider)
-    FastAPIInstrumentor.instrument_app(app)
+
+    FastAPIInstrumentor().instrument(app)
 except ImportError:
     pass
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(
-        "app.api.main:app",
-        host=os.getenv("HOST", "0.0.0.0"),
-        port=int(os.getenv("PORT", "8000")),
-        reload=os.getenv("DEBUG", "false").lower() == "true",
-    )
