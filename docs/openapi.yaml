@@ -473,6 +473,27 @@ components:
 
     RateLimited:
       description: Too many requests
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+            example: 60
+          description: The number of allowed requests in the current window
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+            example: 0
+          description: The number of remaining requests in the current window
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+            example: 1234567890
+          description: The UTC epoch timestamp when the rate limit resets
+        Retry-After:
+          schema:
+            type: integer
+            example: 60
+          description: The number of seconds to wait before making a new request
       content:
         application/json:
           schema:
@@ -490,6 +511,28 @@ components:
             $ref: "#/components/schemas/ErrorResponse"
           example:
             detail: Configuration not found
+
+    UnprocessableEntity:
+      description: Validation error or invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            detail: "Invalid JSON payload"
+
+  # ── Pagination Headers ─────────────────────────────────────────────────────
+  headers:
+    X-Total-Count:
+      schema:
+        type: integer
+        example: 100
+      description: The total number of items across all pages
+    Link:
+      schema:
+        type: string
+        example: '<http://localhost:8000/api/v1/costs?page=2>; rel="next", <http://localhost:8000/api/v1/costs?page=10>; rel="last"'
+      description: 'Link header with rel="next", rel="last", etc.'
 
 paths:
   # ── Health ────────────────────────────────────────────────────────────────
@@ -642,6 +685,11 @@ paths:
       responses:
         "200":
           description: List of configurations
+          headers:
+            X-Total-Count:
+              $ref: "#/components/headers/X-Total-Count"
+            Link:
+              $ref: "#/components/headers/Link"
           content:
             application/json:
               schema:
@@ -650,6 +698,8 @@ paths:
                   $ref: "#/components/schemas/CloudConfigResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
 
     post:
       tags: [config]
