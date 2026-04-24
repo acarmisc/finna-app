@@ -7,12 +7,23 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from fastapi.responses import JSONResponse
 
 from .. import auth as auth_module
 require_auth = auth_module.require_auth
 from ..db import query_all
+from ..openapi_extensions import PaginationHeadersSchema, ERROR_RESPONSE_404, ERROR_RESPONSE_422
 
 router = APIRouter()
+
+# Add pagination header documentation to responses
+_cost_responses = {
+    200: {"description": "Cost records retrieved", "headers": PaginationHeadersSchema},
+    404: ERROR_RESPONSE_404,
+    422: ERROR_RESPONSE_422,
+}
+
+@router.get("/costs", dependencies=[Depends(require_auth)], responses=_cost_responses)
 
 
 class CostFilter(BaseModel):
