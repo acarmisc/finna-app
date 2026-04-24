@@ -153,5 +153,66 @@ PaginationHeadersSchema = {
             "schema": {"type": "integer"},
             "description": "Total number of items across all pages",
         },
+        "X-Page": {
+            "schema": {"type": "integer"},
+            "description": "Current page number",
+        },
+        "X-Page-Count": {
+            "schema": {"type": "integer"},
+            "description": "Total number of pages",
+        },
+        "X-Limit": {
+            "schema": {"type": "integer"},
+            "description": "Maximum number of items per page",
+        },
     },
+}
+
+RateLimitingHeadersSchema = {
+    "description": "Rate limiting headers",
+    "headers": {
+        "X-RateLimit-Limit": {
+            "schema": {"type": "integer"},
+            "description": "Maximum number of requests allowed in the current window",
+        },
+        "X-RateLimit-Remaining": {
+            "schema": {"type": "integer"},
+            "description": "Number of requests remaining in the current window",
+        },
+        "X-RateLimit-Reset": {
+            "schema": {"type": "integer"},
+            "description": "Unix timestamp when the rate limit window resets",
+        },
+        "Retry-After": {
+            "schema": {"type": "integer"},
+            "description": "Seconds to wait before retrying after rate limit is exceeded",
+        },
+    },
+}
+
+RATE_LIMIT_429_RESPONSE = {
+    "description": "Rate limit exceeded",
+    "content": {
+        "application/json": {
+            "schema": {
+                "type": "object",
+                "required": ["detail", "retry_after"],
+                "properties": {
+                    "detail": {
+                        "type": "string",
+                        "example": "Rate limit exceeded",
+                    },
+                    "retry_after": {
+                        "type": "integer",
+                        "example": 60,
+                    },
+                },
+            },
+            "example": {
+                "detail": "Rate limit exceeded",
+                "retry_after": 60,
+            },
+        },
+    },
+    "headers": RateLimitingHeadersSchema,
 }

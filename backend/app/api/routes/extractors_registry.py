@@ -9,8 +9,9 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
 
 from .. import auth as auth_module
+
 require_auth = auth_module.require_auth
-from ..db import insert_and_return, query_all, query_one, execute
+from ..db import execute, insert_and_return, query_all, query_one
 from ..runner import start_extractor
 
 router = APIRouter()

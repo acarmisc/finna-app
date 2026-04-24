@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import base64
 import logging
+import os
+import sys
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -11,11 +13,9 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-import sys
-import os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".."))
-from ..db import insert_and_return, query_one
 from .. import auth as api_auth
+from ..db import insert_and_return, query_one
 
 require_auth = api_auth.require_auth
 logger = logging.getLogger("api.auth")
