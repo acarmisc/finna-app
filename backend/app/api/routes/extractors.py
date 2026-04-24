@@ -23,18 +23,19 @@ from ..runner import cancel_run, get_run_status, list_runs, start_extractor
 router = APIRouter()
 
 
+# Keep existing extractors/run endpoints for backward compatibility
 @router.get("/extractors/status", dependencies=[Depends(require_auth)])
-async def list_extractors(
+async def list_extractor_runs(
     limit: int = 50, provider: Optional[str] = None
 ) -> dict[str, Any]:
-    """List extractor runs."""
+    """List extractor runs (legacy endpoint)."""
     runs = list_runs(limit=limit, provider=provider)
     return {"runs": runs, "count": len(runs)}
 
 
 @router.post("/extractors/run", dependencies=[Depends(require_auth)])
-async def run_extractor(data: dict[str, Any]) -> dict[str, Any]:
-    """Run an extractor."""
+async def run_extractor_via_post(data: dict[str, Any]) -> dict[str, Any]:
+    """Run an extractor (legacy endpoint)."""
     provider = data.get("provider", "gcp")
     extractor_type = data.get("extractor_type", provider)
     config_id = data.get("config_id")
