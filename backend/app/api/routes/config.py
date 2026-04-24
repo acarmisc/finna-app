@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-import sys
 import os
+import sys
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..db import insert_and_return, query_all, query_one, execute
 from .. import auth as auth_module
+from ..db import execute, insert_and_return, query_all, query_one
+
 require_auth = auth_module.require_auth
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".."))
 from utils.encryption import decrypt_config, encrypt_config
@@ -220,8 +221,7 @@ async def test_config(config_id: str) -> dict[str, Any]:
 
     if provider == "azure":
         try:
-            from azure.identity import ClientSecretCredential, AzureCliCredential
-            from azure.core.exceptions import ClientAuthenticationError
+            from azure.identity import AzureCliCredential, ClientSecretCredential
 
             cred_type = row.get("credential_type") or config.get("credential_type", "")
             if cred_type == "cli":
@@ -244,11 +244,16 @@ async def test_config(config_id: str) -> dict[str, Any]:
             # Check Cost Management API access on the configured scope
             subscription_id = config.get("subscription_id")
             if subscription_id:
+                from datetime import datetime, timedelta
+                from datetime import timezone as tz
+
                 from azure.mgmt.costmanagement import CostManagementClient
                 from azure.mgmt.costmanagement.models import (
-                    QueryDefinition, QueryDataset, QueryTimePeriod, TimeframeType
+                    QueryDataset,
+                    QueryDefinition,
+                    QueryTimePeriod,
+                    TimeframeType,
                 )
-                from datetime import datetime, timedelta, timezone as tz
 
                 cm_client = CostManagementClient(credential=credential, subscription_id=subscription_id)
 
@@ -297,7 +302,6 @@ async def test_config(config_id: str) -> dict[str, Any]:
         try:
             from google.auth import default as google_auth_default
             from google.auth.transport.requests import Request
-            import google.auth.exceptions
 
             kwargs: dict[str, Any] = {}
             project_id = config.get("project_id")

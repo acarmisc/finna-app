@@ -70,7 +70,7 @@ app.add_middleware(
 @app.get("/healthz")
 async def healthz() -> JSONResponse:
     """Health check endpoint."""
-    from api.db import get_pg_dsn, get_connection, release_connection
+    from api.db import get_connection, release_connection
 
     status = {
         "status": "ok",
@@ -103,7 +103,8 @@ async def db_stats() -> JSONResponse:
 
 
 # Mount routers
-from api.routes import auth, config as config_router, extractors  # noqa: E402
+from api.routes import auth, extractors  # noqa: E402
+from api.routes import config as config_router
 
 app.include_router(config_router.router, prefix="/api/v1", tags=["config"])
 app.include_router(extractors.router, prefix="/api/v1", tags=["extractors"])
