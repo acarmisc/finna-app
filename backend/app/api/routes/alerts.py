@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from ..openapi_extensions import PaginationHeadersSchema, ERROR_RESPONSE_404, ERROR_RESPONSE_422
 
 from .. import auth as auth_module
+from ..db import query_all, query_one
+from ..openapi_extensions import ERROR_RESPONSE_404, ERROR_RESPONSE_422, PaginationHeadersSchema
+
 require_auth = auth_module.require_auth
 get_current_user = auth_module.get_current_user
-from ..db import query_all, query_one
 
 router = APIRouter()
 
@@ -27,6 +27,8 @@ async def list_alerts(
     status: Optional[str] = Query(None, description="Filter by status: firing, resolved, all"),
     severity: Optional[str] = Query(None, description="Filter by severity: err, warn, ok"),
     limit: int = Query(50, le=100),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=1000),
 ) -> dict[str, Any]:
     """Get alerts with filtering."""
     sql = """
@@ -37,7 +39,38 @@ async def list_alerts(
     LIMIT %s
     """
     rows = query_all(sql, (status, status, severity, severity, limit))
-    return {"alerts": rows, "count": len(rows)}
+    # Map to CLI Alert schema
+    data = []
+    for r in rows:
+        data.append({
+            "id": r.get("id"),
+            "title": r.get("title") or r.get("type") or "Alert",
+            "description": r.get("body") or r.get("description") or "",
+            "severity": r.get("severity") or "warn",
+            "resource": r.get("resource") or "",
+            "service": r.get("service") or "",
+            "provider": r.get("provider") or "",
+            "cost_impact": float(r.get("cost_impact") or 0.0),
+            "first_seen": (r.get("created_at").isoformat()) if r.get("created_at") else None,
+            "last_seen": (
+                r.get("updated_at").isoformat()
+                if r.get("updated_at")
+                else (r.get("created_at").isoformat() if r.get("created_at") else None)
+            ),
+            "is_acknowledged": r.get("acknowledged_at") is not None,
+        })
+    total = len(data)
+    return {
+        "alerts": data,
+        "count": total,
+        # CLI-compatibility wrapper
+        "data": data,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "has_next": total > page * page_size,
+        "has_prev": page > 1,
+    }
 
 
 @router.get("/alerts/stats", dependencies=[Depends(require_auth)])
@@ -83,7 +116,26 @@ async def get_active_alerts(
     ORDER BY created_at DESC
     """
     rows = query_all(sql)
-    return {"alerts": rows, "count": len(rows)}
+    data = []
+    for r in rows:
+        data.append({
+            "id": r.get("id"),
+            "title": r.get("title") or r.get("type") or "Alert",
+            "description": r.get("body") or r.get("description") or "",
+            "severity": r.get("severity") or "warn",
+            "resource": r.get("resource") or "",
+            "service": r.get("service") or "",
+            "provider": r.get("provider") or "",
+            "cost_impact": float(r.get("cost_impact") or 0.0),
+            "first_seen": (r.get("created_at").isoformat()) if r.get("created_at") else None,
+            "last_seen": (
+                r.get("updated_at").isoformat()
+                if r.get("updated_at")
+                else (r.get("created_at").isoformat() if r.get("created_at") else None)
+            ),
+            "is_acknowledged": r.get("acknowledged_at") is not None,
+        })
+    return {"alerts": data, "count": len(data)}
 
 
 @router.post("/alerts/{alert_id}/acknowledge", dependencies=[Depends(require_auth)])
