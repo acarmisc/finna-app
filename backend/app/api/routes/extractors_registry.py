@@ -22,6 +22,8 @@ router = APIRouter()
 async def list_extractors(
     provider: Optional[str] = None,
     limit: int = 50,
+    page: int = 1,
+    page_size: int = 50,
 ) -> dict[str, Any]:
     """List extractor registry entries."""
     sql = """
@@ -35,6 +37,7 @@ async def list_extractors(
     LIMIT %s
     """
     rows = query_all(sql, (provider, provider, limit))
+    total = len(rows)
     return {
         "data": [
             {
@@ -45,12 +48,19 @@ async def list_extractors(
                 "config_name": r["config_name"],
                 "enabled": r["enabled"],
                 "schedule": r["schedule"],
+                "last_run": r["updated_at"].isoformat() if r.get("updated_at") else None,
+                "status": "idle",
                 "created_at": r["created_at"],
                 "updated_at": r["updated_at"],
             }
             for r in rows
         ],
-        "count": len(rows),
+        "count": total,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "has_next": total > page * page_size,
+        "has_prev": page > 1,
     }
 
 
@@ -113,6 +123,8 @@ async def get_extractor(extractor_id: str) -> dict[str, Any]:
         "config_name": row["config_name"],
         "enabled": row["enabled"],
         "schedule": row["schedule"],
+        "last_run": row["updated_at"].isoformat() if row.get("updated_at") else None,
+        "status": "idle",
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }

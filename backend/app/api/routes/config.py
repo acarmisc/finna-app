@@ -444,3 +444,82 @@ async def cli_config_get(config_id: str) -> dict[str, Any]:
         "region": "",
         "last_updated": r["updated_at"].isoformat() if r["updated_at"] else None,
     }
+
+
+# ─── CLI-compatibility /configs CUD wrappers ────────────────────────────────
+
+import uuid as _uuid
+from datetime import datetime as __dt, timezone as __tz
+from pydantic import BaseModel as _BM
+
+class _ConfigCreate(_BM):
+    provider: str
+    cloud_config: str | None = None
+    service_category: str | None = None
+    region: str | None = None
+
+@router.post("/configs", dependencies=[Depends(require_auth)], status_code=201)
+async def cli_configs_create(data: _ConfigCreate) -> dict[str, Any]:
+    """CLI-compatible config create."""
+    cfg_id = str(_uuid.uuid4())
+    now = __dt.now(__tz.utc)
+    cfg_dict: dict[str, Any] = {"provider": data.provider}
+    if data.region:
+        cfg_dict["region"] = data.region
+    if data.service_category:
+        cfg_dict["service_category"] = data.service_category
+    if data.cloud_config:
+        cfg_dict["cloud_config"] = data.cloud_config
+    insert_and_return(
+        "INSERT INTO cloud_config (id, provider, name, credential_type, config, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (cfg_id, data.provider, f"{data.provider} config", data.service_category or "unknown", cfg_dict, now, now),
+    )
+    return {
+        "id": cfg_id,
+        "provider": data.provider,
+        "service_category": data.service_category or "",
+        "region": data.region or "",
+        "last_updated": now.isoformat(),
+    }
+
+@router.put("/configs/{config_id}", dependencies=[Depends(require_auth)])
+async def cli_configs_update(config_id: str, data: _ConfigCreate) -> dict[str, Any]:
+    """CLI-compatible config update."""
+    existing = query_one("SELECT id FROM cloud_config WHERE id = %s", (config_id,))
+    if not existing:
+        raise HTTPException(status_code=404, detail="Configuration not found")
+    now = __dt.now(__tz.utc)
+    # Fetch existing config blob
+    row = query_one("SELECT config FROM cloud_config WHERE id = %s", (config_id,))
+    cfg = row["config"] if row and row.get("config") else {}
+    if isinstance(cfg, str):
+        try:
+            import json as __json
+            cfg = __json.loads(cfg)
+        except Exception:
+            cfg = {}
+    if data.region:
+        cfg["region"] = data.region
+    if data.service_category:
+        cfg["service_category"] = data.service_category
+    if data.cloud_config:
+        cfg["cloud_config"] = data.cloud_config
+    execute(
+        "UPDATE cloud_config SET provider = %s, config = %s, updated_at = %s WHERE id = %s",
+        (data.provider, cfg, now, config_id),
+    )
+    return {
+        "id": config_id,
+        "provider": data.provider,
+        "service_category": data.service_category or "",
+        "region": data.region or "",
+        "last_updated": now.isoformat(),
+    }
+
+@router.delete("/configs/{config_id}", dependencies=[Depends(require_auth)], status_code=204)
+async def cli_configs_delete(config_id: str) -> None:
+    """CLI-compatible config delete."""
+    existing = query_one("SELECT id FROM cloud_config WHERE id = %s", (config_id,))
+    if not existing:
+        raise HTTPException(status_code=404, detail="Configuration not found")
+    execute("DELETE FROM cloud_config WHERE id = %s", (config_id,))
