@@ -240,3 +240,62 @@ async def get_daily_costs(
         "startDate": start_date.isoformat(),
         "endDate": end_date.isoformat(),
     }
+
+
+@router.get("/costs/summary", dependencies=[Depends(require_auth)])
+async def cost_summary(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+) -> dict[str, Any]:
+    """CLI-compatible cost summary endpoint."""
+    end_date = end_date or datetime.now()
+    start_date = start_date or (end_date - timedelta(days=30))
+
+    sql = "SELECT provider, SUM(cost_amount) as total FROM cost_records WHERE cost_date >= %s AND cost_date <= %s GROUP BY provider"
+    rows = query_all(sql, (start_date, end_date))
+
+    by_provider = {}
+    by_service = {}
+    total = 0.0
+    for r in rows:
+        val = float(r["total"] or 0)
+        by_provider[r["provider"]] = val
+        by_service.setdefault(r["provider"], 0.0)
+        by_service[r["provider"]] += val
+        total += val
+
+    return {
+        "total": total,
+        "by_provider": by_provider,
+        "by_service": by_service,
+        "start_period": start_date.isoformat() if hasattr(start_date, "isoformat") and isinstance(start_date, datetime) else str(start_date),
+        "end_period": end_date.isoformat() if hasattr(end_date, "isoformat") and isinstance(end_date, datetime) else str(end_date),
+    }
+
+@router.get("/costs/breakdown", dependencies=[Depends(require_auth)])
+async def cost_breakdown(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    limit: int = Query(50, le=100),
+) -> dict[str, Any]:
+    """CLI-compatible cost breakdown by SKU endpoint."""
+    from ..db import query_all
+    conditions = []
+    params = []
+    if start_date and end_date:
+        conditions.append("cost_date >= %s")
+        conditions.append("cost_date <= %s")
+        params.extend([start_date, end_date])
+    where_clause = ""
+    if conditions:
+        where_clause = "WHERE " + " AND ".join(conditions)
+    sql = f"""
+        SELECT sku_name as sku, SUM(cost_amount) as cost
+        FROM cost_records {where_clause}
+        GROUP BY sku_name
+        ORDER BY cost DESC
+        LIMIT %s
+    """
+    rows = query_all(sql, tuple(params) + (limit,))
+    data = [{"sku": r["sku"], "cost": float(r["cost"])} for r in rows]
+    return {"data": data, "total": len(data)}

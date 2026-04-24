@@ -97,11 +97,10 @@ async def db_stats() -> JSONResponse:
 
 
 # Mount routers
-from .routes import auth, config, extractors, extractors_crud, costs, alerts, db_dev, extractors_registry  # noqa: E402
+from .routes import auth, config, extractors, costs, alerts, db_dev, extractors_registry  # noqa: E402
 
 app.include_router(config.router, prefix="/api/v1", tags=["config"])
 app.include_router(extractors.router, prefix="/api/v1", tags=["extractors"])
-app.include_router(extractors_crud.router, prefix="/api/v1", tags=["extractors"])
 app.include_router(extractors_registry.router, prefix="/api/v1", tags=["extractors"])
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(costs.router, prefix="/api/v1", tags=["costs"])

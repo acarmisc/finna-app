@@ -99,3 +99,10 @@ async def register_azure_service_account(request: AzureServiceAccountRegisterReq
         (config_id, name, config, now, now),
     )
     return {"config_id": config_id, "message": "Azure service account registered successfully"}
+
+
+@router.post("/auth/login")
+async def login_alias(req: TokenRequest) -> dict[str, Any]:
+    """CLI-compatible login endpoint alias."""
+    result = await login_token(req)
+    return {"access_token": result["token"], "token_type": "bearer"}

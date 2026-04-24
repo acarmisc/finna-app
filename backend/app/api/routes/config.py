@@ -406,3 +406,41 @@ async def delete_config(config_id: str) -> None:
     sql = "DELETE FROM cloud_config WHERE id = %s"
     execute(sql, (config_id,))
 
+
+
+# ─── CLI-compatible /configs endpoints ───────────────────────────────────────
+
+@router.get("/configs", dependencies=[Depends(require_auth)])
+async def cli_config_list() -> dict[str, Any]:
+    """CLI-compatible config list wrapper."""
+    rows = query_all("SELECT id, provider, name, credential_type, config, created_at, updated_at FROM cloud_config ORDER BY provider, name")
+    data = [
+        {
+            "id": r["id"],
+            "provider": r["provider"],
+            "name": r["name"],
+            "credential_type": r["credential_type"],
+            "service_category": r["credential_type"],
+            "region": "",
+            "last_updated": r["updated_at"].isoformat() if r["updated_at"] else None,
+        }
+        for r in rows
+    ]
+    return {"data": data, "total": len(data), "page": 1, "page_size": len(data), "has_next": False, "has_prev": False}
+
+@router.get("/configs/{config_id}", dependencies=[Depends(require_auth)])
+async def cli_config_get(config_id: str) -> dict[str, Any]:
+    """CLI-compatible config get."""
+    sql = "SELECT id, provider, name, credential_type, config, created_at, updated_at FROM cloud_config WHERE id = %s"
+    r = query_one(sql, (config_id,))
+    if not r:
+        raise HTTPException(status_code=404, detail="Configuration not found")
+    return {
+        "id": r["id"],
+        "provider": r["provider"],
+        "name": r["name"],
+        "credential_type": r["credential_type"],
+        "service_category": r["credential_type"],
+        "region": "",
+        "last_updated": r["updated_at"].isoformat() if r["updated_at"] else None,
+    }
