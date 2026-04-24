@@ -13,6 +13,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from . import auth as auth_module
 from . import db
+from .errors import register_error_handlers
 from .api import routes
 from .models import ErrorResponse, HealthStatus, HealthStatusDetail
 
@@ -21,6 +22,9 @@ app = FastAPI(
     description="Finna cloud cost management and extraction platform",
     version="1.0.0",
 )
+
+# Register custom error handlers
+register_error_handlers(app)
 
 # Add CORS middleware
 app.add_middleware(
