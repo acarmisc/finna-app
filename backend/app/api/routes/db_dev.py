@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
 from .. import auth as auth_module
+
 require_auth = auth_module.require_auth
 from ..db import query_all
 
