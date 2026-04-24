@@ -15,7 +15,7 @@ from typing import Any, Optional
 
 from psycopg.rows import dict_row
 
-from .metrics import extractor_run_total, extractor_duration_seconds
+from .metrics import extractor_duration_seconds, extractor_run_total
 
 logger = logging.getLogger("api.runner")
 

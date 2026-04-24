@@ -54,8 +54,6 @@ from tenacity import (
     retry_if_exception,
     retry_if_exception_type,
     stop_after_attempt,
-    wait_chain,
-    wait_fixed,
     wait_exponential,
 )
 
@@ -346,7 +344,6 @@ def _is_rate_limited(exc: BaseException) -> bool:
 
 def _retry_after_wait(retry_state: Any) -> float:
     """Use Azure Retry-After header if present, else fall back to env-configured waits."""
-    import time as _time
     exc = retry_state.outcome.exception()
     # Try to read Retry-After from Azure response headers
     retry_after: float | None = None

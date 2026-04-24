@@ -9,7 +9,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import pytest
-
 from aggregation.config import AggregationConfig, MetricAggregationSettings
 from aggregation.engine import (
     aggregate,
