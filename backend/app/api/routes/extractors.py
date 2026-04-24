@@ -33,6 +33,15 @@ async def list_extractor_runs(
     return {"runs": runs, "count": len(runs)}
 
 
+@router.get("/extractors/runs", dependencies=[Depends(require_auth)])
+async def list_extractor_runs_alias(
+    limit: int = 50, provider: Optional[str] = None
+) -> dict[str, Any]:
+    """Alias for /extractors/status (CLI compatibility)."""
+    runs = list_runs(limit=limit, provider=provider)
+    return {"runs": runs, "count": len(runs)}
+
+
 @router.post("/extractors/run", dependencies=[Depends(require_auth)])
 async def run_extractor_via_post(data: dict[str, Any]) -> dict[str, Any]:
     """Run an extractor (legacy endpoint)."""
