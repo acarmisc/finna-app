@@ -1,0 +1,21 @@
+# Terraform state
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Terraform local modules cache
+.local/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Secrets (NEVER commit)
+terraform.tfvars
+*.secret.tfvars
