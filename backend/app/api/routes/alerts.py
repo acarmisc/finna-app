@@ -42,7 +42,27 @@ async def get_alert_stats() -> dict[str, Any]:
     GROUP BY status, severity
     """
     rows = query_all(sql)
-    return {"stats": rows}
+    by_severity: dict[str, int] = {}
+    by_provider: dict[str, int] = {}
+    total = 0
+    acknowledged = 0
+    for r in rows:
+        count = int(r["count"] or 0)
+        total += count
+        sev = r["severity"] or "unknown"
+        by_severity[sev] = by_severity.get(sev, 0) + count
+        # provider field not in alerts; use severity as proxy for by_provider
+        by_provider[sev] = by_provider.get(sev, 0) + count
+        if r["status"] == "resolved":
+            acknowledged += count
+    return {
+        "total": total,
+        "by_severity": by_severity,
+        "by_provider": by_provider,
+        "acknowledged": acknowledged,
+        "pending": total - acknowledged,
+        "stats": rows,
+    }
 
 
 @router.get("/alerts/active", dependencies=[Depends(require_auth)])

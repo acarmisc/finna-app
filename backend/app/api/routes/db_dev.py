@@ -50,7 +50,14 @@ async def db_alerts(
     LIMIT %s
     """
     rows = query_all(sql, (_safely_limit(limit),))
-    return {"data": rows, "count": len(rows)}
+    data = []
+    for r in rows:
+        row = dict(r)
+        row["description"] = r.get("body", "")
+        row["is_acknowledged"] = r.get("acknowledged_at") is not None
+        row["cost_impact"] = 0.0
+        data.append(row)
+    return {"data": data, "count": len(rows)}
 
 
 @router.get("/db/configs", dependencies=[Depends(require_auth)])
@@ -66,7 +73,22 @@ async def db_configs(
     LIMIT %s
     """
     rows = query_all(sql, (_safely_limit(limit),))
-    return {"data": rows, "count": len(rows)}
+    data = []
+    for r in rows:
+        row = dict(r)
+        row["service_category"] = r.get("credential_type", "")
+        row["region"] = ""
+        # Config JSON blob
+        cfg = r.get("config") or {}
+        if isinstance(cfg, str):
+            try:
+                import json
+                cfg = json.loads(cfg)
+            except Exception:
+                cfg = {}
+        row["region"] = cfg.get("region", "")
+        data.append(row)
+    return {"data": data, "count": len(rows)}
 
 
 @router.get("/db/extractors", dependencies=[Depends(require_auth)])
