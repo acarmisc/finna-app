@@ -11,19 +11,19 @@ backend_path = Path(__file__).parent.parent / "backend" / "app"
 if str(backend_path) not in sys.path:
     sys.path.insert(0, str(backend_path))
 
-os.environ["PG_DSN"] = "postgresql://test:test@localhost/testdb"
+os.environ["PG_DSN"] = "postgresql://test:***@localhost/testdb"
 os.environ["POOL_MIN_CONNS"] = "1"
 os.environ["POOL_MAX_CONNS"] = "5"
 os.environ["ENCRYPTION_KEY"] = "fd7Em6qcDLS1FfjAgi0oSc6-keC5uK8r8rshY_UVw5I="
 os.environ["JWT_SECRET"] = "test-secret-key"
 os.environ["JWT_ALGORITHM"] = "HS256"
-os.environ["JWT_EXPIRATION_MINUTES"] = "60"  # noqa: E402
+os.environ["JWT_EXPIRATION_MINUTES"] = "60"
 
-from contextlib import asynccontextmanager  # noqa: E402
-from unittest.mock import MagicMock, patch  # noqa: E402
+from contextlib import asynccontextmanager
+from unittest.mock import MagicMock
 
-import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
+import pytest
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture
@@ -58,8 +58,7 @@ def mock_connection():
 @pytest.fixture
 def client(mock_connection, mock_sync_pool):
     """Create test client with mocked dependencies."""
-    import api.db as db_module
-    import api.main as main_module
+    from backend.app.api import main as main_module
 
     original_lifespan = main_module.app.router.lifespan_context
 
@@ -70,14 +69,8 @@ def client(mock_connection, mock_sync_pool):
     main_module.app.router.lifespan_context = noop_lifespan
 
     try:
-        with patch.object(db_module, "get_connection", return_value=mock_connection):
-            with patch.object(db_module, "release_connection"):
-                with patch.object(db_module, "query_one", return_value=None):
-                    with patch.object(db_module, "query_all", return_value=[]):
-                        with patch.object(db_module, "execute"):
-                            with patch.object(db_module, "insert_and_return", return_value="test-id"):
-                                with TestClient(main_module.app, raise_server_exceptions=False) as test_client:
-                                    yield test_client
+        with TestClient(main_module.app, raise_server_exceptions=False) as test_client:
+            yield test_client
     finally:
         main_module.app.router.lifespan_context = original_lifespan
 
@@ -85,8 +78,8 @@ def client(mock_connection, mock_sync_pool):
 @pytest.fixture
 def auth_client(mock_connection, mock_sync_pool):
     """Create test client with mocked dependencies and authentication."""
-    import api.db as db_module
-    import api.main as main_module
+    from backend.app.api import main as main_module
+    from backend.app.api.auth import create_access_token
 
     original_lifespan = main_module.app.router.lifespan_context
 
@@ -97,25 +90,18 @@ def auth_client(mock_connection, mock_sync_pool):
     main_module.app.router.lifespan_context = noop_lifespan
 
     try:
-        with patch.object(db_module, "get_connection", return_value=mock_connection):
-            with patch.object(db_module, "release_connection"):
-                with patch.object(db_module, "query_one", return_value=None):
-                    with patch.object(db_module, "query_all", return_value=[]):
-                        with patch.object(db_module, "execute"):
-                            with patch.object(db_module, "insert_and_return", return_value="test-id"):
-                                from api.auth import create_access_token
-                                token = create_access_token(data={"sub": "testuser"})
-                                auth_headers = {"Authorization": f"Bearer {token}"}
+        token = create_access_token(data={"sub": "testuser"})
+        auth_headers = {"Authorization": f"Bearer {token}"}
 
-                                def patched_request(method, url, **kwargs):
-                                    headers = kwargs.get("headers") or {}
-                                    headers.update(auth_headers)
-                                    kwargs["headers"] = headers
-                                    return original_request(method, url, **kwargs)
+        def patched_request(method, url, **kwargs):
+            headers = kwargs.get("headers") or {}
+            headers.update(auth_headers)
+            kwargs["headers"] = headers
+            return original_request(method, url, **kwargs)
 
-                                with TestClient(main_module.app, raise_server_exceptions=False) as test_client:
-                                    original_request = test_client.request
-                                    test_client.request = lambda m, u, **kw: patched_request(m, u, **kw)
-                                    yield test_client
+        with TestClient(main_module.app, raise_server_exceptions=False) as test_client:
+            original_request = test_client.request
+            test_client.request = lambda m, u, **kw: patched_request(m, u, **kw)
+            yield test_client
     finally:
         main_module.app.router.lifespan_context = original_lifespan

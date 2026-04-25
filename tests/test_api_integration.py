@@ -45,7 +45,7 @@ class TestAuthToken:
     def test_login_success_with_valid_credentials(self, client):
         """Valid credentials return JWT token."""
         # Mock the database query to return a valid user record
-        with patch("api.db.query_one") as mock_query:
+        with patch("backend.app.api.db.query_one") as mock_query:
             mock_query.return_value = {
                 "id": 1,
                 "username": "admin",
@@ -68,7 +68,7 @@ class TestAuthToken:
     @pytest.mark.integration
     def test_login_fails_with_invalid_credentials(self, client):
         """Invalid credentials return 401."""
-        with patch("api.db.query_one") as mock_query:
+        with patch("backend.app.api.db.query_one") as mock_query:
             mock_query.return_value = {
                 "id": 1,
                 "username": "admin",
@@ -89,7 +89,7 @@ class TestAuthToken:
     @pytest.mark.integration
     def test_login_fails_with_nonexistent_user(self, client):
         """Nonexistent user returns 401."""
-        with patch("api.db.query_one") as mock_query:
+        with patch("backend.app.api.db.query_one") as mock_query:
             mock_query.return_value = None
 
             response = client.post(
@@ -104,7 +104,7 @@ class TestAuthToken:
     @pytest.mark.integration
     def test_login_fails_with_disabled_account(self, client):
         """Disabled account returns 403."""
-        with patch("api.db.query_one") as mock_query:
+        with patch("backend.app.api.db.query_one") as mock_query:
             mock_query.return_value = {
                 "id": 1,
                 "username": "admin",
@@ -134,7 +134,7 @@ class TestConfigCrud:
     @pytest.mark.integration
     def test_create_config_success(self, auth_client):
         """Creating a config succeeds and returns config with ID."""
-        with patch("api.db.insert_and_return") as mock_insert:
+        with patch("backend.app.api.db.insert_and_return") as mock_insert:
             mock_insert.return_value = "test-config-id"
 
             response = auth_client.post(
@@ -158,7 +158,7 @@ class TestConfigCrud:
     @pytest.mark.integration
     def test_list_configs_success(self, auth_client):
         """List configs returns array of configs."""
-        with patch("api.db.query_all") as mock_query:
+        with patch("backend.app.api.db.query_all") as mock_query:
             mock_query.return_value = [
                 {
                     "id": "config-1",
@@ -171,7 +171,7 @@ class TestConfigCrud:
                 },
             ]
 
-            with patch("api.utils.encryption.decrypt_config") as mock_decrypt:
+            with patch("utils.encryption.decrypt_config") as mock_decrypt:
                 mock_decrypt.return_value = {"project_id": "test"}
 
                 response = auth_client.get("/api/v1/config")
@@ -186,7 +186,7 @@ class TestConfigCrud:
     @pytest.mark.integration
     def test_get_config_by_id_success(self, auth_client):
         """Get config by ID returns the config."""
-        with patch("api.db.query_one") as mock_query:
+        with patch("backend.app.api.db.query_one") as mock_query:
             mock_query.return_value = {
                 "id": "config-1",
                 "provider": "gcp",
@@ -197,7 +197,7 @@ class TestConfigCrud:
                 "updated_at": "2025-04-22T12:00:00+00:00",
             }
 
-            with patch("api.utils.encryption.decrypt_config") as mock_decrypt:
+            with patch("utils.encryption.decrypt_config") as mock_decrypt:
                 mock_decrypt.return_value = {"project_id": "test"}
 
                 response = auth_client.get("/api/v1/config/config-1")
@@ -210,7 +210,7 @@ class TestConfigCrud:
     @pytest.mark.integration
     def test_get_config_not_found(self, auth_client):
         """Get nonexistent config returns 404."""
-        with patch("api.db.query_one") as mock_query:
+        with patch("backend.app.api.db.query_one") as mock_query:
             mock_query.return_value = None
 
             response = auth_client.get("/api/v1/config/nonexistent-id")
@@ -222,7 +222,7 @@ class TestConfigCrud:
     @pytest.mark.integration
     def test_update_config_success(self, auth_client):
         """Updating a config succeeds and returns updated config."""
-        with patch("api.db.query_one") as mock_query:
+        with patch("backend.app.api.db.query_one") as mock_query:
             mock_query.return_value = {
                 "id": "config-1",
                 "provider": "gcp",
@@ -233,10 +233,10 @@ class TestConfigCrud:
                 "updated_at": "2025-04-22T12:01:00+00:00",
             }
 
-            with patch("api.utils.encryption.encrypt_config") as mock_encrypt:
+            with patch("utils.encryption.encrypt_config") as mock_encrypt:
                 mock_encrypt.return_value = '{"project_id": "test"}'
 
-                with patch("api.utils.encryption.decrypt_config") as mock_decrypt:
+                with patch("utils.encryption.decrypt_config") as mock_decrypt:
                     mock_decrypt.return_value = {"project_id": "test"}
 
                     response = auth_client.put(
@@ -252,7 +252,7 @@ class TestConfigCrud:
     @pytest.mark.integration
     def test_delete_config_success(self, auth_client):
         """Deleting a config succeeds and returns 204."""
-        with patch("api.db.execute") as mock_execute:
+        with patch("backend.app.api.db.execute") as mock_execute:
             response = auth_client.delete("/api/v1/config/config-1")
 
             assert response.status_code == 204
@@ -270,14 +270,14 @@ class TestConfigTestEndpoint:
     @pytest.mark.integration
     def test_config_test_gcp_success(self, auth_client):
         """Testing GCP config returns ok=True."""
-        with patch("api.db.query_one") as mock_query:
+        with patch("backend.app.api.db.query_one") as mock_query:
             mock_query.return_value = {
                 "provider": "gcp",
                 "credential_type": "service_principal",
                 "config": '{"project_id": "test-project"}',
             }
 
-            with patch("api.utils.encryption.decrypt_config") as mock_decrypt:
+            with patch("utils.encryption.decrypt_config") as mock_decrypt:
                 mock_decrypt.return_value = {"project_id": "test-project"}
 
                 with patch("google.auth.default") as mock_google_auth:
@@ -295,14 +295,14 @@ class TestConfigTestEndpoint:
     @pytest.mark.integration
     def test_config_test_azure_success(self, auth_client):
         """Testing Azure config returns ok=True."""
-        with patch("api.db.query_one") as mock_query:
+        with patch("backend.app.api.db.query_one") as mock_query:
             mock_query.return_value = {
                 "provider": "azure",
                 "credential_type": "service_account",
                 "config": '{"tenant_id": "test", "client_id": "test", "client_secret": "test"}',
             }
 
-            with patch("api.utils.encryption.decrypt_config") as mock_decrypt:
+            with patch("utils.encryption.decrypt_config") as mock_decrypt:
                 mock_decrypt.return_value = {
                     "tenant_id": "test",
                     "client_id": "test",
@@ -326,7 +326,7 @@ class TestConfigTestEndpoint:
     @pytest.mark.integration
     def test_config_test_not_found(self, auth_client):
         """Testing nonexistent config returns 404."""
-        with patch("api.db.query_one") as mock_query:
+        with patch("backend.app.api.db.query_one") as mock_query:
             mock_query.return_value = None
 
             response = auth_client.post("/api/v1/config/nonexistent/test")
@@ -347,7 +347,7 @@ class TestExtractorRun:
     @pytest.mark.integration
     def test_run_extractor_success(self, auth_client):
         """Running an extractor succeeds and returns run_id."""
-        with patch("api.runner.start_extractor") as mock_start:
+        with patch("backend.app.api.runner.start_extractor") as mock_start:
             mock_start.return_value = "run-123"
 
             response = auth_client.post(
@@ -375,7 +375,7 @@ class TestExtractorRun:
     @pytest.mark.integration
     def test_list_extractors_status_success(self, auth_client):
         """Listing extractor status succeeds and returns runs."""
-        with patch("api.runner.list_runs") as mock_list:
+        with patch("backend.app.api.runner.list_runs") as mock_list:
             mock_list.return_value = [
                 {
                     "id": "run-1",
@@ -400,7 +400,7 @@ class TestExtractorRun:
     @pytest.mark.integration
     def test_list_extractors_status_empty(self, auth_client):
         """Listing extractor status when no runs returns empty list."""
-        with patch("api.runner.list_runs") as mock_list:
+        with patch("backend.app.api.runner.list_runs") as mock_list:
             mock_list.return_value = []
 
             response = auth_client.get("/api/v1/extractors/status")
@@ -413,7 +413,7 @@ class TestExtractorRun:
     @pytest.mark.integration
     def test_get_extractor_run_success(self, auth_client):
         """Getting extractor run by ID succeeds."""
-        with patch("api.runner.get_run_status") as mock_get:
+        with patch("backend.app.api.runner.get_run_status") as mock_get:
             mock_get.return_value = {
                 "id": "run-1",
                 "provider": "gcp",
@@ -434,7 +434,7 @@ class TestExtractorRun:
     @pytest.mark.integration
     def test_get_extractor_run_not_found(self, auth_client):
         """Getting nonexistent run returns 404."""
-        with patch("api.runner.get_run_status") as mock_get:
+        with patch("backend.app.api.runner.get_run_status") as mock_get:
             mock_get.return_value = None
 
             response = auth_client.get("/api/v1/extractors/run/nonexistent")
@@ -446,7 +446,7 @@ class TestExtractorRun:
     @pytest.mark.integration
     def test_cancel_extractor_run_success(self, auth_client):
         """Canceling an extractor run succeeds."""
-        with patch("api.runner.cancel_run") as mock_cancel:
+        with patch("backend.app.api.runner.cancel_run") as mock_cancel:
             mock_cancel.return_value = True
 
             response = auth_client.post("/api/v1/extractors/run/run-1/cancel")
@@ -458,7 +458,7 @@ class TestExtractorRun:
     @pytest.mark.integration
     def test_cancel_extractor_run_not_found(self, auth_client):
         """Canceling nonexistent run returns 404."""
-        with patch("api.runner.cancel_run") as mock_cancel:
+        with patch("backend.app.api.runner.cancel_run") as mock_cancel:
             mock_cancel.return_value = False
 
             response = auth_client.post("/api/v1/extractors/run/nonexistent/cancel")
@@ -503,7 +503,7 @@ class TestAuthRequiredEndpoints:
     @pytest.mark.integration
     def test_auth_token_does_not_require_auth(self, client):
         """Token endpoint does not require auth."""
-        with patch("api.db.query_one") as mock_query:
+        with patch("backend.app.api.db.query_one") as mock_query:
             mock_query.return_value = {
                 "id": 1,
                 "username": "admin",
