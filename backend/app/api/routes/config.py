@@ -419,7 +419,10 @@ async def delete_config(config_id: str) -> None:
 @router.get("/configs", dependencies=[Depends(require_auth)])
 async def cli_config_list() -> dict[str, Any]:
     """CLI-compatible config list wrapper."""
-    rows = query_all("SELECT id, provider, name, credential_type, config, created_at, updated_at FROM cloud_config ORDER BY provider, name")
+    rows = query_all(
+        "SELECT id, provider, name, credential_type, config, created_at, updated_at "
+        "FROM cloud_config ORDER BY provider, name"
+    )
     data = [
         {
             "id": r["id"],
@@ -480,7 +483,11 @@ async def cli_configs_create(data: _ConfigCreate) -> dict[str, Any]:
     if data.cloud_config:
         cfg_dict["cloud_config"] = data.cloud_config
     insert_and_return(
-        "INSERT INTO cloud_config (id, provider, name, credential_type, config, created_at, updated_at) VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+        (
+            "INSERT INTO cloud_config "
+            "(id, provider, name, credential_type, config, created_at, updated_at) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id"
+        ),
         (cfg_id, data.provider, f"{data.provider} config", data.service_category or "unknown", cfg_dict, now, now),
     )
     return {

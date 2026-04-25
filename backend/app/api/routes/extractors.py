@@ -9,9 +9,9 @@ from fastapi import APIRouter, Depends, HTTPException
 # Import auth module from parent package
 from .. import auth as auth_module
 
-require_auth = auth_module.require_auth
+require_auth = auth_module.require_auth  # noqa: E402
 
-from ..runner import cancel_run, get_run_status, list_runs, start_extractor
+from ..runner import cancel_run, get_run_status, list_runs, start_extractor  # noqa: E402
 
 router = APIRouter()
 

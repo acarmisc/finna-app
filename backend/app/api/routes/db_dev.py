@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Query
 from .. import auth as auth_module
 
 require_auth = auth_module.require_auth
-from ..db import query_all
+from ..db import query_all  # noqa: E402
 
 router = APIRouter()
 
