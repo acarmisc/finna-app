@@ -67,10 +67,16 @@ async def db_session_middleware(request: Request, call_next: Any) -> Any:
     return response
 
 
-# Health check endpoint
+# Health check endpoints
 @app.get("/health")
 async def health() -> dict[str, str]:
     """Basic health check."""
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+
+@app.get("/healthz")
+async def healthz() -> dict[str, str]:
+    """Basic health check (alias for /health)."""
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
 
