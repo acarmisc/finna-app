@@ -19,11 +19,12 @@ os.environ["JWT_SECRET"] = "test-secret-key"
 os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ["JWT_EXPIRATION_MINUTES"] = "60"
 
-from contextlib import asynccontextmanager
-from unittest.mock import MagicMock
+# noq
+from contextlib import asynccontextmanager  # noqa: E402
+from unittest.mock import MagicMock  # noqa: E402
 
-import pytest
-from fastapi.testclient import TestClient
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
 
 @pytest.fixture
