@@ -10,9 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from .. import auth as auth_module
 
-require_auth = auth_module.require_auth
-from ..db import execute, insert_and_return, query_all, query_one
-from ..runner import start_extractor
+require_auth = auth_module.require_auth  # noqa: E402
+from ..db import execute, insert_and_return, query_all, query_one  # noqa: E402
+from ..runner import start_extractor  # noqa: E402
 
 router = APIRouter()
 

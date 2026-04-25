@@ -104,7 +104,7 @@ async def db_stats() -> JSONResponse:
 
 # Mount routers
 from api.routes import auth, extractors  # noqa: E402
-from api.routes import config as config_router
+from api.routes import config as config_router  # noqa: E402
 
 app.include_router(config_router.router, prefix="/api/v1", tags=["config"])
 app.include_router(extractors.router, prefix="/api/v1", tags=["extractors"])

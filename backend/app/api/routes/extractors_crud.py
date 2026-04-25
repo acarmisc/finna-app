@@ -11,9 +11,9 @@ from fastapi import APIRouter, Depends, HTTPException
 # Import auth module from parent package
 from .. import auth as auth_module
 
-require_auth = auth_module.require_auth
+require_auth = auth_module.require_auth  # noqa: E402
 
-from ..models import (
+from ..models import (  # noqa: E402
     ExtractorCreate,
     ExtractorListResponse,
     ExtractorResponse,
@@ -118,9 +118,12 @@ async def create_extractor(data: ExtractorCreate) -> dict[str, Any]:
     now = datetime.now(timezone.utc)
 
     sql = """
-        INSERT INTO extractors (id, name, provider, extractor_type, enabled, schedule, config_id, status, created_at)
+        INSERT INTO extractors (
+            id, name, provider, extractor_type, enabled, schedule, config_id, status, created_at
+        )
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING id, name, provider, extractor_type, enabled, schedule, config_id, status, last_run_id, last_run_at, created_at, updated_at
+        RETURNING id, name, provider, extractor_type, enabled, schedule, config_id,
+                  status, last_run_id, last_run_at, created_at, updated_at
     """
 
     result = insert_and_return(
@@ -182,7 +185,8 @@ async def update_extractor(extractor_id: str, data: ExtractorUpdate) -> dict[str
         UPDATE extractors
         SET {", ".join(updates)}
         WHERE id = %s
-        RETURNING id, name, provider, extractor_type, enabled, schedule, config_id, status, last_run_id, last_run_at, created_at, updated_at
+        RETURNING id, name, provider, extractor_type, enabled, schedule, config_id,
+                  status, last_run_id, last_run_at, created_at, updated_at
     """
 
     result = query_one(sql, tuple(params))
@@ -201,7 +205,7 @@ async def delete_extractor(extractor_id: str) -> None:
     execute("DELETE FROM extractors WHERE id = %s", (extractor_id,))
 
 
-@router.post("/extractors/{extractor_id}/trigger", response_model=ExtractorRunTriggerResponse, dependencies=[Depends(require_auth)])
+@router.post("/extractors/{extractor_id}/trigger", response_model=ExtractorRunTriggerResponse, dependencies=[Depends(require_auth)])  # noqa: E501
 async def trigger_extractor_run(extractor_id: str, data: ExtractorRunTriggerRequest | None = None) -> dict[str, Any]:
     """Trigger a run for an extractor."""
     from ..db import query_one

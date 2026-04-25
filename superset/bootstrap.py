@@ -281,7 +281,11 @@ FINOPS_OVERVIEW_DASHBOARD = {
             "datasource": "daily_costs",
             "groupby": ["provider"],
             "metrics": [{"expressionType": "SQL", "sqlExpression": "SUM(total_cost)", "label": "cost"}],
-            "sql": "SELECT provider, SUM(total_cost) AS cost FROM daily_costs WHERE day >= CURRENT_DATE - 30 GROUP BY provider ORDER BY cost DESC",
+            "sql": (
+                "SELECT provider, SUM(total_cost) AS cost "
+                "FROM daily_costs WHERE day >= CURRENT_DATE - 30 "
+                "GROUP BY provider ORDER BY cost DESC"
+            ),
             "time_range": "Last 30 days",
         },
         {
@@ -292,7 +296,11 @@ FINOPS_OVERVIEW_DASHBOARD = {
             "groupby": ["provider"],
             "x_axis": "day",
             "metrics": [{"expressionType": "SQL", "sqlExpression": "SUM(total_cost)", "label": "daily_cost"}],
-            "sql": "SELECT day, provider, SUM(total_cost) AS daily_cost FROM daily_costs WHERE day >= CURRENT_DATE - 90 GROUP BY day, provider ORDER BY day",
+            "sql": (
+                "SELECT day, provider, SUM(total_cost) AS daily_cost "
+                "FROM daily_costs WHERE day >= CURRENT_DATE - 90 "
+                "GROUP BY day, provider ORDER BY day"
+            ),
             "time_range": "Last 90 days",
         },
         {
@@ -302,7 +310,11 @@ FINOPS_OVERVIEW_DASHBOARD = {
             "datasource": "daily_costs",
             "groupby": ["project_id"],
             "metrics": [{"expressionType": "SQL", "sqlExpression": "SUM(total_cost)", "label": "cost"}],
-            "sql": "SELECT project_id, SUM(total_cost) AS cost FROM daily_costs WHERE day >= CURRENT_DATE - 30 GROUP BY project_id ORDER BY cost DESC LIMIT 10",
+            "sql": (
+                "SELECT project_id, SUM(total_cost) AS cost "
+                "FROM daily_costs WHERE day >= CURRENT_DATE - 30 "
+                "GROUP BY project_id ORDER BY cost DESC LIMIT 10"
+            ),
             "time_range": "Last 30 days",
         },
         {
@@ -315,7 +327,12 @@ FINOPS_OVERVIEW_DASHBOARD = {
                 {"expressionType": "SQL", "sqlExpression": "SUM(total_cost)", "label": "cost"},
                 {"expressionType": "SQL", "sqlExpression": "SUM(record_count)", "label": "records"},
             ],
-            "sql": "SELECT service_category, SUM(total_cost) AS cost, SUM(record_count) AS records FROM daily_costs WHERE day >= CURRENT_DATE - 30 GROUP BY service_category ORDER BY cost DESC",
+            "sql": (
+                "SELECT service_category, SUM(total_cost) AS cost, "
+                "SUM(record_count) AS records "
+                "FROM daily_costs WHERE day >= CURRENT_DATE - 30 "
+                "GROUP BY service_category ORDER BY cost DESC"
+            ),
             "time_range": "Last 30 days",
         },
     ],
