@@ -15,6 +15,7 @@ from typing import Any, Optional
 
 from psycopg.rows import dict_row
 
+from utils.encryption import decrypt_config
 from .metrics import extractor_duration_seconds, extractor_run_total
 
 logger = logging.getLogger("api.runner")
@@ -164,7 +165,7 @@ def start_extractor(
     if not row:
         raise ValueError(f"Config {config_id} not found")
 
-    config = row["config"]
+    config = decrypt_config(row["config"])
     config["credential_type"] = row["credential_type"]
 
     run_id = str(uuid.uuid4())

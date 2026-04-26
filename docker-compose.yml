@@ -21,14 +21,15 @@ services:
   postgres:
     image: postgres:16-alpine
     ports:
-      - "5433:5432"
+      - "5434:5432"
     environment:
       POSTGRES_DB: finops
       POSTGRES_USER: finops
       POSTGRES_PASSWORD: finops_dev
     volumes:
       - pg_data:/var/lib/postgresql/data
-      - ./sql/init_docker.sql:/docker-entrypoint-initdb.d/00-schema.sql
+      - ./sql/init_docker.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./sql/seed_demo.sql:/docker-entrypoint-initdb.d/02-seed.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U finops"]
       interval: 5s
