@@ -7,9 +7,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [Session: 2026-04-26] - GKE Staging Deployment & Azure Extraction Fix
 
-- **FastAPI Orchestrator** - New API service for cloud credential management
+### Goal
+
+Deploy finna-app staging on GKE with Cloud SQL PostgreSQL connection and verify
+Azure cost extraction works with stored SP credentials.
+
+### Infrastructure
+
+- **Cluster**: `gke_abs-digital-playground_europe-west1_abs-ces-n8w`
+- **Namespace**: `finna-app-staging`
+- **Cloud SQL**: `ces-dev-db-03` private IP `10.1.128.19:5432`
+- **Database**: `finna-staging` (user: `finna-staging`, password: `abstract.2026.A`)
+- **Ingress**: Traefik with letsencrypt-prod, LB `34.79.180.243`
+- **API URL**: `https://finna-app.ces.abssrv.it`
+
+### Key Issues Fixed
+
+1. **Encrypted credentials not decrypted in runner.py**
+   - `cloud_config.client_secret` is stored as Fernet-encrypted blob (`__enc__: True`)
+   - `runner.py` was reading `config.get("client_secret")` which returned `None`
+   - This caused `AZURE_AUTH_METHOD=cli` fallback → `DefaultAzureCredential` → all RGs failed
+   - **Fix**: Added `decrypt_config()` call before building subprocess env vars
+
+2. **AZURE_TENANT_ID/AZURE_CLIENT_ID/AZURE_CLIENT_SECRET not passed to extractor**
+   - When `azure_cost.py` builds `multi_subs` from saved subscription selections,
+     it was not including `tenant_id/client_id/client_secret` from env vars
+   - **Fix**: Modified `azure_cost.py` to include credentials from env vars when
+     building multi_subs selections so `ClientSecretCredential` is used
+
+3. **async pool initialization mismatch**
+   - `main.py` called `init_pool()` but pool method was `init_async_pool()`
+   - `close_pool()` → `close_pools()`, connection uses `async with` context manager
+
+### Azure Extraction Results
+
+- **9,504 records** extracted across 22 resource groups in ~10 minutes
+- All 22 RGs succeeded with `ClientSecretCredential` authentication
+- Resource groups: ABS-ATOS-DEV (38), ABS-DEVOPS-RESOURCES (527), ABS-GEOSTRATEGY-DEV (341),
+  ABS-SHIELD-DEV (324), ABS-TEST-GEN-AI (155), ABS-VSP (56), MyLux4Consumers (720),
+  OrderTracker (186), RayBanDev (348), Recon3Dev (655), Recon3Test (620), RedCarpet (1073),
+  Sgsfs (777), SmartRetailOperations (867), WCS-Test (175), databricks-rg-shield-dev-dbks (207),
+  MC_ABS-DEVOPS-RESOURCES (589), MC_ABS-GEOSTRATEGY-DEV (434), MC_ABS-SHIELD-DEV (435),
+  MC_ABS-SITE-DEV_abssitedevaks (367), MC_ABS-SITE-DEV_abssitedevaks-bck (57),
+  MC_SmartRetailOperations_sro2-aks (553)
+
+### Files Created/Modified
+
+| File | Status |
+|------|--------|
+| `config/__init__.py` | Created |
+| `config/auth.py` | Created |
+| `k8s/overlays/staging-deploy/namespace.yaml` | Created |
+| `k8s/overlays/staging-deploy/configmap.yaml` | Created |
+| `k8s/overlays/staging-deploy/serviceaccount.yaml` | Created |
+| `k8s/overlays/staging-deploy/deployment.yaml` | Created |
+| `k8s/overlays/staging-deploy/service.yaml` | Created |
+| `k8s/overlays/staging-deploy/ingress.yaml` | Created |
+| `backend/app/api/runner.py` | Modified (decrypt_config fix) |
+| `extractors/azure_cost.py` | Modified (multi-subs credential fix) |
+| `backend/app/api/main.py` | Modified (async pool fix) |
+| `Dockerfile.api` | Modified (add config/ module) |
+| `docker-compose.yml` | Modified |
+
+---
+
+## [Session: 2026-04-14] - FastAPI Orchestrator Implementation
   - `api/main.py` - FastAPI app with healthz endpoint
   - `api/db.py` - PostgreSQL connection pool and query helpers
   - `api/models.py` - Pydantic schemas for request/response
@@ -39,7 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Auth proxy (`api/routes/auth.py`) not fully tested
 - K8s manifests not yet implemented (Fase 7 of implementation plan)
-- Records count shows 0 in API response even when records were extracted (parsing issue in runner.py)
+- ~~Records count shows 0 in API response even when records were extracted~~ - **Fixed** (9,504 records extracted in latest run)
 
 ---
 
