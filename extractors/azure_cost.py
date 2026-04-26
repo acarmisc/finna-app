@@ -818,9 +818,9 @@ def main() -> None:
                 prefix = sid.replace("-", "_").upper()[:20]
                 multi_subs[prefix] = {
                     "subscription_id": sid,
-                    "tenant_id": "",
-                    "client_id": "",
-                    "client_secret": "",
+                    "tenant_id": sub.get("tenant_id", ""),
+                    "client_id": sub.get("client_id", ""),
+                    "client_secret": sub.get("client_secret", ""),
                     "scope": "subscription",
                     "resource_groups": sub.get("resource_groups", []),
                 }

@@ -40,30 +40,21 @@ __all__ = ["app", "auth", "db", "routes"]
 @app.on_event("startup")
 async def startup_event() -> None:
     """Initialize database connection pool on startup."""
-    await db.init_pool()
+    await db.init_async_pool()
 
 
 @app.on_event("shutdown")
 async def shutdown_event() -> None:
     """Close database connection pool on shutdown."""
-    await db.close_pool()
+    db.close_pools()
 
 
 @app.middleware("http")
-async def rate_limit_middleware_handler(request: Request, call_next: Any) -> Any:
-    """Apply rate limiting middleware."""
-    return await rate_limit_module.rate_limit_middleware(request, call_next)
-
-
-app.middleware("http")
 async def db_session_middleware(request: Request, call_next: Any) -> Any:
     """Attach database connection to request."""
-    conn = await db.get_connection()
-    request.state.db = conn
-    try:
+    async with db.get_async_connection() as conn:
+        request.state.db = conn
         response = await call_next(request)
-    finally:
-        await db.release_connection(conn)
     return response
 
 
@@ -90,16 +81,13 @@ async def api_health() -> JSONResponse:
     # Check database connection
     conn = None
     try:
-        conn = await db.get_connection()
-        await conn.fetchrow("SELECT 1")
-        status["database"] = "ok"
+        async with db.get_async_connection() as conn:
+            await conn.execute("SELECT 1")
+            status["database"] = "ok"
     except Exception as e:
         status["error"] = str(e)
         status["database"] = f"error: {e}"
         status["status"] = "degraded"
-    finally:
-        if conn is not None:
-            await db.release_connection(conn)
 
     return JSONResponse(status, status_code=200 if status["status"] == "ok" else 503)
 

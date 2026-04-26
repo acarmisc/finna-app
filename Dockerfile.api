@@ -28,8 +28,8 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy the backend folder (FastAPI app)
 COPY backend/ ./backend/
-COPY models/ ./models/
 COPY config/ ./config/
+COPY models/ ./models/
 COPY extractors/ ./extractors/
 COPY sql/ ./sql/
 COPY utils/ ./utils/
