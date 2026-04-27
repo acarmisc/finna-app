@@ -7,6 +7,79 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [Session: 2026-04-27] - Azure Cronjob API-Triggered Extraction
+
+### Goal
+
+Fix Azure extraction workflow: cronjob should trigger API instead of direct extractor,
+poll for completion status, then complete job with success/failure.
+
+### Problem
+
+Previously, cronjob tried to run extractors directly with Kubernetes secrets.
+But finna-app stores credentials in PostgreSQL `cloud_config` table and triggers
+extractors via API. The Kubernetes secrets approach was mismatched.
+
+### Solution
+
+- **Cronjob now triggers API**: `POST /api/v1/extractors/run` endpoint
+- **Polling**: Cronjob monitors `GET /api/v1/extractors/run/{id}` until completion
+- **Final status**: Job completes with success/failure based on API extraction result
+- **Auth via secrets**: API_USERNAME/API_PASSWORD stored in Kubernetes secret
+
+### Architecture Changes
+
+| Component | Old Approach | New Approach |
+|-----------|-------------|--------------|
+| Credentials | `k8s secrets` | DB `cloud_config` + API auth |
+| Extraction | Direct subprocess | API-triggered subprocess |
+| Status | Command exit code | API status polling |
+| Cronjob | `finops-extractor:latest` | API image (`api:latest`) |
+
+### Environment Variables
+
+| Variable | Purpose |
+|----------|---------|
+| `EXTRACTOR_PROVIDER` | Provider name (`azure`, `gcp`) |
+| `CONFIG_ID` | Cloud config ID from DB (default: 1) |
+| `API_URL` | API endpoint URL |
+| `AUTH_USERNAME` | API basic auth username |
+| `AUTH_PASSWORD` | API basic auth password |
+| `PG_DSN` | PostgreSQL connection for status checks |
+
+### Testing
+
+```bash
+# Trigger manual extraction
+kubectl create job --from=cronjob/finops-extractor-azure manual-azure-extract -n finna-app-staging
+
+# Check status
+kubectl get jobs manual-azure-extract -n finna-app-staging
+kubectl get pods -l job-name=manual-azure-extract -n finna-app-staging
+
+# Watch API logs
+kubectl logs -f deployment/finops-api -n finna-app-staging
+```
+
+### Files Created/Modified
+
+| File | Status |
+|------|--------|
+| `k8s/base/cronjob-azure.yaml` | Modified (API-triggered extraction) |
+| `k8s/base/secret.yaml` | Modified (added API credentials, full Azure config) |
+
+### Next Steps
+
+- Test actual extraction with polling
+- Verify status updates in `extractor_runs` table
+- Confirm job completion status matches extraction result
+- Add metrics endpoint for observability
+- Consider adding `activeDeadlineSeconds` to prevent stuck jobs
+
+---
+
+## [Session: 2026-04-26] - GKE Staging Deployment & Azure Extraction Fix
+
 ## [Session: 2026-04-26] - GKE Staging Deployment & Azure Extraction Fix
 
 ### Goal
