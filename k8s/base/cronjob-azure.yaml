@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: finops-extractor-azure
-  namespace: finops
+  namespace: finna-app-staging
   labels:
     app: finops-extractor
     extractor: azure-cost
@@ -11,7 +11,6 @@ spec:
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
-  activeDeadlineSeconds: 3600
   jobTemplate:
     spec:
       backoffLimit: 2
@@ -28,31 +27,25 @@ spec:
             fsGroup: 1000
           containers:
           - name: extractor
-            image: finops-extractor:latest
-            imagePullPolicy: IfNotPresent
+            image: europe-west1-docker.pkg.dev/abs-digital-playground/finna-app-staging/api:latest
+            imagePullPolicy: Always
             env:
-            - name: EXTRACTOR_TYPE
-              value: "azure_cost"
-            - name: AZURE_SUBSCRIPTION_ID
+            - name: EXTRACTOR_PROVIDER
+              value: "azure"
+            - name: CONFIG_ID
+              value: "1"
+            - name: API_URL
+              value: "http://finops-api.finna-app-staging.svc.cluster.local:8000"
+            - name: AUTH_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: finops-secret
-                  key: AZURE_SUBSCRIPTION_ID
-            - name: AZURE_TENANT_ID
+                  key: API_USERNAME
+            - name: AUTH_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: finops-secret
-                  key: AZURE_TENANT_ID
-            - name: AZURE_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: finops-secret
-                  key: AZURE_CLIENT_ID
-            - name: AZURE_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: finops-secret
-                  key: AZURE_CLIENT_SECRET
+                  key: API_PASSWORD
             - name: PG_DSN
               valueFrom:
                 secretKeyRef:
