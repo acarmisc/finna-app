@@ -124,6 +124,31 @@ export class APIClient {
     const qs = range ? `?range=${range}` : ''
     return this.request(`/api/v1/dashboard/stats${qs}`)
   }
+  async getTopProjects(range?: string, limit?: number): Promise<ApiResponse<any>> {
+    return this.request(`/api/v1/projects/top?range=${range || 'mtd'}&limit=${limit || 5}`)
+  }
+  async getRecentRuns(limit: number = 10): Promise<ApiResponse<any>> {
+    return this.request(`/api/v1/extractors/runs?limit=${limit}`)
+  }
+  
+  // --- Alerts ---
+  async getAlertingRules(): Promise<ApiResponse<any>> { return this.request(`/api/v1/alerts/rules`) }
+  async createAlertingRule(data: any): Promise<ApiResponse<any>> {
+    return this.request(`/api/v1/alerts/rules`, { method: 'POST', body: JSON.stringify(data) })
+  }
+  
+  // --- Settings ---
+  async getProfile(): Promise<ApiResponse<any>> { return this.request(`/api/v1/auth/profile`) }
+  async updateProfile(data: any): Promise<ApiResponse<any>> {
+    return this.request(`/api/v1/auth/profile`, { method: 'PUT', body: JSON.stringify(data) })
+  }
+  async getApiKeys(): Promise<ApiResponse<any>> { return this.request(`/api/v1/auth/api-keys`) }
+  async createApiKey(name: string, scopes: string[]): Promise<ApiResponse<any>> {
+    return this.request(`/api/v1/auth/api-keys`, { method: 'POST', body: JSON.stringify({ name, scopes }) })
+  }
+  async deleteApiKey(id: string): Promise<ApiResponse<any>> {
+    return this.request(`/api/v1/auth/api-keys/${id}`, { method: 'DELETE' })
+  }
 }
 
 let client: APIClient | null = null

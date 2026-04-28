@@ -7,6 +7,8 @@ import { ProviderBadge } from '@/components/shared/provider-badge'
 import { money } from '@/components/shared/money'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useQuery } from '@tanstack/react-query'
+import { getApiClient } from '@/services/apiClient'
 
 // richer mock data
 const MOCK = {
