@@ -47,9 +47,10 @@ kubectl rollout status deployment/finna-console -n finna-app-staging --timeout=1
 
 ### Endpoints
 
-- **Frontend UI**: `https://finna-app-ui.ces.abssrv.it`
+- **Frontend UI**: `https://finna-app-ui.ces.abssrv.it` ✅ live (2/2 pods ready)
 - **Backend API**: `https://finna-app.ces.abssrv.it/api/v1`
 - **Namespace GKE**: `finna-app-staging`
+- **Ingress**: Traefik con TLS su REDACTED-LB-IP
 
 ### Login
 
