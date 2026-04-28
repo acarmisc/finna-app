@@ -1,121 +1,71 @@
 # FinOps Console
 
-A modern FinOps monitoring dashboard built with React, TypeScript, Vite, and Tailwind CSS.
+**FinOps Console** è una dashboard multi-cloud per il monitoraggio dei costi di Azure, GCP e LLM API.
 
-## 🚀 Features
+![Dashboard](screenshots/01-dashboard.png)
 
-- **Multi-cloud Cost Monitoring**: Track Azure, GCP, and LLM costs in one place
-- **Real-time Dashboard**: Visualize cost trends with interactive charts
-- **Alert Management**: Monitor andacknowledge alerts from all providers
-- **Job Scheduler**: Trigger and monitor cost extraction jobs
-- **Configuration Management**: Manage cloud provider credentials securely
-- **Responsive Design**: Works on desktop, tablet, and mobile devices
+## Caratteristiche principali
 
-## 🎨 Design System
+- **Dashboard**: overview MTD/7d/30d/90d con 4 KPI card (Total, Azure, GCP, LLM), trend daily, top projects, LLM spend breakdown, recent extractor runs
+- **Projects**: lista progetti con budget cap, % di utilizzo, progress bar colorati (verde <70%, giallo 70-90%, rosso >90%), filtri
+- **Cost Explorer**: tabella dettagliata per SKU, raggruppamento by SKU, stacked area chart per provider, filtri multipli
+- **Alerts**: stat cards (total/firing/pending/resolved), lista alert con stato, condition, threshold e valore corrente
+- **Cloud Configs**: gestione credenziali Azure (service principal, managed identity) e GCP (service account key)
+- **Settings**: preferenze utente, notification channels (telegram/slack/email), API keys, retention dati
 
-FinOps Console follows a "pixel-art corporate" design philosophy:
-- Sharp corners, visible borders
-- Mono numerics for consistent data display
-- Flat color blocks
-- Bracketed button labels like `[ RUN EXTRACTOR ]`
+## Design System
 
-## 🛠️ Tech Stack
+Pixel-art dark theme con:
+- Font: `JetBrains Mono` per numeri e label, `Inter` per il testo
+- Bordi netti, no shadow, no blur
+- Button con bracket style `[label]`
+- Colori semantic: `--accent` (primario verde), `--danger` (rosso), `--warning` (giallo), provider badges (`--azure`, `--gcp`, `--llm`)
 
-- **Frontend**: React 18, TypeScript, Vite
-- **UI Library**: shadcn/ui (new-york-v4 registry)
-- **Styling**: Tailwind CSS v4 with custom design tokens
-- **State Management**: Zustand, TanStack Query
-- **Authentication**: JWT Bearer tokens
+## Deployment
 
-## 📸 Screenshots
+### Prerequisiti
 
-### Dashboard
-The main dashboard provides a high-level overview of costs, alerts, and extractors.
+- Accesso GCP con `gcloud` autenticato: `gcloud auth login`
+- Docker installato
+- kubectl configurato per il cluster `REDACTED-CLUSTER-NAME`
 
-### Extractors Page
-Manage and trigger cost extraction jobs with detailed run history.
-
-### Configuration
-Securely manage cloud provider credentials for Azure and GCP.
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Node.js 20+
-- pnpm (recommended) or npm
-
-### Installation
+### Build e push
 
 ```bash
-# Clone the repository
-git clone https://github.com/acarmisc/finna-app-ui.git
-cd finna-app-ui
+cd /root/projects/finna-app-ui
+npm run build
 
-# Install dependencies
-pnpm install
+# Build e push Docker image
+docker build -t finna-frontend:latest .
+docker tag finna-frontend:latest europe-west1-docker.pkg.dev/abs-digital-playground/finna-app-staging/frontend:latest
+docker push europe-west1-docker.pkg.dev/abs-digital-playground/finna-app-staging/frontend:latest
 
-# Start the development server
-pnpm dev
+# Rollout su GKE
+kubectl rollout restart deployment/finna-console -n finna-app-staging
+kubectl rollout status deployment/finna-console -n finna-app-staging --timeout=120s
 ```
 
-### Build
+### Endpoints
 
-```bash
-pnpm build
-pnpm preview
+- **Frontend UI**: `https://finna-app-ui.ces.abssrv.it`
+- **Backend API**: `https://finna-app.ces.abssrv.it/api/v1`
+- **Namespace GKE**: `finna-app-staging`
+
+### Login
+
+```
+Username: admin
+Password: admin
 ```
 
-## 🌍 API Endpoints
+## Pagina aggiuntive (tutte implementate)
 
-The frontend connects to the FinOps Backend API at `/api/v1/`:
+- `/projects/:slug` — dettagio progetto con breakdown SKU
+- `/configs/new` — wizard 3 step per nuova configurazione cloud
+- `/runs` — storico run degli extractor
+- `/sources` — elenco data sources con health status
 
-- `POST /api/v1/auth/login` - Login and get JWT token
-- `GET /api/v1/config` - List cloud configurations
-- `GET /api/v1/config/projects` - List FinOps projects
-- `GET /api/v1/costs` - List cost records
-- `GET /api/v1/costs/totals` - Get aggregated costs
-- `GET /api/v1/costs/daily` - Daily cost breakdown
-- `GET /api/v1/alerts` - List alerts
-- `GET /api/v1/extractors/status` - Get extractor runs
-- `POST /api/v1/extractors/run` - Trigger an extractor
+---
 
-## 🔐 Authentication
-
-All API endpoints (except `/healthz`) require a JWT Bearer token:
-
-```bash
-curl -X POST https://api.example.com/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin"}'
-```
-
-## 🐳 Docker
-
-```bash
-docker build -t finna-app-ui .
-docker run -p 80:80 finna-app-ui
-```
-
-## 📦 Kubernetes
-
-Deploy to GKE in the `finna-app-staging` namespace:
-
-```bash
-kubectl apply -f k8s/deployment.yaml
-```
-
-## 📄 License
-
-MIT License - see LICENSE file for details.
-
-## 👤 Author
-
-Andrea Carmisciano
-
-## 🌐 Live Demo Access
-
-**Frontend (UI):** `https://finna-app-ui.ces.abssrv.it`  
-**Backend (API):** `https://finna-app.ces.abssrv.it`  
-**Namespace:** `finna-app-staging`  
-**Credentials:** Username: `admin` | Password: `admin`
+*Build timestamp: 2026-04-28*
+*Docker image: `europe-west1-docker.pkg.dev/abs-digital-playground/finna-app-staging/frontend:latest`*
