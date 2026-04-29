@@ -72,8 +72,8 @@ def client(mock_connection, mock_sync_pool):
     async def mock_get_async_connection():
         yield mock_async_conn
 
-    with patch.object(main_module.db, "get_async_connection", side_effect=mock_get_async_connection), \
-         patch.object(main_module.db, "init_async_pool", new_callable=AsyncMock, return_value=MagicMock()):
+    with patch("backend.app.api.db.get_async_connection", side_effect=mock_get_async_connection), \
+         patch("backend.app.api.db.init_async_pool", new_callable=AsyncMock, return_value=MagicMock()):
         with TestClient(main_module.app, raise_server_exceptions=False) as test_client:
             yield test_client
 
@@ -104,8 +104,8 @@ def auth_client(mock_connection, mock_sync_pool):
         token = create_access_token(data={"sub": "testuser"})
         auth_headers = {"Authorization": f"Bearer {token}"}
 
-        with patch.object(main_module.db, "get_async_connection", side_effect=mock_get_async_connection), \
-             patch.object(main_module.db, "init_async_pool", new_callable=AsyncMock, return_value=MagicMock()):
+        with patch("backend.app.api.db.get_async_connection", side_effect=mock_get_async_connection), \
+             patch("backend.app.api.db.init_async_pool", new_callable=AsyncMock, return_value=MagicMock()):
             with TestClient(main_module.app, raise_server_exceptions=False) as test_client:
                 original_request = test_client.request
 
