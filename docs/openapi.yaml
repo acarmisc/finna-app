@@ -1,11 +1,11 @@
 openapi: 3.1.0
 info:
-  title: FinOps Orchestrator API
+  title: Finna API
   description: >
-    Centralized orchestration API for FinOps cloud cost extractors.
+    Finna cloud cost management and extraction platform.
     Supports multi-cloud cost extraction (Azure, GCP), configuration management,
-    alert monitoring, and cost data queries.
-  version: 0.1.0
+    alert monitoring, extractor registry, device-code auth, and cost data queries.
+  version: 1.0.0
   contact:
     name: FinOps Team
     url: https://github.com/acarmisc/finna-app
@@ -33,6 +33,8 @@ tags:
     description: Alert management
   - name: internal
     description: Internal operational endpoints
+  - name: db
+    description: Developer-only raw query endpoints
 
 security: []
 
@@ -44,7 +46,7 @@ components:
       bearerFormat: JWT
       description: >
         JWT token obtained from POST /api/v1/auth/token.
-        Required on all /api/v1/* endpoints except auth/token and healthz.
+        Required on all /api/v1/* endpoints except auth/token, auth/login, and healthz.
 
   schemas:
     # ── Enums ────────────────────────────────────────────────────────────────
@@ -78,6 +80,16 @@ components:
           type: string
           description: JWT access token
 
+    AccessTokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: JWT access token
+        token_type:
+          type: string
+          example: bearer
+
     GCPRegisterRequest:
       type: object
       required: [project_id]
@@ -108,7 +120,115 @@ components:
           type: string
           description: Azure subscription ID
 
+    DeviceCodeStartRequest:
+      type: object
+      properties:
+        tenant_id:
+          type: string
+          default: organizations
+          description: Azure AD tenant ID
+        client_id:
+          type: string
+          nullable: true
+          description: Client ID (defaults to known public client)
+
+    DeviceCodeStartResponse:
+      type: object
+      properties:
+        verification_uri:
+          type: string
+        user_code:
+          type: string
+        device_code:
+          type: string
+        expires_in:
+          type: integer
+        interval:
+          type: integer
+        message:
+          type: string
+
+    DeviceCodePollRequest:
+      type: object
+      properties:
+        device_code:
+          type: string
+        tenant_id:
+          type: string
+          default: organizations
+
+    DeviceCodePollResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, completed, expired, failed]
+        config_id:
+          type: string
+          nullable: true
+          description: Only present when status is completed
+
     # ── Config ───────────────────────────────────────────────────────────────
+    AzureConfigInput:
+      type: object
+      properties:
+        tenant_id:
+          type: string
+          description: Azure AD tenant ID
+        client_id:
+          type: string
+          description: Service principal application ID
+        client_secret:
+          type: string
+          description: Service principal secret
+        subscription_id:
+          type: string
+          description: Azure subscription ID
+        resource_groups:
+          type: array
+          items:
+            type: string
+          description: Resource groups to track (empty = all)
+        scope:
+          type: string
+          default: resourcegroup
+          description: "Query scope: subscription or resourcegroup"
+        environment:
+          type: string
+          nullable: true
+          description: prod / staging / dev
+        team:
+          type: string
+          nullable: true
+          description: Owning team
+
+    GCPConfigInput:
+      type: object
+      properties:
+        project_id:
+          type: string
+          description: GCP project ID
+        billing_account_id:
+          type: string
+          nullable: true
+          description: GCP billing account ID
+        bigquery_dataset:
+          type: string
+          nullable: true
+          description: BigQuery dataset
+        bigquery_table:
+          type: string
+          nullable: true
+          description: BigQuery table name
+        environment:
+          type: string
+          nullable: true
+          description: prod / staging / dev
+        team:
+          type: string
+          nullable: true
+          description: Owning team
+
     CloudConfigCreate:
       type: object
       required: [provider, name, credential_type, config]
@@ -230,20 +350,126 @@ components:
           nullable: true
 
     # ── Extractors ───────────────────────────────────────────────────────────
+    ExtractorCreate:
+      type: object
+      required: [name, provider, extractor_type]
+      properties:
+        name:
+          type: string
+          description: Human-readable name
+        provider:
+          type: string
+          description: Cloud provider
+        extractor_type:
+          type: string
+          description: Extractor type (e.g., azure_cost, gcp_billing)
+        enabled:
+          type: boolean
+          default: true
+        schedule:
+          type: string
+          nullable: true
+          description: Cron expression for scheduled runs
+        config_id:
+          type: string
+          nullable: true
+          description: Cloud config ID to use
+
+    ExtractorUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        enabled:
+          type: boolean
+          nullable: true
+        schedule:
+          type: string
+          nullable: true
+        config_id:
+          type: string
+          nullable: true
+
+    ExtractorResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        provider:
+          type: string
+        extractor_type:
+          type: string
+        enabled:
+          type: boolean
+        schedule:
+          type: string
+          nullable: true
+        config_id:
+          type: string
+          nullable: true
+        status:
+          type: string
+        last_run_id:
+          type: string
+          nullable: true
+        last_run_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ExtractorListResponse:
+      type: object
+      properties:
+        extractors:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExtractorResponse"
+        count:
+          type: integer
+
     ExtractorRunRequest:
       type: object
-      required: [provider, config_id]
+      required: [provider]
       properties:
         provider:
           type: string
           description: Cloud provider to extract from
         extractor_type:
           type: string
+          nullable: true
           description: Extractor type override (defaults to provider)
         config_id:
           type: string
+          nullable: true
           format: uuid
-          description: ID of the cloud config to use
+          description: Optional config ID (defaults to first config for provider)
+
+    ExtractorRunTriggerRequest:
+      type: object
+      properties:
+        config_id:
+          type: string
+          nullable: true
+          description: Specific config ID to use (defaults to the extractor's config_id)
+
+    ExtractorRunTriggerResponse:
+      type: object
+      properties:
+        run_id:
+          type: string
+        status:
+          type: string
+        extractor_id:
+          type: string
 
     ExtractorRunResponse:
       type: object
@@ -339,6 +565,21 @@ components:
         endDate:
           type: string
           format: date-time
+        # CLI-compatibility wrapper
+        data:
+          type: array
+          items:
+            type: object
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        has_next:
+          type: boolean
+        has_prev:
+          type: boolean
 
     CostTotalsResponse:
       type: object
@@ -406,10 +647,69 @@ components:
           type: string
           format: date-time
 
+    CostSummaryResponse:
+      type: object
+      properties:
+        total:
+          type: number
+        by_provider:
+          type: object
+          additionalProperties:
+            type: number
+        by_service:
+          type: object
+          additionalProperties:
+            type: number
+        start_period:
+          type: string
+        end_period:
+          type: string
+
+    CostBreakdownResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              sku:
+                type: string
+              cost:
+                type: number
+        total:
+          type: integer
+
     # ── Alerts ───────────────────────────────────────────────────────────────
     AlertRecord:
       type: object
-      properties: {}
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+        resource:
+          type: string
+        service:
+          type: string
+        provider:
+          type: string
+        cost_impact:
+          type: number
+        first_seen:
+          type: string
+          format: date-time
+          nullable: true
+        last_seen:
+          type: string
+          format: date-time
+          nullable: true
+        is_acknowledged:
+          type: boolean
 
     AlertListResponse:
       type: object
@@ -417,13 +717,42 @@ components:
         alerts:
           type: array
           items:
-            type: object
+            $ref: "#/components/schemas/AlertRecord"
         count:
           type: integer
+        # CLI-compatibility wrapper
+        data:
+          type: array
+          items:
+            type: object
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        has_next:
+          type: boolean
+        has_prev:
+          type: boolean
 
     AlertStatsResponse:
       type: object
       properties:
+        total:
+          type: integer
+        by_severity:
+          type: object
+          additionalProperties:
+            type: integer
+        by_provider:
+          type: object
+          additionalProperties:
+            type: integer
+        acknowledged:
+          type: integer
+        pending:
+          type: integer
         stats:
           type: array
           items:
@@ -574,6 +903,61 @@ paths:
                   database:
                     type: string
 
+  /health:
+    get:
+      tags: [health]
+      summary: Basic health check
+      description: Returns status and timestamp. No auth required.
+      operationId: health
+      responses:
+        "200":
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /api/v1/health:
+    get:
+      tags: [health]
+      summary: Extended health check
+      description: Returns status with actual database connection check.
+      operationId: apiHealth
+      responses:
+        "200":
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
+                    format: date-time
+                  database:
+                    type: string
+        "503":
+          description: Service degraded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  error:
+                    type: string
+                  database:
+                    type: string
+
   # ── Auth ──────────────────────────────────────────────────────────────────
   /api/v1/auth/token:
     post:
@@ -612,6 +996,96 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
                 detail: Account is disabled
+
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Obtain JWT token (CLI-compatible)
+      description: >
+        CLI-compatible alias for /api/v1/auth/token.
+        Returns a standard OAuth2-like access_token response.
+      operationId: authLoginAlias
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TokenRequest"
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessTokenResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                detail: Invalid credentials
+        "403":
+          description: Account disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                detail: Account is disabled
+
+  /api/v1/auth/device-code/start:
+    post:
+      tags: [auth]
+      summary: Start device code flow
+      description: >
+        Initiate Azure AD device code authentication flow.
+        Returns a verification URI and user code for the user to authorize.
+      operationId: deviceCodeStart
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceCodeStartRequest"
+      responses:
+        "200":
+          description: Device code flow started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceCodeStartResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/auth/device-code/poll:
+    post:
+      tags: [auth]
+      summary: Poll device code flow
+      description: >
+        Poll the status of an ongoing device code authentication flow.
+        Returns pending, completed, expired, or failed status.
+      operationId: deviceCodePoll
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceCodePollRequest"
+      responses:
+        "200":
+          description: Poll result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceCodePollResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /api/v1/auth/gcp/register:
     post:
@@ -934,13 +1408,201 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /api/v1/configs:
+    get:
+      tags: [config]
+      summary: List cloud configurations (CLI-compatible)
+      description: CLI-compatible config list wrapper. Returns simplified fields.
+      operationId: cliConfigList
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Configuration list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  page_size:
+                    type: integer
+                  has_next:
+                    type: boolean
+                  has_prev:
+                    type: boolean
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      tags: [config]
+      summary: Create cloud configuration (CLI-compatible)
+      description: CLI-compatible config create wrapper.
+      operationId: cliConfigsCreate
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                provider:
+                  type: string
+                cloud_config:
+                  type: string
+                  nullable: true
+                service_category:
+                  type: string
+                  nullable: true
+                region:
+                  type: string
+                  nullable: true
+      responses:
+        "201":
+          description: Configuration created
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /api/v1/configs/{config_id}:
+    get:
+      tags: [config]
+      summary: Get cloud configuration (CLI-compatible)
+      description: CLI-compatible config get wrapper.
+      operationId: cliConfigGet
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: config_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Configuration details
+          content:
+            application/json:
+              schema:
+                type: object
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    put:
+      tags: [config]
+      summary: Update cloud configuration (CLI-compatible)
+      description: CLI-compatible config update wrapper.
+      operationId: cliConfigsUpdate
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: config_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                provider:
+                  type: string
+                cloud_config:
+                  type: string
+                  nullable: true
+                service_category:
+                  type: string
+                  nullable: true
+                region:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: Configuration updated
+          content:
+            application/json:
+              schema:
+                type: object
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    delete:
+      tags: [config]
+      summary: Delete cloud configuration (CLI-compatible)
+      description: CLI-compatible config delete wrapper.
+      operationId: cliConfigsDelete
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: config_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Configuration deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   # ── Extractors ────────────────────────────────────────────────────────────
   /api/v1/extractors/status:
     get:
       tags: [extractors]
-      summary: List extractor runs
+      summary: List extractor runs (legacy)
       description: Returns recent extractor run history with optional provider filter.
       operationId: listExtractorRuns
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: provider
+          in: query
+          schema:
+            type: string
+            nullable: true
+            enum: [azure, gcp]
+      responses:
+        "200":
+          description: Extractor run list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtractorStatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/extractors/runs:
+    get:
+      tags: [extractors]
+      summary: List extractor runs (alias)
+      description: Alias for /api/v1/extractors/status (CLI compatibility).
+      operationId: listExtractorRunsAlias
       security:
         - BearerAuth: []
       parameters:
@@ -970,7 +1632,7 @@ paths:
   /api/v1/extractors/run:
     post:
       tags: [extractors]
-      summary: Start extractor run
+      summary: Start extractor run (legacy)
       description: Trigger a cloud cost extraction run for a given configuration.
       operationId: startExtractor
       security:
@@ -1086,6 +1748,190 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /api/v1/extractors:
+    get:
+      tags: [extractors]
+      summary: List extractors (registry)
+      description: List extractor registry entries with optional filtering.
+      operationId: listExtractorsRegistry
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: provider
+          in: query
+          schema:
+            type: string
+            nullable: true
+        - name: enabled
+          in: query
+          schema:
+            type: boolean
+            nullable: true
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: Extractor list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtractorListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    post:
+      tags: [extractors]
+      summary: Create extractor (registry)
+      description: Register a new extractor in the registry.
+      operationId: createExtractor
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtractorCreate"
+      responses:
+        "201":
+          description: Extractor created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtractorResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/extractors/{extractor_id}:
+    get:
+      tags: [extractors]
+      summary: Get extractor (registry)
+      description: Get a single extractor registry entry by ID.
+      operationId: getExtractor
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: extractor_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Extractor details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtractorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    put:
+      tags: [extractors]
+      summary: Update extractor (registry)
+      description: Update an extractor registry entry.
+      operationId: updateExtractor
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: extractor_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtractorUpdate"
+      responses:
+        "200":
+          description: Extractor updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtractorResponse"
+        "400":
+          description: No fields to update
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    delete:
+      tags: [extractors]
+      summary: Delete extractor (registry)
+      description: Delete an extractor registry entry.
+      operationId: deleteExtractor
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: extractor_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Extractor deleted
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/extractors/{extractor_id}/trigger:
+    post:
+      tags: [extractors]
+      summary: Trigger extractor run
+      description: Trigger a run for a registered extractor. Uses its linked config_id if none is provided.
+      operationId: triggerExtractorRun
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: extractor_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtractorRunTriggerRequest"
+      responses:
+        "200":
+          description: Run triggered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtractorRunTriggerResponse"
+        "400":
+          description: Extractor disabled or missing config
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   # ── Costs ─────────────────────────────────────────────────────────────────
   /api/v1/costs:
     get:
@@ -1094,6 +1940,7 @@ paths:
       description: >
         Retrieve cost records with optional provider, project, and date range filters.
         Defaults to last 30 days. Returns up to 1000 records.
+        Supports CLI-compatible aliases start=/end= for date parameters.
       operationId: listCosts
       security:
         - BearerAuth: []
@@ -1125,6 +1972,21 @@ paths:
             format: date-time
             nullable: true
           description: End of date range. Defaults to now.
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number for pagination
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 50
+          description: Number of records per page
       responses:
         "200":
           description: Cost records with provider totals
@@ -1233,6 +2095,74 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /api/v1/costs/summary:
+    get:
+      tags: [costs]
+      summary: Get cost summary
+      description: CLI-compatible aggregated cost summary grouped by provider. Supports start=/end= aliases.
+      operationId: getCostSummary
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+      responses:
+        "200":
+          description: Cost summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CostSummaryResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/costs/breakdown:
+    get:
+      tags: [costs]
+      summary: Get cost breakdown by SKU
+      description: CLI-compatible cost breakdown by SKU. Supports start=/end= aliases.
+      operationId: getCostBreakdown
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date-time
+            nullable: true
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        "200":
+          description: Cost breakdown by SKU
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CostBreakdownResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   # ── Alerts ────────────────────────────────────────────────────────────────
   /api/v1/alerts:
     get:
@@ -1261,6 +2191,21 @@ paths:
             type: integer
             default: 50
             maximum: 100
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+          description: Page number for pagination
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 50
+          description: Number of alerts per page
       responses:
         "200":
           description: Alert list
@@ -1307,6 +2252,68 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /api/v1/alerts/{alert_id}/acknowledge:
+    post:
+      tags: [alerts]
+      summary: Acknowledge alert
+      description: Acknowledge a single alert.
+      operationId: acknowledgeAlert
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: alert_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Alert acknowledged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  acknowledged:
+                    type: boolean
+        "404":
+          description: Alert not found or already acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                detail: Alert not found or already acknowledged
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/alerts/acknowledge-all:
+    post:
+      tags: [alerts]
+      summary: Acknowledge all alerts
+      description: Bulk acknowledge all firing alerts.
+      operationId: acknowledgeAllAlerts
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Alerts acknowledged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  acknowledged_count:
+                    type: integer
+                  ids:
+                    type: array
+                    items:
+                      type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   # ── Internal ──────────────────────────────────────────────────────────────
   /api/v1/db/stats:
     get:
@@ -1324,5 +2331,134 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ── Developer DB Endpoints ────────────────────────────────────────────────
+  /api/v1/db/costs:
+    get:
+      tags: [db]
+      summary: Raw cost records (dev only)
+      description: Returns raw cost_records rows for CLI testing.
+      operationId: dbCosts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 1000
+      responses:
+        "200":
+          description: Raw cost records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                  count:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/db/alerts:
+    get:
+      tags: [db]
+      summary: Raw alerts (dev only)
+      description: Returns raw alerts rows for CLI testing.
+      operationId: dbAlerts
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 1000
+      responses:
+        "200":
+          description: Raw alerts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                  count:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/db/configs:
+    get:
+      tags: [db]
+      summary: Raw cloud configs (dev only)
+      description: Returns raw cloud_config rows for CLI testing.
+      operationId: dbConfigs
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 1000
+      responses:
+        "200":
+          description: Raw config records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                  count:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/db/extractors:
+    get:
+      tags: [db]
+      summary: Raw extractor runs (dev only)
+      description: Returns raw extractor_runs rows for CLI testing.
+      operationId: dbExtractors
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 1000
+      responses:
+        "200":
+          description: Raw extractor runs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                  count:
+                    type: integer
         "401":
           $ref: "#/components/responses/Unauthorized"
