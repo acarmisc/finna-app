@@ -59,6 +59,7 @@ def client(mock_connection, mock_sync_pool):
     from backend.app.api import main as main_module
 
     original_lifespan = main_module.app.router.lifespan_context
+    original_middleware = None
 
     @asynccontextmanager
     async def noop_lifespan(app):
@@ -66,14 +67,13 @@ def client(mock_connection, mock_sync_pool):
 
     main_module.app.router.lifespan_context = noop_lifespan
 
-    mock_async_conn = MagicMock()
-
     @asynccontextmanager
     async def mock_get_async_connection():
-        yield mock_async_conn
+        yield MagicMock()
 
     with patch("backend.app.api.db.get_async_connection", side_effect=mock_get_async_connection), \
-         patch("backend.app.api.db.init_async_pool", new_callable=AsyncMock, return_value=MagicMock()):
+         patch("backend.app.api.db.init_async_pool", new_callable=AsyncMock, return_value=MagicMock()), \
+         patch("backend.app.api.main.db_session_middleware", new=lambda req, call_next: call_next(req)):
         with TestClient(main_module.app, raise_server_exceptions=False) as test_client:
             yield test_client
 
@@ -105,7 +105,8 @@ def auth_client(mock_connection, mock_sync_pool):
         auth_headers = {"Authorization": f"Bearer {token}"}
 
         with patch("backend.app.api.db.get_async_connection", side_effect=mock_get_async_connection), \
-             patch("backend.app.api.db.init_async_pool", new_callable=AsyncMock, return_value=MagicMock()):
+             patch("backend.app.api.db.init_async_pool", new_callable=AsyncMock, return_value=MagicMock()), \
+             patch("backend.app.api.main.db_session_middleware", new=lambda req, call_next: call_next(req)):
             with TestClient(main_module.app, raise_server_exceptions=False) as test_client:
                 original_request = test_client.request
 
