@@ -69,7 +69,12 @@ def client(mock_connection, mock_sync_pool):
 
     main_module.app.router.lifespan_context = noop_lifespan
 
-    db_module._async_pool = MagicMock()
+    mock_pool = MagicMock()
+    mock_conn = MagicMock()
+    mock_pool.connection.return_value.__aenter__ = MagicMock(return_value=mock_conn)
+    mock_pool.connection.return_value.__aexit__ = MagicMock(return_value=False)
+
+    db_module._async_pool = mock_pool
     db_module._sync_pool = mock_sync_pool
 
     try:
@@ -98,7 +103,12 @@ def auth_client(mock_connection, mock_sync_pool):
 
     main_module.app.router.lifespan_context = noop_lifespan
 
-    db_module._async_pool = MagicMock()
+    mock_pool = MagicMock()
+    mock_conn = MagicMock()
+    mock_pool.connection.return_value.__aenter__ = MagicMock(return_value=mock_conn)
+    mock_pool.connection.return_value.__aexit__ = MagicMock(return_value=False)
+
+    db_module._async_pool = mock_pool
     db_module._sync_pool = mock_sync_pool
 
     try:
