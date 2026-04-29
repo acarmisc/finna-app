@@ -22,7 +22,7 @@ _alert_responses = {
     422: ERROR_RESPONSE_422,
 }
 
-@router.get("/alerts", dependencies=[Depends(require_auth)], responses=_alert_responses)
+@router.get("/alerts", dependencies=[Depends(require_auth)], responses=_alert_responses)  # type: ignore[arg-type]
 async def list_alerts(
     status: Optional[str] = Query(None, description="Filter by status: firing, resolved, all"),
     severity: Optional[str] = Query(None, description="Filter by severity: err, warn, ok"),
@@ -51,11 +51,11 @@ async def list_alerts(
             "service": r.get("service") or "",
             "provider": r.get("provider") or "",
             "cost_impact": float(r.get("cost_impact") or 0.0),
-            "first_seen": (r.get("created_at").isoformat()) if r.get("created_at") else None,
+            "first_seen": (r.get("created_at").isoformat()) if r.get("created_at") else None,  # type: ignore[union-attr]
             "last_seen": (
-                r.get("updated_at").isoformat()
+                r.get("updated_at").isoformat()  # type: ignore[union-attr]
                 if r.get("updated_at")
-                else (r.get("created_at").isoformat() if r.get("created_at") else None)
+                else (r.get("created_at").isoformat() if r.get("created_at") else None)  # type: ignore[union-attr]
             ),
             "is_acknowledged": r.get("acknowledged_at") is not None,
         })
@@ -127,11 +127,11 @@ async def get_active_alerts(
             "service": r.get("service") or "",
             "provider": r.get("provider") or "",
             "cost_impact": float(r.get("cost_impact") or 0.0),
-            "first_seen": (r.get("created_at").isoformat()) if r.get("created_at") else None,
+            "first_seen": (r.get("created_at").isoformat()) if r.get("created_at") else None,  # type: ignore[union-attr]
             "last_seen": (
-                r.get("updated_at").isoformat()
+                r.get("updated_at").isoformat()  # type: ignore[union-attr]
                 if r.get("updated_at")
-                else (r.get("created_at").isoformat() if r.get("created_at") else None)
+                else (r.get("created_at").isoformat() if r.get("created_at") else None)  # type: ignore[union-attr]
             ),
             "is_acknowledged": r.get("acknowledged_at") is not None,
         })

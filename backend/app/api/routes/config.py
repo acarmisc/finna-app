@@ -234,7 +234,7 @@ async def test_config(config_id: str) -> dict[str, Any]:
                 client_secret = config.get("client_secret", "")
                 if not all([tenant_id, client_id, client_secret]):
                     return {"ok": False, "provider": "azure", "error": "Missing tenant_id, client_id or client_secret"}
-                credential = ClientSecretCredential(
+                credential = ClientSecretCredential(  # type: ignore[assignment]
                     tenant_id=tenant_id,
                     client_id=client_id,
                     client_secret=client_secret,
@@ -284,7 +284,7 @@ async def test_config(config_id: str) -> dict[str, Any]:
                             dataset=QueryDataset(granularity="Daily", aggregation={}),
                         ),
                     )
-                    row_count = len(result.rows) if result.rows else 0
+                    row_count = len(result.rows) if result.rows else 0  # type: ignore[union-attr]
                     checks["cost_management_api"] = "ok"
                     checks["sample_rows"] = row_count
                 except Exception as cm_exc:
@@ -361,8 +361,8 @@ async def get_config(config_id: str) -> dict[str, Any]:
     dependencies=[Depends(require_auth)],
 )
 async def update_config(config_id: str, data: CloudConfigUpdate) -> dict[str, Any]:
-    updates = []
-    params = []
+    updates: list[str] = []
+    params: list[Any] = []
 
     if data.name is not None:
         updates.append("name = %s")

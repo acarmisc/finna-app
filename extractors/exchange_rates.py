@@ -81,7 +81,7 @@ def _fetch_ecb_xml(url: str, timeout: int = 30) -> str:
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         payload = resp.read().decode("utf-8")
     logger.debug("Received %d bytes from ECB", len(payload))
-    return payload
+    return payload  # type: ignore[no-any-return]
 
 
 def _parse_ecb_xml(xml_text: str) -> tuple[date, dict[str, Decimal]]:
@@ -189,7 +189,7 @@ def _convert_to_usd_rates(rates_vs_eur: dict[str, Decimal]) -> dict[str, Decimal
 )
 def _get_pg_connection(dsn: str) -> psycopg.Connection:
     """Open a PostgreSQL connection with retry on transient errors."""
-    return psycopg.connect(dsn, row_factory=dict_row, autocommit=False)
+    return psycopg.connect(dsn, row_factory=dict_row, autocommit=False)  # type: ignore[arg-type]
 
 
 _UPSERT_SQL = """

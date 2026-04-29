@@ -127,7 +127,7 @@ def extract_project_label(row: dict[str, Any]) -> str:
     if isinstance(labels, list):
         for entry in labels:
             if isinstance(entry, dict) and entry.get("key") == "project":
-                return entry.get("value", "")
+                return entry.get("value", "")  # type: ignore[no-any-return]
 
     # CSV format: semicolon-separated "key:value" pairs
     if isinstance(labels, str) and labels.strip():

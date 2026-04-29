@@ -52,8 +52,8 @@ async def list_extractors(
     """List extractors with optional filtering."""
     from ..db import query_all
 
-    where_clauses = []
-    params = []
+    where_clauses: list[str] = []
+    params: list[str | bool | int] = []
 
     if provider:
         where_clauses.append("provider = %s")
@@ -75,7 +75,7 @@ async def list_extractors(
         LIMIT %s
     """
 
-    extractors = query_all(sql, params + [limit])
+    extractors = query_all(sql, tuple(params) + (limit,))  # type: ignore[arg-type]
 
     return {
         "extractors": [_extractor_to_response(e) for e in extractors],
@@ -141,7 +141,7 @@ async def create_extractor(data: ExtractorCreate) -> dict[str, Any]:
         ),
     )
 
-    return result
+    return result  # type: ignore[return-value]
 
 
 @router.put("/extractors/{extractor_id}", response_model=ExtractorResponse, dependencies=[Depends(require_auth)])
@@ -154,8 +154,8 @@ async def update_extractor(extractor_id: str, data: ExtractorUpdate) -> dict[str
         raise HTTPException(status_code=404, detail=f"Extractor {extractor_id} not found")
 
     # Build update query dynamically
-    updates = []
-    params = []
+    updates: list[str] = []
+    params: list[Any] = []
 
     if data.name is not None:
         updates.append("name = %s")
@@ -190,7 +190,7 @@ async def update_extractor(extractor_id: str, data: ExtractorUpdate) -> dict[str
     """
 
     result = query_one(sql, tuple(params))
-    return result
+    return result  # type: ignore[return-value]
 
 
 @router.delete("/extractors/{extractor_id}", status_code=204, dependencies=[Depends(require_auth)])

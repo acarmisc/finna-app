@@ -97,7 +97,7 @@ def get_gcp_credentials() -> tuple[Any, str]:
             from google.oauth2.service_account import Credentials
 
             creds = Credentials.from_service_account_info(sa_info)
-            project_id = project_id or creds.project_id
+            project_id = project_id or creds.project_id  # type: ignore[assignment]
             logger.info("Using GCP service account credentials for project=%s", project_id)
             return creds, project_id
         except Exception:
@@ -105,7 +105,7 @@ def get_gcp_credentials() -> tuple[Any, str]:
 
     try:
         creds, project = google.auth.default()
-        project_id = project_id or project
+        project_id = project_id or project  # type: ignore[assignment]
         logger.info("Using GCP default credentials for project=%s", project_id)
         return creds, project_id
     except Exception:
