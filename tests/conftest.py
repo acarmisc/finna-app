@@ -59,7 +59,6 @@ def client(mock_connection, mock_sync_pool):
     from backend.app.api import main as main_module
 
     original_lifespan = main_module.app.router.lifespan_context
-    original_middleware = None
 
     @asynccontextmanager
     async def noop_lifespan(app):
