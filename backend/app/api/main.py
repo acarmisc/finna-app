@@ -13,7 +13,6 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from . import db, routes
 from .errors import register_error_handlers
-from .middleware import rate_limit as rate_limit_module
 
 app = FastAPI(
     title="Finna API",
