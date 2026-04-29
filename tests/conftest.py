@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import os
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
-# Set up path to import from backend
 backend_path = Path(__file__).parent.parent / "backend" / "app"
 if str(backend_path) not in sys.path:
     sys.path.insert(0, str(backend_path))
@@ -18,10 +19,6 @@ os.environ["ENCRYPTION_KEY"] = "fd7Em6qcDLS1FfjAgi0oSc6-keC5uK8r8rshY_UVw5I="
 os.environ["JWT_SECRET"] = "test-secret-key"
 os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ["JWT_EXPIRATION_MINUTES"] = "60"
-
-# noq
-from contextlib import asynccontextmanager  # noqa: E402
-from unittest.mock import MagicMock  # noqa: E402
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -69,11 +66,18 @@ def client(mock_connection, mock_sync_pool):
 
     main_module.app.router.lifespan_context = noop_lifespan
 
-    try:
+    mock_async_conn = MagicMock()
+
+    @asynccontextmanager
+    async def mock_get_async_connection():
+        yield mock_async_conn
+
+    with patch.object(main_module.db, "get_async_connection", side_effect=mock_get_async_connection), \
+         patch.object(main_module.db, "init_async_pool", new_callable=AsyncMock, return_value=MagicMock()):
         with TestClient(main_module.app, raise_server_exceptions=False) as test_client:
             yield test_client
-    finally:
-        main_module.app.router.lifespan_context = original_lifespan
+
+    main_module.app.router.lifespan_context = original_lifespan
 
 
 @pytest.fixture
@@ -90,19 +94,28 @@ def auth_client(mock_connection, mock_sync_pool):
 
     main_module.app.router.lifespan_context = noop_lifespan
 
+    mock_async_conn = MagicMock()
+
+    @asynccontextmanager
+    async def mock_get_async_connection():
+        yield mock_async_conn
+
     try:
         token = create_access_token(data={"sub": "testuser"})
         auth_headers = {"Authorization": f"Bearer {token}"}
 
-        def patched_request(method, url, **kwargs):
-            headers = kwargs.get("headers") or {}
-            headers.update(auth_headers)
-            kwargs["headers"] = headers
-            return original_request(method, url, **kwargs)
+        with patch.object(main_module.db, "get_async_connection", side_effect=mock_get_async_connection), \
+             patch.object(main_module.db, "init_async_pool", new_callable=AsyncMock, return_value=MagicMock()):
+            with TestClient(main_module.app, raise_server_exceptions=False) as test_client:
+                original_request = test_client.request
 
-        with TestClient(main_module.app, raise_server_exceptions=False) as test_client:
-            original_request = test_client.request
-            test_client.request = lambda m, u, **kw: patched_request(m, u, **kw)
-            yield test_client
+                def patched_request(method, url, **kwargs):
+                    headers = kwargs.get("headers") or {}
+                    headers.update(auth_headers)
+                    kwargs["headers"] = headers
+                    return original_request(method, url, **kwargs)
+
+                test_client.request = lambda m, u, **kw: patched_request(m, u, **kw)
+                yield test_client
     finally:
         main_module.app.router.lifespan_context = original_lifespan
