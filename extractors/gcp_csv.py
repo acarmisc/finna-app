@@ -78,7 +78,7 @@ _INSERT_SQL = SQL(
 )
 def _get_pg_connection(dsn: str) -> psycopg.Connection:
     """Open a PostgreSQL connection with retry on transient errors."""
-    return psycopg.connect(dsn, row_factory=dict_row, autocommit=False)
+    return psycopg.connect(dsn, row_factory=dict_row, autocommit=False)  # type: ignore[arg-type]
 
 
 def _batch_insert(

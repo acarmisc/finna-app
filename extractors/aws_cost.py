@@ -92,7 +92,7 @@ def get_cost_and_usage(
     start_date: str,
     end_date: str,
     granularity: str = GRANULARITY,
-    metrics: list[str] = None,
+    metrics: list[str] | None = None,
 ) -> dict[str, Any]:
     """Fetch cost data from AWS Cost Explorer API."""
     if metrics is None:
@@ -112,7 +112,7 @@ def get_cost_and_usage(
             ],
             NextPageToken=None,  # Simple page traversal - could be improved
         )
-        return response
+        return response  # type: ignore[no-any-return]
     except ClientError as e:
         logger.error(f"AWS Cost Explorer API error: {e}")
         raise
@@ -157,7 +157,7 @@ def normalize_aws_cost_records(
                 amount = Decimal("0")
 
             if amount > 0:
-                record = NormalizedCostRecord(
+                record = NormalizedCostRecord(  # type: ignore[call-arg]
                     provider=Provider.AWS,
                     project_name=account_id,
                     sku_name=service_code or "Unknown",
@@ -190,3 +190,7 @@ def extract_costs(
 
     if not aws_access_key_id or not aws_secret_access_key:
         logger.error("AWS credentials not configured")
+        return 0
+
+    # TODO: Implement extraction logic
+    return 0

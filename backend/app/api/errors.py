@@ -151,6 +151,6 @@ async def generic_exception_handler(
 
 def register_error_handlers(app: FastAPI) -> None:
     """Register custom error handlers with FastAPI app."""
-    app.add_exception_handler(APIError, error_handler)
+    app.add_exception_handler(APIError, error_handler)  # type: ignore[arg-type]
     app.add_exception_handler(422, validation_exception_handler)
     app.add_exception_handler(Exception, generic_exception_handler)

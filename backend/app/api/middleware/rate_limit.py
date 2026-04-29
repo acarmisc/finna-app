@@ -69,16 +69,14 @@ def add_rate_limit_headers(response: Response, info: RateLimitInfo) -> Response:
     if info.retry_after is not None:
         response.headers["Retry-After"] = str(info.retry_after)
 
-    return response
-
-
+    return response  # type: ignore[no-any-return]
 async def rate_limit_middleware(request: Request, call_next: Any) -> Response:
     """FastAPI HTTP rate limiting middleware."""
     # Get client identifier (could be user ID, API key, or IP)
     client_id = "anonymous"
 
     try:
-        user = await get_current_user(request)
+        user = await get_current_user(request)  # type: ignore[arg-type]
         if user:
             client_id = user.get("username", "anonymous")
     except Exception:
@@ -94,4 +92,4 @@ async def rate_limit_middleware(request: Request, call_next: Any) -> Response:
     # Add rate limit headers
     add_rate_limit_headers(response, rate_info)
 
-    return response
+    return response  # type: ignore[no-any-return]

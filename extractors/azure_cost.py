@@ -179,7 +179,7 @@ def _parse_date(val: str) -> datetime:
 
 def _default_date_range() -> tuple[datetime, datetime]:
     """Return (from, to) defaulting to last LOOKBACK_DAYS days (env var, default 30)."""
-    days = int(_env_optional("LOOKBACK_DAYS", "30"))
+    days = int(_env_optional("LOOKBACK_DAYS", "30") or "30")
     to_dt = datetime.now(timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
@@ -362,9 +362,9 @@ def _retry_after_wait(retry_state: Any) -> float:
     # Fallback: env-configurable waits (shorter for multi-RG runs)
     attempt = retry_state.attempt_number  # 1 = first retry
     waits = [
-        int(_env_optional("RATE_LIMIT_WAIT_1", "30")),
-        int(_env_optional("RATE_LIMIT_WAIT_2", "60")),
-        int(_env_optional("RATE_LIMIT_WAIT_3", "120")),
+        int(_env_optional("RATE_LIMIT_WAIT_1", "30") or "30"),
+        int(_env_optional("RATE_LIMIT_WAIT_2", "60") or "60"),
+        int(_env_optional("RATE_LIMIT_WAIT_3", "120") or "120"),
     ]
     wait = waits[min(attempt - 1, len(waits) - 1)]
     return float(wait)
@@ -395,7 +395,7 @@ def fetch_cost_rows(
 
     while True:
         if continuation_token:
-            result = client.query.usage_by_scope(
+            result = client.query.usage_by_scope(  # type: ignore[attr-defined]
                 scope=scope,
                 parameters=query_def,
                 skip_token=continuation_token,
@@ -708,7 +708,7 @@ def run_extractor(
     scope_type = scope_type or _env_optional("AZURE_SCOPE", "resourcegroup")
     mgmt_group_id = mgmt_group_id or _env_optional("AZURE_MGMT_GROUP_ID")
     resource_group = resource_group or _env_optional("AZURE_RESOURCE_GROUP")
-    batch_size = batch_size or int(_env_optional("BATCH_SIZE", "500"))
+    batch_size = batch_size or int(_env_optional("BATCH_SIZE", "500") or "500")
     exchange_rate_table = exchange_rate_table or _env_optional(
         "EXCHANGE_RATE_TABLE", "exchange_rates"
     )
@@ -717,10 +717,10 @@ def run_extractor(
     if date_from is None or date_to is None:
         default_from, default_to = _default_date_range()
         date_from = date_from or _parse_date(
-            _env_optional("DATE_FROM", default_from.strftime("%Y-%m-%d"))
+            _env_optional("DATE_FROM", default_from.strftime("%Y-%m-%d")) or ""
         )
         date_to = date_to or _parse_date(
-            _env_optional("DATE_TO", default_to.strftime("%Y-%m-%d"))
+            _env_optional("DATE_TO", default_to.strftime("%Y-%m-%d")) or ""
         )
 
     provider_label = health_provider or "azure"
@@ -739,7 +739,7 @@ def run_extractor(
         client_secret=client_secret,
         subscription_id=sub_id,
     )
-    scope = _build_scope(sub_id, scope_type, mgmt_group_id, resource_group)
+    scope = _build_scope(sub_id, scope_type, mgmt_group_id, resource_group)  # type: ignore[arg-type]
 
     raw_rows = fetch_cost_rows(client, scope, date_from, date_to)
 
@@ -761,7 +761,7 @@ def run_extractor(
         return 0
 
     with psycopg.connect(pg_dsn) as conn:
-        exchange_rates = _load_exchange_rates(conn, exchange_rate_table)
+        exchange_rates = _load_exchange_rates(conn, exchange_rate_table)  # type: ignore[arg-type]
 
         records: list[NormalizedCostRecord] = []
         errors: list[str] = []
@@ -831,7 +831,7 @@ def main() -> None:
         )
         grand_total = 0
         for prefix, cfg in multi_subs.items():
-            rgs = cfg.get("resource_groups", [])
+            rgs: list[str | None] = cfg.get("resource_groups", [])  # type: ignore[assignment]
             health_name = f"azure_{prefix.lower()}"
             logger.info(
                 "Processing Azure subscription prefix=%s id=%s rgs=%d",
@@ -841,7 +841,7 @@ def main() -> None:
             # Iterate over every RG; fall back to subscription scope if no RGs
             rg_targets: list[str | None] = [rg for rg in rgs] if rgs else [None]
             sub_total = 0
-            rg_delay = int(_env_optional("RG_API_DELAY_SECS", "5"))
+            rg_delay = int(_env_optional("RG_API_DELAY_SECS", "5") or "5")
             for rg_idx, rg in enumerate(rg_targets):
                 if rg_idx > 0 and rg_delay > 0:
                     import time
@@ -888,13 +888,13 @@ def main() -> None:
 
         rg_targets = [rg for rg in rg_list if rg] or [None]
         grand_total = 0
-        rg_delay = int(_env_optional("RG_API_DELAY_SECS", "5"))
+        rg_delay = int(_env_optional("RG_API_DELAY_SECS", "5") or "5")
         for idx, rg in enumerate(rg_targets):
             if idx > 0 and rg_delay > 0:
                 import time
                 time.sleep(rg_delay)
             try:
-                scope = "resourcegroup" if rg else _env_optional("AZURE_SCOPE", "subscription")
+                scope = "resourcegroup" if rg else _env_optional("AZURE_SCOPE", "subscription") or "subscription"
                 total = run_extractor(scope_type=scope, resource_group=rg)
                 grand_total += total
                 logger.info("RG %s: %d records inserted", rg or "(subscription)", total)

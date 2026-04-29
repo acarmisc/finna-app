@@ -87,7 +87,7 @@ def create_rate_limiting_middleware():
         response.headers["X-RateLimit-Remaining"] = str(remaining)
         response.headers["X-RateLimit-Reset"] = str(reset_time)
 
-        return response
+        return response  # type: ignore[no-any-return]
 
     return middleware
 

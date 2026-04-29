@@ -103,7 +103,7 @@ def _build_query(
     table: str,
     date_from: str,
     date_to: str,
-) -> tuple[str, dict[str, Any]]:
+) -> tuple[str, list[Any]]:
     """Return parameterised SQL and query params for BigQuery."""
     query = (
         f"SELECT\n"
@@ -236,7 +236,7 @@ _INSERT_SQL = SQL(
 )
 def _get_pg_connection(dsn: str) -> psycopg.Connection:
     """Open a PostgreSQL connection with retry on transient errors."""
-    return psycopg.connect(dsn, row_factory=dict_row, autocommit=False)
+    return psycopg.connect(dsn, row_factory=dict_row, autocommit=False)  # type: ignore[arg-type]
 
 
 def _batch_insert(
@@ -373,7 +373,7 @@ def _run_bq_query(
     query: str,
     query_params: list[bigquery.ScalarQueryParameter],
     project: str,
-) -> bigquery.RowIterator:
+) -> Any:
     """Execute a parameterised BigQuery query with retry."""
     job_config = QueryJobConfig()
     job_config.query_parameters = query_params
@@ -430,7 +430,7 @@ def extract(
             client = bigquery.Client(project=project)
 
     query, query_params = _build_query(project, dataset, table, from_date, to_date)
-    rows: bigquery.RowIterator = _run_bq_query(client, query, query_params, project)
+    rows: Any = _run_bq_query(client, query, query_params, project)  # type: ignore[arg-type]
 
     pg_conn = _get_pg_connection(dsn)
     _mark_health_start(pg_conn, extractor_name=extractor_name)

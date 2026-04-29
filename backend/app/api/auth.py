@@ -31,12 +31,12 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against a hash."""
-    return pwd_context.verify(plain_password, hashed_password)
+    return pwd_context.verify(plain_password, hashed_password)  # type: ignore[no-any-return]
 
 
 def get_password_hash(password: str) -> str:
     """Hash a password."""
-    return pwd_context.hash(password)
+    return pwd_context.hash(password)  # type: ignore[no-any-return]
 
 
 def create_access_token(data: dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
@@ -52,7 +52,7 @@ def create_access_token(data: dict[str, Any], expires_delta: Optional[timedelta]
 
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    return encoded_jwt
+    return encoded_jwt  # type: ignore[no-any-return]
 
 
 def decode_token(token: str) -> dict[str, Any]:
@@ -62,7 +62,7 @@ def decode_token(token: str) -> dict[str, Any]:
 
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return payload
+        return payload  # type: ignore[no-any-return]
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -84,7 +84,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict[str, Any
 
     try:
         payload = decode_token(token)
-        username: str = payload.get("sub")
+        username: str = payload.get("sub")  # type: ignore[assignment]
         if username is None:
             raise credentials_exception
         return {"username": username, **payload}

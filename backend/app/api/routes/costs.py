@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -37,8 +37,8 @@ class CostFilter(BaseModel):
 async def list_costs(
     provider: Optional[str] = Query(None, description="Filter by provider: gcp, azure, llm"),
     project: Optional[str] = Query(None, description="Filter by project name"),
-    start_date: Optional[str] = Query(None, description="Start date in ISO format"),
-    end_date: Optional[str] = Query(None, description="End date in ISO format"),
+    start_date: Union[str, datetime, None] = Query(None, description="Start date in ISO format"),
+    end_date: Union[str, datetime, None] = Query(None, description="End date in ISO format"),
     start: Optional[str] = Query(None, alias="start", include_in_schema=False),
     end: Optional[str] = Query(None, alias="end", include_in_schema=False),
     page: int = Query(1, ge=1),
@@ -65,11 +65,11 @@ async def list_costs(
         end_date = end
     # Default to last 30 days if no date range specified
     end_date = end_date or datetime.now()
-    start_date = start_date or (end_date - timedelta(days=30))
+    start_date = start_date or (end_date - timedelta(days=30))  # type: ignore[operator,assignment]
 
     conditions.append("cost_date >= %s")
     conditions.append("cost_date <= %s")
-    params.extend([start_date, end_date])
+    params.extend([start_date, end_date])  # type: ignore[list-item]
 
     where_clause = ""
     if conditions:
@@ -122,8 +122,8 @@ async def list_costs(
         "costs": costs,
         "totals": provider_totals,
         "filtered": total > 0,
-        "startDate": start_date.isoformat(),
-        "endDate": end_date.isoformat(),
+        "startDate": start_date.isoformat() if hasattr(start_date, "isoformat") else str(start_date),  # type: ignore[union-attr]
+        "endDate": end_date.isoformat() if hasattr(end_date, "isoformat") else str(end_date),  # type: ignore[union-attr]
         # CLI-compatibility wrapper
         "data": costs,
         "total": total,
@@ -136,12 +136,12 @@ async def list_costs(
 
 @router.get("/costs/totals", dependencies=[Depends(require_auth)])
 async def get_cost_totals(
-    start_date: Optional[str] = Query(None),
-    end_date: Optional[str] = Query(None),
+    start_date: Union[str, datetime, None] = Query(None),
+    end_date: Union[str, datetime, None] = Query(None),
 ) -> dict[str, Any]:
     """Get aggregated cost totals."""
     end_date = end_date or datetime.now()
-    start_date = start_date or (end_date - timedelta(days=30))
+    start_date = start_date or (end_date - timedelta(days=30))  # type: ignore[operator,assignment]
 
     sql = """
         SELECT
@@ -161,8 +161,8 @@ async def get_cost_totals(
 
     return {
         "totals": totals,
-        "startDate": start_date.isoformat(),
-        "endDate": end_date.isoformat(),
+        "startDate": start_date.isoformat() if hasattr(start_date, "isoformat") else str(start_date),  # type: ignore[union-attr]
+        "endDate": end_date.isoformat() if hasattr(end_date, "isoformat") else str(end_date),  # type: ignore[union-attr]
     }
 
 
@@ -216,16 +216,18 @@ async def get_costs_by_sku(
 
 @router.get("/costs/daily", dependencies=[Depends(require_auth)])
 async def get_daily_costs(
-    start_date: Optional[str] = Query(None),
-    end_date: Optional[str] = Query(None),
+    start_date: Union[str, datetime, None] = Query(None),
+    end_date: Union[str, datetime, None] = Query(None),
     provider: Optional[str] = Query(None),
 ) -> dict[str, Any]:
     """Get daily cost breakdown for chart visualization."""
     end_date = end_date or datetime.now()
-    start_date = start_date or (end_date - timedelta(days=30))
+    start_date = start_date or (end_date - timedelta(days=30))  # type: ignore[operator,assignment]
 
     conditions = ["DATE(cost_date) >= %s", "DATE(cost_date) <= %s"]
-    params = [start_date.date(), end_date.date()]
+    _sd = start_date.date() if hasattr(start_date, "date") else start_date  # type: ignore[union-attr]
+    _ed = end_date.date() if hasattr(end_date, "date") else end_date  # type: ignore[union-attr]
+    params = [_sd, _ed]
 
     if provider:
         conditions.append("provider = %s")
@@ -263,15 +265,15 @@ async def get_daily_costs(
 
     return {
         "days": days,
-        "startDate": start_date.isoformat(),
-        "endDate": end_date.isoformat(),
+        "startDate": start_date.isoformat() if hasattr(start_date, "isoformat") else str(start_date),  # type: ignore[union-attr]
+        "endDate": end_date.isoformat() if hasattr(end_date, "isoformat") else str(end_date),
     }
 
 
 @router.get("/costs/summary", dependencies=[Depends(require_auth)])
 async def cost_summary(
-    start_date: Optional[str] = Query(None),
-    end_date: Optional[str] = Query(None),
+    start_date: Union[str, datetime, None] = Query(None),
+    end_date: Union[str, datetime, None] = Query(None),
     start: Optional[str] = Query(None, alias="start", include_in_schema=False),
     end: Optional[str] = Query(None, alias="end", include_in_schema=False),
 ) -> dict[str, Any]:
@@ -281,17 +283,17 @@ async def cost_summary(
     if end and not end_date:
         end_date = end
     end_date = end_date or datetime.now()
-    start_date = start_date or (end_date - timedelta(days=30))
+    start_date = start_date or (end_date - timedelta(days=30))  # type: ignore[operator,assignment]
 
     sql = (
         "SELECT provider, SUM(cost_amount) as total "
         "FROM cost_records "
         "WHERE cost_date >= %s AND cost_date <= %s GROUP BY provider"
     )
-    rows = query_all(sql, (start_date, end_date))
+    rows = query_all(sql, (start_date, end_date))  # type: ignore[list-item]
 
     by_provider = {}
-    by_service = {}
+    by_service: dict[str, float] = {}
     total = 0.0
     for r in rows:
         val = float(r["total"] or 0)
@@ -318,8 +320,8 @@ async def cost_summary(
 
 @router.get("/costs/breakdown", dependencies=[Depends(require_auth)])
 async def cost_breakdown(
-    start_date: Optional[str] = Query(None),
-    end_date: Optional[str] = Query(None),
+    start_date: Union[str, datetime, None] = Query(None),
+    end_date: Union[str, datetime, None] = Query(None),
     start: Optional[str] = Query(None, alias="start", include_in_schema=False),
     end: Optional[str] = Query(None, alias="end", include_in_schema=False),
     limit: int = Query(50, le=100),

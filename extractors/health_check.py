@@ -37,7 +37,7 @@ logger = logging.getLogger("extractors.health_check")
 )
 def _get_pg_connection(pg_dsn: str) -> psycopg.Connection:
     """Open a PostgreSQL connection with retry on transient errors."""
-    return psycopg.connect(pg_dsn, row_factory=dict_row, autocommit=False)
+    return psycopg.connect(pg_dsn, row_factory=dict_row, autocommit=False)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ def get_extractor_status(pg_dsn: str) -> list[tuple[str, datetime, str, int]]:
         conn.close()
 
     return [
-        (row["extractor_name"], row["last_run"], row["status"], row["records_count"])
+        (row["extractor_name"], row["last_run"], row["status"], row["records_count"])  # type: ignore[call-overload]
         for row in rows
     ]
 
@@ -199,7 +199,7 @@ def detect_stale_extractors(
 
     # Build a lookup from DB results
     db_lookup: dict[str, dict[str, Any]] = {
-        row["extractor_name"]: dict(row) for row in rows
+        row["extractor_name"]: dict(row) for row in rows  # type: ignore[call-overload]
     }
 
     stale: list[tuple[str, str]] = []
