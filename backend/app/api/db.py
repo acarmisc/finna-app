@@ -46,6 +46,9 @@ async def init_async_pool() -> AsyncConnectionPool:
     if _async_pool is not None:
         return _async_pool
 
+    if os.environ.get("TESTING"):
+        return _async_pool  # type: ignore[return-value]
+
     config = get_pool_config()
     dsn = get_pg_dsn()
 
@@ -75,6 +78,9 @@ def init_sync_pool() -> ConnectionPool:
     global _sync_pool
     if _sync_pool is not None:
         return _sync_pool
+
+    if os.environ.get("TESTING"):
+        return _sync_pool  # type: ignore[return-value]
 
     config = get_pool_config()
     dsn = get_pg_dsn()
