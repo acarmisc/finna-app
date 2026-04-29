@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from typing import Any
 
@@ -39,18 +40,22 @@ __all__ = ["app", "auth", "db", "routes"]
 @app.on_event("startup")
 async def startup_event() -> None:
     """Initialize database connection pool on startup."""
-    await db.init_async_pool()
+    if not os.environ.get("TESTING"):
+        await db.init_async_pool()
 
 
 @app.on_event("shutdown")
 async def shutdown_event() -> None:
     """Close database connection pool on shutdown."""
-    db.close_pools()
+    if not os.environ.get("TESTING"):
+        db.close_pools()
 
 
 @app.middleware("http")
 async def db_session_middleware(request: Request, call_next: Any) -> Any:
     """Attach database connection to request."""
+    if os.environ.get("TESTING"):
+        return await call_next(request)
     try:
         async with db.get_async_connection() as conn:
             request.state.db = conn
