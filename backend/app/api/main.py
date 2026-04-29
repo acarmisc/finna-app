@@ -51,10 +51,14 @@ async def shutdown_event() -> None:
 @app.middleware("http")
 async def db_session_middleware(request: Request, call_next: Any) -> Any:
     """Attach database connection to request."""
-    async with db.get_async_connection() as conn:
-        request.state.db = conn
+    try:
+        async with db.get_async_connection() as conn:
+            request.state.db = conn
+            response = await call_next(request)
+        return response
+    except Exception:
         response = await call_next(request)
-    return response
+        return response
 
 
 # Health check endpoints
