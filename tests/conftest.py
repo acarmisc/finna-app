@@ -6,7 +6,7 @@ import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 backend_path = Path(__file__).parent.parent / "backend" / "app"
 if str(backend_path) not in sys.path:
@@ -56,9 +56,12 @@ def mock_connection():
 @pytest.fixture
 def client(mock_connection, mock_sync_pool):
     """Create test client with mocked dependencies."""
+    from backend.app.api import db as db_module
     from backend.app.api import main as main_module
 
     original_lifespan = main_module.app.router.lifespan_context
+    original_async_pool = db_module._async_pool
+    original_sync_pool = db_module._sync_pool
 
     @asynccontextmanager
     async def noop_lifespan(app):
@@ -66,17 +69,57 @@ def client(mock_connection, mock_sync_pool):
 
     main_module.app.router.lifespan_context = noop_lifespan
 
-    @asynccontextmanager
-    async def mock_get_async_connection():
-        yield MagicMock()
+    db_module._async_pool = MagicMock()
+    db_module._sync_pool = mock_sync_pool
 
-    with patch("backend.app.api.db.get_async_connection", side_effect=mock_get_async_connection), \
-         patch("backend.app.api.db.init_async_pool", new_callable=AsyncMock, return_value=MagicMock()), \
-         patch("backend.app.api.main.db_session_middleware", new=lambda req, call_next: call_next(req)):
+    try:
         with TestClient(main_module.app, raise_server_exceptions=False) as test_client:
             yield test_client
+    finally:
+        main_module.app.router.lifespan_context = original_lifespan
+        db_module._async_pool = original_async_pool
+        db_module._sync_pool = original_sync_pool
 
-    main_module.app.router.lifespan_context = original_lifespan
+
+@pytest.fixture
+def auth_client(mock_connection, mock_sync_pool):
+    """Create test client with mocked dependencies and authentication."""
+    from backend.app.api import db as db_module
+    from backend.app.api import main as main_module
+    from backend.app.api.auth import create_access_token
+
+    original_lifespan = main_module.app.router.lifespan_context
+    original_async_pool = db_module._async_pool
+    original_sync_pool = db_module._sync_pool
+
+    @asynccontextmanager
+    async def noop_lifespan(app):
+        yield
+
+    main_module.app.router.lifespan_context = noop_lifespan
+
+    db_module._async_pool = MagicMock()
+    db_module._sync_pool = mock_sync_pool
+
+    try:
+        token = create_access_token(data={"sub": "testuser"})
+        auth_headers = {"Authorization": f"Bearer {token}"}
+
+        with TestClient(main_module.app, raise_server_exceptions=False) as test_client:
+            original_request = test_client.request
+
+            def patched_request(method, url, **kwargs):
+                headers = kwargs.get("headers") or {}
+                headers.update(auth_headers)
+                kwargs["headers"] = headers
+                return original_request(method, url, **kwargs)
+
+            test_client.request = lambda m, u, **kw: patched_request(m, u, **kw)
+            yield test_client
+    finally:
+        main_module.app.router.lifespan_context = original_lifespan
+        db_module._async_pool = original_async_pool
+        db_module._sync_pool = original_sync_pool
 
 
 @pytest.fixture
