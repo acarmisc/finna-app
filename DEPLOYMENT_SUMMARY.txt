@@ -1,19 +1,19 @@
 ✅ **FinOps Console - Deployment Summary**
 
 **Backend API (Production Ready):**
-- URL: https://finna-app.ces.abssrv.it
+- URL: https://\<your-domain\>/api/v1
 - Status: Fully operational
 - Extractors: 7 runs (1 successful: 9504 records)
 - Credentials: admin/admin
 
 **Frontend (GKE - Staging):**
-- URL: https://finna-app-ui.ces.abssrv.it
+- URL: https://<your-domain>
 - Namespace: finna-app-staging
 - TLS: Active (cert-manager)
 
 **Live Demo Access:**
-- Frontend (UI): https://finna-app-ui.ces.abssrv.it
-- Backend (API): https://finna-app.ces.abssrv.it
+- Frontend (UI): https://<your-domain>
+- Backend (API): https://<your-domain>/api/v1
 - Credentials: Username: admin | Password: admin
 
 **Repository:**

@@ -44,9 +44,9 @@ This is a pixel-art dark-themed FinOps dashboard (Azure/GCP/LLM costs). Follow t
 
 - Dev server proxies `/api` to `http://localhost:8000` (vite.config.ts:17)
 - Deployment uses GKE (`finna-app-staging` namespace, `finna-console` deployment)
-- Docker image: `europe-west1-docker.pkg.dev/abs-digital-playground/finna-app-staging/frontend:latest`
-- Backend endpoint: `https://finna-app.ces.abssrv.it/api/v1`
-- Frontend URL: `https://finna-app-ui.ces.abssrv.it`
+- Docker image: `europe-west1-docker.pkg.dev/<gcp-project-id>/finna-app-staging/frontend:latest`
+- Backend endpoint: `https://<your-domain>/api/v1`
+- Frontend URL: `https://<your-domain>`
 - Build artifact: `dist/` → nginx `/usr/share/nginx/html/`
 
 ## Testing

@@ -27,7 +27,7 @@ Pixel-art dark theme con:
 
 - Accesso GCP con `gcloud` autenticato: `gcloud auth login`
 - Docker installato
-- kubectl configurato per il cluster `REDACTED-CLUSTER-NAME`
+- kubectl configurato per il cluster `<gke-cluster-name>`
 
 ### Build e push
 
@@ -37,8 +37,8 @@ npm run build
 
 # Build e push Docker image
 docker build -t finna-frontend:latest .
-docker tag finna-frontend:latest europe-west1-docker.pkg.dev/abs-digital-playground/finna-app-staging/frontend:latest
-docker push europe-west1-docker.pkg.dev/abs-digital-playground/finna-app-staging/frontend:latest
+docker tag finna-frontend:latest europe-west1-docker.pkg.dev/<gcp-project-id>/finna-app-staging/frontend:latest
+docker push europe-west1-docker.pkg.dev/<gcp-project-id>/finna-app-staging/frontend:latest
 
 # Rollout su GKE
 kubectl rollout restart deployment/finna-console -n finna-app-staging
@@ -47,8 +47,8 @@ kubectl rollout status deployment/finna-console -n finna-app-staging --timeout=1
 
 ### Endpoints
 
-- **Frontend UI**: `https://finna-app-ui.ces.abssrv.it` ✅ live (2/2 pods ready)
-- **Backend API**: `https://finna-app.ces.abssrv.it/api/v1`
+- **Frontend UI**: `https://<your-domain>`
+- **Backend API**: `https://<your-domain>/api/v1`
 - **Namespace GKE**: `finna-app-staging`
 - **Ingress**: Traefik con TLS su REDACTED-LB-IP
 
@@ -69,4 +69,4 @@ Password: admin
 ---
 
 *Build timestamp: 2026-04-28*
-*Docker image: `europe-west1-docker.pkg.dev/abs-digital-playground/finna-app-staging/frontend:latest`*
+*Docker image: `europe-west1-docker.pkg.dev/<gcp-project-id>/finna-app-staging/frontend:latest`*

@@ -15,7 +15,7 @@ const CONNECTIONS = [
     health:'healthy', records_total:'2.4M',
   },
   {
-    id:'ds2', name:'GCP · abs-digital-playground', provider:'gcp',
+    id:'ds2', name:'GCP · my-gcp-project', provider:'gcp',
     type:'project', scope:'project',
     config:'gcp-production', config_id:'cfg2',
     extractor:'gcp_billing', schedule:'0 * * * *',
