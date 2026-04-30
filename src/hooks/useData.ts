@@ -1,23 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getApiClient } from '../services/apiClient'
+import { useAuthStore } from '@/store/auth'
+import { getApiClient } from '@/services/apiClient'
 
 export function useAuth() {
-  const [authenticated, setAuthenticated] = useState(false)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const token = localStorage.getItem('finna-auth-token')
-    setAuthenticated(!!token)
-    setLoading(false)
-  }, [])
-
-  const logout = useCallback(() => {
-    localStorage.removeItem('finna-auth-token')
-    setAuthenticated(false)
-    window.location.reload()
-  }, [])
-
-  return { authenticated, loading, setAuthenticated, logout }
+  const { checkAuth, isAuthenticated, logout } = useAuthStore()
+  
+  useEffect(() => { checkAuth() }, [])
+  
+  return { 
+    authenticated: isAuthenticated,
+    loading: !isAuthenticated,
+    logout
+  }
 }
 
 export function useCostTotals(params?: { startDate?: string, endDate?: string }) {
@@ -29,14 +23,14 @@ export function useCostTotals(params?: { startDate?: string, endDate?: string })
     setLoading(true)
     setError('')
     getApiClient().getCostTotals(params)
-      .then(r => { 
+      .then((r: any) => { 
         if (r.error) {
           setError(r.error.message || 'Failed to load totals')
         } else {
           setData(r.data)
         }
       })
-      .catch(e => setError(e.message || 'Network error'))
+      .catch((e: Error) => setError(e.message || 'Network error'))
       .finally(() => setLoading(false))
   }, [JSON.stringify(params)])
 
@@ -54,14 +48,14 @@ export function useDailyCosts(params?: { startDate?: string, endDate?: string, p
     setLoading(true)
     setError('')
     getApiClient().getDailyCosts(params)
-      .then(r => { 
+      .then((r: any) => { 
         if (r.error) {
           setError(r.error.message || 'Failed to load daily costs')
         } else {
           setData(r.data)
         }
       })
-      .catch(e => setError(e.message || 'Network error'))
+      .catch((e: Error) => setError(e.message || 'Network error'))
       .finally(() => setLoading(false))
   }, [JSON.stringify(params)])
 
@@ -79,14 +73,14 @@ export function useCosts(params?: { provider?: string; project?: string; startDa
     setLoading(true)
     setError('')
     getApiClient().getCosts(params)
-      .then(r => { 
+      .then((r: any) => { 
         if (r.error) {
           setError(r.error.message || 'Failed to load costs')
         } else {
           setData(r.data)
         }
       })
-      .catch(e => setError(e.message || 'Network error'))
+      .catch((e: Error) => setError(e.message || 'Network error'))
       .finally(() => setLoading(false))
   }, [JSON.stringify(params)])
 
@@ -105,14 +99,14 @@ export function useAlerts(params?: { status?: string; severity?: string; limit?:
     setRefreshing(true)
     setError('')
     getApiClient().getAlerts(params)
-      .then(r => { 
+      .then((r: any) => { 
         if (r.error) {
           setError(r.error.message || 'Failed to load alerts')
         } else {
           setData(r.data)
         }
       })
-      .catch(e => setError(e.message || 'Network error'))
+      .catch((e: Error) => setError(e.message || 'Network error'))
       .finally(() => { setLoading(false); setRefreshing(false) })
   }, [JSON.stringify(params)])
 
@@ -130,14 +124,14 @@ export function useAlertStats() {
     setLoading(true)
     setError('')
     getApiClient().getAlertStats()
-      .then(r => { 
+      .then((r: any) => { 
         if (r.error) {
           setError(r.error.message || 'Failed to load alert stats')
         } else {
           setData(r.data)
         }
       })
-      .catch(e => setError(e.message || 'Network error'))
+      .catch((e: Error) => setError(e.message || 'Network error'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -155,14 +149,14 @@ export function useConnections() {
     setLoading(true)
     setError('')
     getApiClient().getConnections()
-      .then(r => { 
+      .then((r: any) => { 
         if (r.error) {
           setError(r.error.message || 'Failed to load connections')
         } else {
           setData(r.data)
         }
       })
-      .catch(e => setError(e.message || 'Network error'))
+      .catch((e: Error) => setError(e.message || 'Network error'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -180,14 +174,14 @@ export function useProjects() {
     setLoading(true)
     setError('')
     getApiClient().getProjects()
-      .then(r => { 
+      .then((r: any) => { 
         if (r.error) {
           setError(r.error.message || 'Failed to load projects')
         } else {
           setData(r.data)
         }
       })
-      .catch(e => setError(e.message || 'Network error'))
+      .catch((e: Error) => setError(e.message || 'Network error'))
       .finally(() => setLoading(false))
   }, [])
 

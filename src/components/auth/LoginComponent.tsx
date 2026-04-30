@@ -1,12 +1,14 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { useAuthStore } from '@/store/auth'
 
-export interface LoginComponentProps {
-  onLogin: () => void
+interface LoginComponentProps {
+  onLoginSuccess?: () => void
 }
 
-function LoginComponent({ onLogin }: LoginComponentProps) {
-  const [user, setUser] = useState('finops@acme.co')
+export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) {
+  const { setToken, checkAuth, login } = useAuthStore()
+  const [user, setUser] = useState('admin')
   const [pw, setPw] = useState('')
   const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
@@ -21,7 +23,9 @@ function LoginComponent({ onLogin }: LoginComponentProps) {
     setLoading(true)
     setTimeout(() => {
       setLoading(false)
-      onLogin()
+      const token = 'admin'
+      setToken(token)
+      onLoginSuccess?.()
     }, 700)
   }
 
@@ -65,12 +69,9 @@ function LoginComponent({ onLogin }: LoginComponentProps) {
           </div>
         </form>
         <div className="login-foot">
-          <span>v2.4.1</span>
-          <span>api · http://api.finna.dev</span>
+          <span>v0.1.0</span>
         </div>
       </div>
     </div>
   )
 }
-
-export default LoginComponent

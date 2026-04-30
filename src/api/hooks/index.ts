@@ -1,7 +1,7 @@
 // API hooks for Finna Console
 // Uses React Query with the existing apiClient
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getApiClient, APIClient } from '@/services/apiClient'
+import { getApiClient, type APIClient } from '@/services/apiClient'
 import {
   CostListResponse,
   CostTotalsResponse,
