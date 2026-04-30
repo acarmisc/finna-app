@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
+import { useNavigate } from 'react-router-dom'
 
 export interface AppShellProps {
   children: React.ReactNode | ((route: RouteState, ctx: { range: string; customRange: { start: string; end: string } | null }) => React.ReactNode)
@@ -10,7 +11,7 @@ export interface AppShellProps {
   onLogout?: () => void
 }
 
-interface RouteState {
+export interface RouteState {
   path: string
   base: string
   sub: string | null
@@ -47,15 +48,12 @@ const AppShell: React.FC<AppShellProps> = ({
   onToggleSidebar,
   onLogout,
 }) => {
+  const navigate = useNavigate()
   const route = useHashRoute()
   const [collapsed, setCollapsed] = useState(initialCollapsed)
-  const [range, setRange] = useState('mtd')
-  const [customRange, setCustomRange] = useState<{ start: string; end: string } | null>(null)
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
 
-  // Expose range to window for child components
-  ;(window as any).__finnaRange = range
-  ;(window as any).__finnaCustomRange = customRange
+  useEffect(() => {
+  }, [])
 
   const handleToggle = onToggleSidebar || (() => { setCollapsed((v: boolean) => !v) })
 
@@ -67,23 +65,26 @@ const AppShell: React.FC<AppShellProps> = ({
         activeBase={route.base}
         onLogout={onLogout}
       />
-      <TopBar
-        route={route}
-        theme={theme}
-        setTheme={setTheme}
-        range={range}
-        setRange={setRange}
-        customRange={customRange}
-        setCustomRange={setCustomRange}
-      />
+      <TopBar route={route} />
       <main className="main">
         {typeof children === 'function'
-          ? children(route, { range, customRange })
+          ? children(route, {
+              range: route.qs.get('window') || 'mtd',
+              customRange: route.qs.get('start')
+                ? {
+                    start: route.qs.get('start')!,
+                    end: route.qs.get('end')!,
+                  }
+                : null,
+            })
           : children}
       </main>
+      <div className="sidebar-toggle" onClick={handleToggle}>
+        <span className="expand-icon">☰</span>
+        <span className="collapse-icon">✕</span>
+      </div>
     </div>
   )
 }
 
-export { useHashRoute }
 export default AppShell

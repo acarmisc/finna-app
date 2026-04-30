@@ -1,182 +1,178 @@
-import React, { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
+import { useState, useEffect } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ProviderBadge } from '@/components/shared/provider-badge'
 import { ProgressBar } from '@/components/shared/progress-bar'
-import { StatusBadge } from '@/components/shared/status-badge'
-import CostDeltaCell from '@/components/shared/cost-delta-cell'
+import { CostDeltaCell } from '@/components/shared/cost-delta-cell'
+import { EmptyState } from '@/components/shared/empty-state'
+import { Button } from '@/components/shared/Button'
 import { money } from '@/components/shared/money'
-import { ArrowLeft, Edit3, Trash2 } from 'lucide-react'
+import { useProject, useCosts } from '@/api/hooks'
+import { useToast } from '@/contexts/ToastContext'
+import type { Provider } from '@/types/api'
 
-const PROJECTS = [
-  {id:'p1', name:'production', slug:'production', provider:'azure', owner:'alice@acme.co', cost_center:'ENG-001', budget_cap:5000, mtd:3210.50, tags:['prod','critical']},
-  {id:'p2', name:'staging',    slug:'staging',    provider:'gcp',   owner:'bob@acme.co',   cost_center:'ENG-002', budget_cap:2000, mtd:890.25,  tags:['staging']},
-  {id:'p3', name:'ml-platform',slug:'ml-platform',provider:'llm',   owner:'carol@acme.co', cost_center:'ML-001',  budget_cap:1500, mtd:1240.00, tags:['ml','internal']},
-  {id:'p4', name:'dev-sandbox',slug:'dev-sandbox',provider:'azure', owner:'dave@acme.co',  cost_center:'ENG-003', budget_cap:500,  mtd:145.00,  tags:['dev']},
-]
+function Sparkline({ seed = 1, up = true }: { seed?: number; up?: boolean }) {
+  const len = 12
+  const pts = Array.from({ length: len }, (_, i) => {
+    const n = Math.sin(seed + i * 0.9) * 0.3 + Math.cos(i * 0.5) * 0.2 + (up ? i * 0.08 : -i * 0.06)
+    return { x: i, y: n }
+  })
+  const ys = pts.map(p => p.y)
+  const miny = Math.min(...ys)
+  const maxy = Math.max(...ys)
+  const w = 140, h = 28
+  const path = pts.map((p, i) => {
+    const x = (p.x / (len - 1)) * w
+    const y = h - ((p.y - miny) / (maxy - miny + 0.001)) * h
+    return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+      <path d={path} fill="none" stroke={up ? 'var(--danger)' : 'var(--accent)'} strokeWidth="1.5" />
+    </svg>
+  )
+}
 
-const COST_SKUS: Record<string,Array<{sku:string,mtd:number,prev:number,delta:number}>> = {
-  'production': [
-    {sku:'Virtual Machines', mtd:1820.00, prev:1540.00, delta:18.2},
-    {sku:'Blob Storage',      mtd:640.50,  prev:580.00,  delta:10.4},
-    {sku:'SQL Database',      mtd:450.00,  prev:420.00,  delta:7.1},
-    {sku:'AKS Cluster',       mtd:300.00,  prev:280.00,  delta:7.1},
-  ],
-  'staging': [
-    {sku:'Compute Engine',   mtd:520.00,  prev:480.00,  delta:8.3},
-    {sku:'Cloud Storage',    mtd:210.25,  prev:195.00,  delta:7.8},
-    {sku:'BigQuery',         mtd:160.00,  prev:140.00,  delta:14.3},
-  ],
-  'ml-platform': [
-    {sku:'Claude API',       mtd:780.00,  prev:620.00,  delta:25.8},
-    {sku:'GPT-4o',           mtd:320.00,  prev:280.00,  delta:14.3},
-    {sku:'Embeddings',       mtd:140.00,  prev:110.00,  delta:27.3},
-  ],
-  'dev-sandbox': [
-    {sku:'VM Instances',     mtd:95.00,   prev:90.00,   delta:5.6},
-    {sku:'Cloud Storage',    mtd:50.00,   prev:45.00,   delta:11.1},
-  ],
+const tagsToList = (tags?: any): string[] => {
+  if (!tags) return []
+  if (Array.isArray(tags)) return tags
+  return Object.entries(tags).map(([k, v]) => v && v !== 'true' ? `${k}:${v}` : k)
 }
 
 export function ProjectDetailPage() {
-  const { slug } = useParams<{slug:string}>()
-  const p = PROJECTS.find(x => x.slug === slug)
+  const navigate = useNavigate()
+  const { slug = '' } = useParams<{ slug: string }>()
+  const toast = useToast()
+  const { data: p, isLoading } = useProject(slug)
+  const { data: costsResp } = useCosts({ project: slug })
+
   const [note, setNote] = useState('')
+  useEffect(() => { setNote((p as any)?.note ?? '') }, [(p as any)?.note])
+
+  if (isLoading) {
+    return <div className="page"><div className="muted mono" style={{ textAlign: 'center', padding: 48 }}>// loading project…</div></div>
+  }
 
   if (!p) {
     return (
       <div className="page">
-        <div className="page-head">
-          <h1>Project not found</h1>
-        </div>
-        <Card>
-          <CardContent className="pt-6 text-center text-muted-foreground">
-            no project matches slug "{slug}"
-          </CardContent>
-        </Card>
+        <EmptyState
+          icon="search-x"
+          title="Project not found"
+          message={`no project matches slug "${slug}"`}
+          action={<Button onClick={() => navigate('/projects')} bracket>back to projects</Button>}
+        />
       </div>
     )
   }
 
-  const pct = (p.mtd/p.budget_cap)*100
-  const skus = COST_SKUS[slug!] || []
+  const cap = p.budget_cap ?? 0
+  const mtd = p.mtd ?? 0
+  const pct = cap > 0 ? (mtd / cap) * 100 : 0
+  const provider = (p.provider ?? 'azure') as Provider
+
+  const skus = costsResp?.costs?.map(c => ({ sku: c.sku, mtd: c.mtd, prev: c.prev ?? 0, delta: c.delta ?? 0 })) ?? []
+
+  const tags = tagsToList(p.tags)
+  const totalMtd = skus.reduce((s, c) => s + c.mtd, 0)
+  const totalPrev = skus.reduce((s, c) => s + c.prev, 0)
 
   return (
     <div className="page">
       <div className="page-head">
         <div>
-          <Link to="/projects" className="font-mono text-[11px] text-muted-foreground hover:text-foreground mb-1 inline-block">
-            ← projects
-          </Link>
-          <h1 className="flex items-center gap-2">
-            <ProviderBadge provider={p.provider} size="lg"/>
-            {p.name}
+          <Link to="/projects" className="mono muted" style={{ fontSize: 11 }}>← projects</Link>
+          <h1 style={{ marginTop: 6 }}>
+            <span className="hstack-3">
+              <ProviderBadge provider={provider} size="lg" />
+              {p.name}
+            </span>
           </h1>
-          <div className="flex gap-4 mt-1 text-[11px] font-mono text-muted-foreground">
-            <span>owner · <b className="text-foreground">{p.owner}</b></span>
-            <span>cost_center · <b className="text-foreground">{p.cost_center}</b></span>
-            <span>slug · <b className="text-foreground">{p.slug}</b></span>
+          <div className="hstack-3 sub" style={{ marginTop: 6, flexWrap: 'wrap' }}>
+            <span>owner · <b style={{ color: 'var(--fg)' }}>{p.owner ?? '—'}</b></span>
+            <span>cost_center · <b style={{ color: 'var(--fg)' }}>{p.cost_center ?? '—'}</b></span>
+            <span>slug · <b style={{ color: 'var(--fg)' }}>{p.slug ?? slug}</b></span>
+            {tags.length > 0 && <span>tags · {tags.map(t => <span key={t} className="chip" style={{ marginRight: 4 }}>{t}</span>)}</span>}
           </div>
         </div>
         <div className="actions">
-          <Button variant="outline" size="sm"><Edit3 className="w-3 h-3"/>edit</Button>
-          <Button variant="destructive" size="sm"><Trash2 className="w-3 h-3"/>delete</Button>
+          <Button icon="edit-3" bracket>edit</Button>
+          <Button icon="trash-2" variant="danger" bracket>delete</Button>
         </div>
       </div>
 
-      <div className="row" style={{gridTemplateColumns:'1fr 340px', gap:16, marginBottom:16}}>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-              Monthly budget · Apr 2026
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex justify-between items-start mb-4">
+      <div className="row row-2-6040-rev" style={{ gap: 12 }}>
+        <div className="card">
+          <div className="card-hd"><h3>Monthly budget</h3><span className="chip">Apr 2026</span></div>
+          <div className="card-bd">
+            <div className="spread">
               <div>
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">MTD</div>
-                <div className="text-3xl font-mono font-semibold text-foreground tabular-nums">
-                  {money(p.mtd)}<span className="text-sm text-muted-foreground ml-1">USD</span>
-                </div>
+                <div className="stat-lbl">MTD</div>
+                <div className="stat-val" style={{ fontSize: 32 }}>{money(mtd)}<span className="ccy">USD</span></div>
               </div>
-              <div className="text-right">
-                <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">cap</div>
-                <div className="text-xl font-mono text-muted-foreground tabular-nums">{money(p.budget_cap,0)}</div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="stat-lbl">cap</div>
+                <div className="stat-val" style={{ fontSize: 20, color: 'var(--fg-muted)' }}>{cap ? money(cap, 0) : '—'}</div>
               </div>
             </div>
-            <ProgressBar value={p.mtd} max={p.budget_cap} stepped segments={20}/>
-            <div className="flex justify-between mt-2">
-              <span className="font-mono text-[10px] text-muted-foreground">{pct.toFixed(1)}% utilized</span>
-              <span className="font-mono text-[10px]"
-                style={{color: pct>=90?'var(--danger)':pct>=70?'var(--warning)':'var(--accent)'}}>
-                {pct>=90?'OVER THRESHOLD':pct>=70?'NEAR CAP':'HEALTHY'}
-              </span>
+            <div style={{ marginTop: 16 }}>
+              <ProgressBar value={mtd} max={Math.max(cap, 1)} stepped segments={20} />
+              <div className="hstack spread mt-2">
+                <span className="mono" style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{cap ? `${pct.toFixed(1)}% utilized` : 'no budget cap'}</span>
+                <span className="mono" style={{ fontSize: 11, color: pct >= 90 ? 'var(--danger)' : pct >= 70 ? 'var(--warning)' : 'var(--accent)' }}>
+                  {cap ? (pct >= 90 ? 'OVER THRESHOLD' : pct >= 70 ? 'NEAR CAP' : 'HEALTHY') : '—'}
+                </span>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-              Notes <span className="text-[10px] text-muted-foreground normal-case tracking-normal">// editable</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              className="font-mono text-xs mb-2"
-              rows={4}
-              value={note}
-              onChange={e=>setNote(e.target.value)}
-              placeholder="// operator notes…"
-            />
-            <div className="flex justify-end">
-              <Button size="sm" variant="default">save</Button>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-hd"><h3>Notes</h3><span className="mono muted" style={{ fontSize: 10 }}>editable</span></div>
+          <div className="card-bd">
+            <textarea className="txt" rows={4} value={note} onChange={e => setNote(e.target.value)} placeholder="// operator notes…" style={{ resize: 'vertical', minHeight: 80 }} />
+            <div className="hstack" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
+              <Button size="sm" onClick={() => toast.showSuccess('Notes saved')} bracket>save</Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
-            Cost breakdown · SKU
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-surface-alt">
-                  <th className="text-left px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-normal">SKU</th>
-                  <th className="text-right px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-normal">MTD</th>
-                  <th className="text-right px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-normal">Previous</th>
-                  <th className="text-right px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-normal">Δ</th>
+      <div className="card mt-3">
+        <div className="card-hd">
+          <h3>Cost breakdown · SKU</h3>
+          <Link to="/costs" style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>open in explorer →</Link>
+        </div>
+        <div className="card-bd p0">
+          <table className="tbl">
+            <thead><tr>
+              <th>SKU</th><th className="num">MTD</th><th className="num">Previous</th><th className="num">Δ</th><th>Trend</th>
+            </tr></thead>
+            <tbody>
+              {skus.map((c, i) => (
+                <tr key={`${c.sku}-${i}`}>
+                  <td className="mono">{c.sku}</td>
+                  <td className="num mono">{money(c.mtd)}</td>
+                  <td className="num mono muted">{money(c.prev)}</td>
+                  <td className="num"><CostDeltaCell value={c.delta} /></td>
+                  <td style={{ width: 160 }}><Sparkline seed={c.sku.length} up={c.delta > 0} /></td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {skus.map(c => (
-                  <tr key={c.sku} className="hover:bg-surface-alt transition-colors">
-                    <td className="px-4 py-2 font-mono text-xs text-foreground">{c.sku}</td>
-                    <td className="px-4 py-2 text-right font-mono text-xs text-foreground tabular-nums">{money(c.mtd)}</td>
-                    <td className="px-4 py-2 text-right font-mono text-xs text-muted-foreground tabular-nums">{money(c.prev)}</td>
-                    <td className="px-4 py-2 text-right"><CostDeltaCell value={c.delta}/></td>
-                  </tr>
-                ))}
-              </tbody>
+              ))}
+              {skus.length === 0 && (
+                <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 24 }}>// no cost records</td></tr>
+              )}
+            </tbody>
+            {skus.length > 0 && (
               <tfoot>
-                <tr className="border-t border-border font-semibold">
-                  <td className="px-4 py-2 text-sm">Total</td>
-                  <td className="px-4 py-2 text-right font-mono text-xs text-foreground tabular-nums">{money(skus.reduce((s,c)=>s+c.mtd,0))}</td>
-                  <td className="px-4 py-2 text-right font-mono text-xs text-muted-foreground tabular-nums">{money(skus.reduce((s,c)=>s+c.prev,0))}</td>
-                  <td></td>
+                <tr>
+                  <td>Total</td>
+                  <td className="num mono">{money(totalMtd)}</td>
+                  <td className="num mono muted">{money(totalPrev)}</td>
+                  <td></td><td></td>
                 </tr>
               </tfoot>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+            )}
+          </table>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,71 +1,80 @@
-import React, { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ProviderBadge } from '@/components/shared/provider-badge'
 import { StatusBadge } from '@/components/shared/status-badge'
-import { money } from '@/components/shared/money'
-import { Plus, Edit3, Activity, Trash2, Play } from 'lucide-react'
+import { Dialog } from '@/components/shared/dialog'
+import { EmptyState } from '@/components/shared/empty-state'
+import { Button } from '@/components/shared/Button'
+import { useConnections, useTestConnection, useDeleteConnection } from '@/api/hooks'
+import { useToast } from '@/contexts/ToastContext'
+import type { Provider } from '@/types/api'
 
-const CONFIGS = [
-  {
-    id:'cfg1', name:'acme-prod-azure', provider:'azure',
-    credential_type:'service_principal',
-    tenant_id:'8f2c-…-a1e9', subscription_id:'7795…',
-    created_at:'Jan 15, 2026', last_test:'completed', last_test_at:'Apr 23 06:00',
-    err:null,
-  },
-  {
-    id:'cfg2', name:'gcp-production', provider:'gcp',
-    credential_type:'service_account',
-    project_id:'abs-digital-playground',
-    created_at:'Feb 3, 2026', last_test:'completed', last_test_at:'Apr 23 06:00',
-    err:null,
-  },
-  {
-    id:'cfg3', name:'llm-gateway', provider:'llm',
-    credential_type:'api_key',
-    created_at:'Mar 10, 2026', last_test:'failed', last_test_at:'Apr 22 14:30',
-    err:'rate limit exceeded · 429',
-  },
-]
+type ConfigRow = {
+  id: string
+  name: string
+  provider: Provider | string
+  credential_type: string
+  tenant_id?: string
+  subscription_id?: string
+  project_id?: string
+  created_at?: string
+  last_test?: string
+  last_test_at?: string
+  err?: string | null
+}
 
-function ConfirmDialog({ open, onClose, onConfirm, title, children }: {
-  open: boolean
-  onClose: ()=>void
-  onConfirm: ()=>void
-  title: string
-  children: React.ReactNode
-}) {
-  if (!open) return null
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55" onClick={onClose}>
-      <div className="bg-surface border border-border w-full max-w-md" onClick={e=>e.stopPropagation()}>
-        <div className="px-4 py-3 border-b border-border">
-          <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">{title}</h3>
-        </div>
-        <div className="px-4 py-4 text-sm text-foreground">{children}</div>
-        <div className="px-4 py-3 border-t border-border flex justify-end gap-2">
-          <Button size="sm" variant="outline" onClick={onClose}>cancel</Button>
-          <Button size="sm" variant="destructive" onClick={onConfirm}>delete</Button>
-        </div>
-      </div>
-    </div>
-  )
+const normalize = (c: any): ConfigRow => {
+  const cfg = c.config || {}
+  return {
+    id: c.id,
+    name: c.name,
+    provider: c.provider,
+    credential_type: c.credential_type,
+    tenant_id: cfg.tenant_id,
+    subscription_id: cfg.subscription_id,
+    project_id: cfg.project_id,
+    created_at: c.created_at ? new Date(c.created_at).toLocaleDateString() : undefined,
+    last_test: c.last_test ?? 'pending',
+    last_test_at: c.last_test_at,
+    err: c.error_message ?? c.err,
+  }
 }
 
 export function ConfigsListPage() {
-  const [testing, setTesting] = useState<string|null>(null)
-  const [results, setResults] = useState<Record<string,'ok'|'err'|null>>({})
-  const [confirmDel, setConfirmDel] = useState<typeof CONFIGS[0]|null>(null)
+  const navigate = useNavigate()
+  const toast = useToast()
+  const { data } = useConnections()
+  const testMut = useTestConnection()
+  const delMut = useDeleteConnection()
 
-  const testConn = (c: typeof CONFIGS[0]) => {
-    setTesting(c.id)
-    setTimeout(() => {
-      setTesting(null)
-      const ok = c.last_test !== 'failed'
-      setResults(r => ({...r, [c.id]: ok ? 'ok' : 'err'}))
-      setTimeout(() => setResults(r => ({...r, [c.id]: null})), 2200)
-    }, 900)
+  const [confirmDel, setConfirmDel] = useState<ConfigRow | null>(null)
+  const [flash, setFlash] = useState<Record<string, 'ok' | 'err'>>({})
+
+  const list: ConfigRow[] = (data ?? []).map(normalize)
+  const failures = list.filter(c => c.last_test === 'failed' || c.err).length
+
+  const testConn = (c: ConfigRow) => {
+    testMut.mutate(c.id, {
+      onSuccess: (res: any) => {
+        const ok = res?.data?.ok ?? true
+        setFlash(f => ({ ...f, [c.id]: ok ? 'ok' : 'err' }))
+        toast[ok ? 'showSuccess' : 'showError'](ok ? `Connection ${c.name} · OK` : `Connection ${c.name} failed`)
+        setTimeout(() => setFlash(f => { const n = { ...f }; delete n[c.id]; return n }), 2200)
+      },
+      onError: () => {
+        setFlash(f => ({ ...f, [c.id]: 'err' }))
+        toast.showError(`Connection ${c.name} failed`)
+        setTimeout(() => setFlash(f => { const n = { ...f }; delete n[c.id]; return n }), 2200)
+      },
+    })
+  }
+
+  const doDelete = () => {
+    if (!confirmDel) return
+    delMut.mutate(confirmDel.id, {
+      onSuccess: () => { toast.showSuccess(`Deleted ${confirmDel.name}`); setConfirmDel(null) },
+      onError: () => { toast.showError('Delete failed'); setConfirmDel(null) },
+    })
   }
 
   return (
@@ -73,87 +82,79 @@ export function ConfigsListPage() {
       <div className="page-head">
         <div>
           <h1>Cloud configs</h1>
-          <div className="sub">// {CONFIGS.length} configured · 1 test failure in last 24h</div>
+          <div className="sub">// {list.length} configured · {failures} test failures in last 24h</div>
         </div>
         <div className="actions">
-          <Button variant="default" size="sm" onClick={()=>window.location.hash='#/configs/new'}>
-            <Plus className="w-3 h-3"/>new config
-          </Button>
+          <Button icon="plus" variant="primary" bracket onClick={() => navigate('/configs/new')}>new config</Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-        {CONFIGS.map(c => {
-          const flash = results[c.id]
+      {list.length === 0 ? (
+        <EmptyState icon="plug" title="No cloud configs" message="add an Azure / GCP / LLM connection to start tracking costs" action={<Button variant="primary" bracket icon="plus" onClick={() => navigate('/configs/new')}>new config</Button>} />
+      ) : (
+      <div className="row row-3" style={{ gap: 12 }}>
+        {list.map(c => {
+          const f = flash[c.id]
           return (
-            <Card key={c.id} style={{
-              borderColor: flash==='ok' ? 'var(--accent)' : flash==='err' ? 'var(--danger)' : 'var(--border)',
-              transition:'border-color 150ms'
-            }}>
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-sm font-semibold text-foreground">{c.name}</CardTitle>
-                    <div className="font-mono text-[10px] text-muted-foreground mt-0.5">{c.credential_type}</div>
-                  </div>
-                  <ProviderBadge provider={c.provider} size="lg"/>
+            <div key={c.id} className="card" style={{ borderColor: f === 'ok' ? 'var(--accent)' : f === 'err' ? 'var(--danger)' : 'var(--border)', transition: 'border-color 150ms' }}>
+              <div className="card-hd">
+                <div>
+                  <h3 style={{ color: 'var(--fg)', fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 600 }}>{c.name}</h3>
+                  <div className="mono muted" style={{ fontSize: 10, marginTop: 2 }}>{c.credential_type}</div>
                 </div>
-              </CardHeader>
-              <CardContent className="pb-3">
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                  {c.tenant_id && <>
-                    <dt className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">TENANT</dt>
-                    <dd className="font-mono text-[10px] text-foreground">{c.tenant_id}</dd>
-                  </>}
-                  {c.subscription_id && <>
-                    <dt className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">SUB</dt>
-                    <dd className="font-mono text-[10px] text-foreground">{c.subscription_id}</dd>
-                  </>}
-                  {c.project_id && <>
-                    <dt className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">PROJECT</dt>
-                    <dd className="font-mono text-[10px] text-foreground">{c.project_id}</dd>
-                  </>}
-                  <dt className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">CREATED</dt>
-                  <dd className="font-mono text-[10px] text-foreground">{c.created_at}</dd>
-                  <dt className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">LAST TEST</dt>
-                  <dd className="flex items-center gap-1.5">
-                    <StatusBadge status={c.last_test}/>
-                    <span className="font-mono text-[10px] text-muted-foreground">{c.last_test_at}</span>
+                <ProviderBadge provider={c.provider} size="lg" />
+              </div>
+              <div className="card-bd">
+                <dl style={{ margin: 0, fontSize: 12, display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 12px' }}>
+                  {c.tenant_id && <><dt className="mono muted" style={{ fontSize: 10 }}>TENANT</dt><dd className="mono" style={{ margin: 0 }}>{c.tenant_id}</dd></>}
+                  {c.subscription_id && <><dt className="mono muted" style={{ fontSize: 10 }}>SUB</dt><dd className="mono" style={{ margin: 0 }}>{c.subscription_id}</dd></>}
+                  {c.project_id && <><dt className="mono muted" style={{ fontSize: 10 }}>PROJECT</dt><dd className="mono" style={{ margin: 0 }}>{c.project_id}</dd></>}
+                  {c.created_at && <><dt className="mono muted" style={{ fontSize: 10 }}>CREATED</dt><dd className="mono" style={{ margin: 0 }}>{c.created_at}</dd></>}
+                  <dt className="mono muted" style={{ fontSize: 10 }}>LAST TEST</dt>
+                  <dd style={{ margin: 0 }}>
+                    <span className="hstack">
+                      <StatusBadge status={c.last_test ?? 'pending'} />
+                      {c.last_test_at && <span className="mono muted" style={{ fontSize: 11 }}>{c.last_test_at}</span>}
+                    </span>
                   </dd>
                 </dl>
                 {c.err && (
-                  <div className="mt-3 px-3 py-2 text-[11px] font-mono text-danger border border-danger/20 bg-danger/5">
+                  <div style={{ marginTop: 10, padding: '8px 10px', background: 'color-mix(in oklab, var(--danger) 12%, var(--surface))', border: '1px solid var(--danger)', fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'var(--danger)' }}>
                     // {c.err}
                   </div>
                 )}
-              </CardContent>
-              <div className="px-4 py-2 border-t border-border flex items-center justify-between">
-                <div className="flex gap-1">
-                  <Button size="sm" variant="outline" onClick={()=>window.location.hash=`#/configs/${c.id}`}>
-                    <Edit3 className="w-3 h-3"/>edit
-                  </Button>
-                  <Button size="sm" variant="outline" disabled={testing===c.id} onClick={()=>testConn(c)}>
-                    <Activity className="w-3 h-3"/>{testing===c.id ? 'testing…' : 'test'}
+              </div>
+              <div className="card-ft">
+                <div className="hstack">
+                  <Button size="sm" icon="edit-3" bracket onClick={() => navigate(`/configs/${c.id}`)}>edit</Button>
+                  <Button size="sm" icon={testMut.isPending ? 'loader' : 'activity'} bracket disabled={testMut.isPending} onClick={() => testConn(c)}>
+                    {testMut.isPending ? 'testing…' : 'test'}
                   </Button>
                 </div>
-                <Button size="sm" variant="ghost" onClick={()=>setConfirmDel(c)}>
-                  <Trash2 className="w-3 h-3"/>
-                </Button>
+                <Button size="sm" variant="ghost" icon="trash-2" onClick={() => setConfirmDel(c)}>delete</Button>
               </div>
-            </Card>
+            </div>
           )
         })}
       </div>
+      )}
 
-      <ConfirmDialog
+      <Dialog
         open={!!confirmDel}
-        onClose={()=>setConfirmDel(null)}
-        onConfirm={()=>{ setConfirmDel(null); }}
-        title={`Delete config · ${confirmDel?.name || ''}`}
+        onClose={() => setConfirmDel(null)}
+        title={`Delete config · ${confirmDel?.name ?? ''}`}
+        actions={
+          <>
+            <Button onClick={() => setConfirmDel(null)} bracket>cancel</Button>
+            <Button variant="danger" bracket onClick={doDelete} disabled={delMut.isPending}>
+              {delMut.isPending ? 'deleting…' : 'delete'}
+            </Button>
+          </>
+        }
       >
-        <p className="text-sm text-foreground">This will remove the config and stop all scheduled extractions using it. Historical cost records remain.</p>
-        <p className="font-mono text-xs text-danger mt-2">// this action cannot be undone</p>
-      </ConfirmDialog>
+        <p>This will remove the config and stop all scheduled extractions using it. Historical cost records remain.</p>
+        <p className="mono" style={{ color: 'var(--danger)', marginTop: 12 }}>// this action cannot be undone</p>
+      </Dialog>
     </div>
   )
 }

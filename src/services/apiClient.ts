@@ -151,6 +151,10 @@ export class APIClient {
   async triggerExtractor(data: { config_id: string; extractor_type?: string }): Promise<{ data?: any; error?: any; status: number }> {
     return this.request('/extractors/run', { method: 'POST', body: JSON.stringify(data) })
   }
+  
+  async getExtractorLogs(runId: string): Promise<{ data?: any; error?: any; status: number }> {
+    return this.request(`/extractors/runs/${runId}/logs`)
+  }
 
   // --- Dashboard ---
   async getDashboardStats(range?: string): Promise<{ data?: any; error?: any; status: number }> {

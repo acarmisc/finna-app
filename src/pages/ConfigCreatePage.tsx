@@ -98,11 +98,11 @@ export function ConfigCreatePage() {
             </div>
           )}
 
-          {step===2 && prov==='azure' && (
-            <div className="space-y-4">
-              <div>
-                <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-1.5">credential type</label>
-                <Select value={cred} onValueChange={(v: string)=>setCred(v || "service_principal")}>
+           {step===2 && prov==='azure' && (
+             <div className="space-y-4">
+               <div>
+                 <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-1.5">credential type</label>
+                 <Select value={cred} onValueChange={(v: string | null)=>setCred(v || "service_principal")}>
                   <SelectTrigger className="font-mono text-xs"><SelectValue/></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="service_principal">service_principal</SelectItem>
@@ -141,11 +141,11 @@ export function ConfigCreatePage() {
             </div>
           )}
 
-          {step===2 && prov==='gcp' && (
-            <div className="space-y-4">
-              <div>
-                <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-1.5">credential type</label>
-                <Select value={cred} onValueChange={(v: string)=>setCred(v || "service_principal")}>
+           {step===2 && prov==='gcp' && (
+             <div className="space-y-4">
+               <div>
+                 <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-1.5">credential type</label>
+                 <Select value={cred} onValueChange={(v: string | null)=>setCred(v || "service_principal")}>
                   <SelectTrigger className="font-mono text-xs"><SelectValue/></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="service_principal">service account key</SelectItem>

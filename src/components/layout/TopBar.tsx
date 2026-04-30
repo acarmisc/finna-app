@@ -1,18 +1,21 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useEffect, useRef } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Icon } from '@/components/shared'
+
+interface Notification {
+  id: string
+  title: string
+  message: string
+  time: string
+  read: boolean
+  type: 'alert' | 'info' | 'warning'
+}
 
 export interface TopBarProps {
   route?: {
     base: string
     sub: string | null
   }
-  theme?: 'dark' | 'light'
-  setTheme?: (theme: 'dark' | 'light') => void
-  range?: string
-  setRange?: (range: string) => void
-  customRange?: { start: string; end: string } | null
-  setCustomRange?: (range: { start: string; end: string } | null) => void
 }
 
 interface DateRangePickerProps {
@@ -299,16 +302,31 @@ function DateRangePicker({ range, setRange, customRange, setCustomRange, label }
   )
 }
 
-const TopBar: React.FC<TopBarProps> = ({
-  route,
-  theme = 'dark',
-  setTheme,
-  range = 'mtd',
-  setRange,
-  customRange,
-  setCustomRange,
-}) => {
+const TopBar: React.FC<TopBarProps> = ({ route }) => {
   const navigate = useNavigate()
+  const [range, setRange] = useState('mtd')
+  const [customRange, setCustomRange] = useState<{ start: string; end: string } | null>(null)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const notificationsRef = useRef<HTMLDivElement>(null)
+  const bellRef = useRef<HTMLButtonElement>(null)
+
+  const mockNotifications: Notification[] = [
+    { id: 'n1', title: 'Cost Alert', message: 'Azure cost spike detected in prod', time: '2m ago', read: false, type: 'warning' },
+    { id: 'n2', title: 'Run Completed', message: 'GCP billing extraction completed', time: '15m ago', read: false, type: 'info' },
+    { id: 'n3', title: 'Alert Acknowledged', message: 'Critical alert ack by user', time: '1h ago', read: true, type: 'alert' },
+  ]
+  const unreadCount = mockNotifications.filter(n => !n.read).length
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node) &&
+          bellRef.current && !bellRef.current.contains(event.target as Node)) {
+        setNotificationsOpen(false)
+      }
+    }
+    if (notificationsOpen) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [notificationsOpen])
 
   const labelFor: Record<string, string> = {
     dashboard: 'Dashboard',
@@ -345,8 +363,7 @@ const TopBar: React.FC<TopBarProps> = ({
     return `${months[m - 1]} ${d}`
   }
 
-  const customLabel =
-    customRange ? `${fmt(customRange.start)} — ${fmt(customRange.end)}` : null
+  const customLabel = customRange ? `${fmt(customRange.start)} — ${fmt(customRange.end)}` : null
   const label = range === 'custom' && customLabel ? customLabel : presetLabel[range] || presetLabel['mtd']
 
   const handleNavigate = (path: string) => {
@@ -377,8 +394,8 @@ const TopBar: React.FC<TopBarProps> = ({
             <button
               key={k}
               onClick={() => {
-                setRange?.(k)
-                setCustomRange?.(null)
+                setRange(k)
+                setCustomRange(null)
               }}
               style={{
                 padding: '5px 9px',
@@ -399,23 +416,144 @@ const TopBar: React.FC<TopBarProps> = ({
         </div>
         <DateRangePicker
           range={range}
-          setRange={setRange!}
-          customRange={customRange ?? null}
-          setCustomRange={setCustomRange!}
+          setRange={setRange}
+          customRange={range === 'custom' ? customRange : null}
+          setCustomRange={(range: { start: string; end: string } | null) => {
+            if (range) {
+              setCustomRange(range)
+            } else {
+              setRange('mtd')
+            }
+          }}
           label={label}
         />
         <div className="sep-v" />
         <button
           className="icon-btn"
-          onClick={() => setTheme?.(theme === 'dark' ? 'light' : 'dark')}
+          onClick={() => {
+            const root = document.documentElement
+            const isDark = root.classList.contains('dark')
+            if (isDark) {
+              root.classList.remove('dark')
+              root.classList.add('light')
+              root.setAttribute('data-theme', 'light')
+            } else {
+              root.classList.remove('light')
+              root.classList.add('dark')
+              root.setAttribute('data-theme', 'dark')
+            }
+          }}
           title="Toggle theme"
         >
-          <Icon name={theme === 'dark' ? 'sun' : 'moon'} size={14} />
+          <Icon name={document.documentElement.classList.contains('dark') ? 'sun' : 'moon'} size={14} />
         </button>
-        <button className="tb-bell" onClick={() => handleNavigate('/alerts')} title="Alerts">
-          <Icon name="bell" size={14} />
-          <span className="badge">3</span>
-        </button>
+        <div className="sep-v" />
+        <div ref={notificationsRef} className="relative">
+          <button ref={bellRef} className="tb-bell" onClick={() => setNotificationsOpen(!notificationsOpen)} title="Notifications">
+            <Icon name="bell" size={14} />
+            {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
+          </button>
+          {notificationsOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                right: 0,
+                width: 320,
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                boxShadow: 'var(--pxshadow-3)',
+                zIndex: 100,
+              }}
+            >
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderBottom: '1px solid var(--border)',
+                  fontFamily: 'Doto, monospace',
+                  fontSize: 12,
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  color: 'var(--fg-muted)',
+                }}
+              >
+                Notifications
+              </div>
+              <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                {mockNotifications.length === 0 ? (
+                  <div style={{ padding: 20, textAlign: 'center', color: 'var(--fg-muted)', fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
+                    // no new notifications
+                  </div>
+                ) : (
+                  mockNotifications.map(n => (
+                    <div
+                      key={n.id}
+                      onClick={() => {
+                        if (n.type === 'alert' || n.type === 'warning') {
+                          navigate('/alerts')
+                          setNotificationsOpen(false)
+                        }
+                      }}
+                      style={{
+                        padding: '10px 14px',
+                        borderBottom: '1px solid var(--border-2)',
+                        cursor: 'pointer',
+                        opacity: n.read ? 0.7 : 1,
+                        background: n.read ? 'transparent' : 'var(--surface-2)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <span
+                          style={{
+                            fontFamily: 'JetBrains Mono, monospace',
+                            fontSize: 10,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.06em',
+                            color: n.type === 'warning' ? 'var(--warning)' : n.type === 'alert' ? 'var(--danger)' : 'var(--primary)',
+                          }}
+                        >
+                          {n.type}
+                        </span>
+                        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 9, color: 'var(--fg-muted)' }}>{n.time}</span>
+                      </div>
+                      <div style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, marginBottom: 4, color: 'var(--fg)' }}>
+                        {n.title}
+                      </div>
+                      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, color: 'var(--fg-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {n.message}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div
+                style={{
+                  padding: '8px 14px',
+                  borderTop: '1px solid var(--border)',
+                  textAlign: 'center',
+                }}
+              >
+                <button
+                  onClick={() => setNotificationsOpen(false)}
+                  style={{
+                    fontFamily: 'JetBrains Mono, monospace',
+                    fontSize: 10,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    color: 'var(--primary)',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  [ dismiss ]
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="sep-v" />
       </div>
     </header>
   )

@@ -32,8 +32,8 @@ export function Button({
 }: ButtonProps) {
   const cls = [
     'btn',
-    variant !== 'default' ? `btn-${variant}` : '',
-    size !== 'md' ? `btn-${size}` : '',
+    variant === 'primary' ? 'btn-primary' : variant === 'danger' ? 'btn-danger' : variant === 'ghost' ? 'btn-ghost' : '',
+    size === 'sm' ? 'btn-sm' : size === 'lg' ? 'btn-lg' : '',
     block ? 'btn-block' : '',
     className || '',
   ].filter(Boolean).join(' ')

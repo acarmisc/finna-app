@@ -39,7 +39,7 @@ export function StatCard({
     <div className={`stat ${accent}${className ? ` ${className}` : ''}`}>
       <div className="stat-lbl">{label}</div>
       <div className="stat-val">
-        {value}
+        <span className="num">{value}</span>
         {unit && <span className="ccy">{unit}</span>}
       </div>
       {(delta || meta) && (

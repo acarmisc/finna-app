@@ -26,7 +26,7 @@ export function useCosts(params?: {
     queryKey: ['costs', params],
     queryFn: async () => {
       const res = await getApiClient().getCosts(params)
-      return res.data as CostListResponse
+      return (res.data ?? null) as CostListResponse
     },
     placeholderData: (previousData) => previousData,
   })
@@ -37,7 +37,7 @@ export function useCostTotals(params?: { startDate?: string; endDate?: string })
     queryKey: ['costs', 'totals', params],
     queryFn: async () => {
       const res = await getApiClient().getCostTotals(params)
-      return res.data as CostTotalsResponse
+      return (res.data ?? null) as CostTotalsResponse
     },
     placeholderData: (previousData) => previousData,
   })
@@ -52,7 +52,7 @@ export function useDailyCosts(params?: {
     queryKey: ['costs', 'daily', params],
     queryFn: async () => {
       const res = await getApiClient().getDailyCosts(params)
-      return res.data as CostDailyResponse
+      return (res.data ?? null) as CostDailyResponse
     },
     placeholderData: (previousData) => previousData,
   })
@@ -63,7 +63,7 @@ export function useCostsBySku(params?: { provider?: string; limit?: number }) {
     queryKey: ['costs', 'by-sku', params],
     queryFn: async () => {
       const res = await getApiClient().getCostsBySku(params)
-      return res.data as CostBySkuResponse
+      return (res.data ?? null) as CostBySkuResponse
     },
   })
 }
@@ -79,7 +79,7 @@ export function useAlerts(params?: {
     queryKey: ['alerts', params],
     queryFn: async () => {
       const res = await getApiClient().getAlerts(params)
-      return res.data as AlertListResponse
+      return (res.data ?? null) as AlertListResponse
     },
     placeholderData: (previousData) => previousData,
   })
@@ -90,7 +90,7 @@ export function useAlertStats() {
     queryKey: ['alerts', 'stats'],
     queryFn: async () => {
       const res = await getApiClient().getAlertStats()
-      return res.data as AlertStatsResponse
+      return (res.data ?? null) as AlertStatsResponse
     },
     placeholderData: (previousData) => previousData,
   })
@@ -114,7 +114,7 @@ export function useProjects() {
     queryKey: ['projects'],
     queryFn: async () => {
       const res = await getApiClient().getProjects()
-      return res.data as ProjectResponse[]
+      return (res.data ?? null) as ProjectResponse[]
     },
     placeholderData: (previousData) => previousData,
   })
@@ -125,7 +125,7 @@ export function useProject(slug: string) {
     queryKey: ['projects', slug],
     queryFn: async () => {
       const res = await getApiClient().getProject(slug)
-      return res.data as ProjectResponse
+      return (res.data ?? null) as ProjectResponse
     },
     enabled: !!slug,
   })
@@ -138,7 +138,7 @@ export function useConnections() {
     queryKey: ['connections'],
     queryFn: async () => {
       const res = await getApiClient().getConnections()
-      return res.data as CloudConfigResponse[]
+      return (res.data ?? null) as CloudConfigResponse[]
     },
     placeholderData: (previousData) => previousData,
   })
@@ -149,7 +149,7 @@ export function useConnection(id: string) {
     queryKey: ['connections', id],
     queryFn: async () => {
       const res = await getApiClient().getConnection(id)
-      return res.data as CloudConfigResponse
+      return (res.data ?? null) as CloudConfigResponse
     },
     enabled: !!id,
   })
@@ -193,7 +193,7 @@ export function useExtractors(params?: { provider?: string; limit?: number }) {
     queryKey: ['extractors', params],
     queryFn: async () => {
       const res = await getApiClient().getExtractors(params)
-      return res.data as ExtractorListResponse
+      return (res.data ?? null) as ExtractorListResponse
     },
   })
 }
@@ -203,9 +203,14 @@ export function useExtractorRuns(params?: { configId?: string; limit?: number })
     queryKey: ['extractor-runs', params],
     queryFn: async () => {
       const res = await getApiClient().getExtractorRuns(params)
-      return res.data as { runs: unknown[]; total: number }
+      return (res.data ?? null) as { runs: unknown[]; total: number }
     },
     placeholderData: (previousData) => previousData,
+    refetchInterval: (data) => {
+      const runs = (data as any)?.runs || []
+      const running = runs.some((r: any) => ['running', 'started'].includes(r?.status))
+      return running ? 2000 : false
+    },
   })
 }
 
@@ -213,6 +218,17 @@ export function useTriggerExtractor() {
   return useMutation({
     mutationFn: (data: { config_id: string; extractor_type?: string }) =>
       getApiClient().triggerExtractor(data),
+  })
+}
+
+export function useExtractorLogs(runId: string) {
+  return useQuery<{ logs: string[] }, Error>({
+    queryKey: ['extractor-logs', runId],
+    queryFn: async () => {
+      const res = await getApiClient().getExtractorLogs(runId)
+      return (res.data ?? null) as { logs: string[] }
+    },
+    enabled: false,
   })
 }
 
@@ -236,7 +252,7 @@ export function useDashboardStats(range?: 'mtd' | '7d' | '30d' | '90d') {
     queryKey: ['dashboard', 'stats', range],
     queryFn: async () => {
       const res = await getApiClient().getDashboardStats(range)
-      return res.data as {
+      return (res.data ?? null) as {
         totals: { azure: number; gcp: number; llm: number; total: number }
         daily: Array<{ date: string; azure: number; gcp: number; llm: number }>
         alertStats: { firing: number; ack: number; resolved: number }

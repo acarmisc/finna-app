@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { ThemeProvider } from '@/contexts/ThemeContext'
+import { DateRangeProvider } from '@/contexts/DateRangeContext'
+import { ToastProvider } from '@/contexts/ToastContext'
+import { queryClient } from '@/query/queryClient'
 import LoginComponent from '@/components/auth/LoginComponent'
 import { AppShell } from '@/components/layout'
 import CONFIG from '@/config/env'
@@ -16,49 +21,32 @@ import {
   ConfigCreatePage,
   AlertsPage,
   SettingsPage,
+  ExtractorsPage,
   RunHistoryPage,
   DataSourcesPage,
 } from '@/pages'
-
-function HashRouter({ children }: { children: (hash: string) => React.ReactNode }) {
-  const [hash] = useState(() => window.location.hash.replace(/^#/, '') || '/dashboard')
-  
-  useEffect(() => {
-    const onChange = () => window.location.hash = `#${window.location.hash.replace(/^#/, '') || '/dashboard'}`
-    window.addEventListener('hashchange', onChange)
-    return () => window.removeEventListener('hashchange', onChange)
-  }, [])
-
-  return <>{children(hash)}</>
-}
 
 function Router() {
   const { logout } = useAuthStore()
   
   return (
-    <HashRouter>
-      {(hash) => {
-        const path = hash.startsWith('/') ? hash : '/dashboard'
-        
-        return (
-          <AppShell title={CONFIG.APP_NAME} onLogout={() => { logout(); window.location.hash = '/login' }}>
-            <Routes>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/projects" element={<ProjectsListPage />} />
-              <Route path="/projects/:slug" element={<ProjectDetailPage />} />
-              <Route path="/costs" element={<CostsPage />} />
-              <Route path="/configs" element={<ConfigsListPage />} />
-              <Route path="/configs/new" element={<ConfigCreatePage />} />
-              <Route path="/alerts" element={<AlertsPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/runs" element={<RunHistoryPage />} />
-              <Route path="/sources" element={<DataSourcesPage />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </AppShell>
-        )
-      }}
-    </HashRouter>
+    <AppShell title={CONFIG.APP_NAME} onLogout={() => { logout(); window.location.hash = '/login' }}>
+      <Routes>
+        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/projects" element={<ProjectsListPage />} />
+        <Route path="/projects/:slug" element={<ProjectDetailPage />} />
+        <Route path="/costs" element={<CostsPage />} />
+        <Route path="/configs" element={<ConfigsListPage />} />
+        <Route path="/configs/new" element={<ConfigCreatePage />} />
+        <Route path="/configs/:id" element={<ConfigCreatePage />} />
+        <Route path="/alerts" element={<AlertsPage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/extractors" element={<ExtractorsPage />} />
+        <Route path="/runs" element={<RunHistoryPage />} />
+        <Route path="/sources" element={<DataSourcesPage />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </AppShell>
   )
 }
 
@@ -82,7 +70,15 @@ function Root() {
 
   return (
     <BrowserRouter>
-      <AuthenticatedApp />
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <DateRangeProvider>
+            <ToastProvider>
+              <AuthenticatedApp />
+            </ToastProvider>
+          </DateRangeProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
     </BrowserRouter>
   )
 }

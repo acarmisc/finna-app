@@ -1,5 +1,5 @@
-import React from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import React, { useEffect } from 'react'
+import { Navigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
 
 export interface ProtectedRouteProps {
@@ -9,17 +9,30 @@ export interface ProtectedRouteProps {
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireAuth = true }) => {
   const location = useLocation()
-  const navigate = useNavigate()
   const { token, loading } = useAuthStore()
 
-  // If authentication is required and no token, redirect to login
-  if (requireAuth && !token && !loading) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+  useEffect(() => {
+    if (!loading && !token && requireAuth) {
+      const params = new URLSearchParams()
+      params.set('from', location.pathname + location.search)
+      window.location.hash = `/login?${params.toString()}`
+    }
+  }, [token, loading, requireAuth, location])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-muted-foreground font-mono text-sm">authenticating...</div>
+      </div>
+    )
   }
 
-  // If not authenticated but auth not required, redirect to login
-  if (!requireAuth && !token && !loading) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+  if (requireAuth && !token) {
+    return <Navigate to="/login" replace />
+  }
+
+  if (!requireAuth && token) {
+    return <Navigate to="/dashboard" replace />
   }
 
   return <>{children}</>

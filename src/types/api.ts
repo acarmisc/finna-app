@@ -2,11 +2,11 @@
 
 // --- Enums ---
 
-export type Provider = 'azure' | 'gcp' | 'llm'
-export type CredentialType = 'service_principal' | 'managed_identity' | 'cli' | 'device_code'
+export type Provider = 'azure' | 'gcp' | 'llm' | 'aws'
+export type CredentialType = 'service_principal' | 'managed_identity' | 'cli' | 'device_code' | 'access_key' | 'assume_role'
 export type RunStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'pending'
 export type AlertSeverity = 'err' | 'warn' | 'ok'
-export type AlertStatus = 'firing' | 'resolved' | 'all'
+export type AlertStatus = 'firing' | 'resolved' | 'pending' | 'all'
 
 // --- Authentication DTOs ---
 
@@ -18,19 +18,22 @@ export interface TokenRequest {
 export interface TokenResponse {
   token: string
   access_token?: string
+  refresh_token?: string
 }
 
 export interface ErrorResponse {
   detail: string
   error?: string
+  code?: string
 }
 
 // --- Configuration DTOs ---
 
 export interface CloudConfigCreate {
-  provider: 'azure' | 'gcp'
+  provider: 'azure' | 'gcp' | 'llm' | 'aws'
   name: string
   credential_type: CredentialType
+  api_provider?: 'anthropic' | 'openai' | 'azure-openai'
   config: Record<string, unknown>
 }
 
@@ -52,12 +55,12 @@ export interface CloudConfigResponse {
 
 export interface ConfigTestResult {
   ok: boolean
-  provider: 'azure' | 'gcp'
-  token_expires_at?: number
+  provider: 'azure' | 'gcp' | 'llm' | 'aws'
+  latency_ms?: number
   checks: {
     auth: string
     scope?: string
-    cost_management_api: string
+    cost_management_api?: string
     sample_rows?: number
   }
   error?: string
@@ -83,6 +86,19 @@ export interface GCPConfigInput {
   team?: string
 }
 
+export interface LLMConfigInput {
+  api_provider: 'anthropic' | 'openai' | 'azure-openai'
+  api_key: string
+  base_url?: string
+}
+
+export interface AWSConfigInput {
+  access_key_id?: string
+  secret_access_key?: string
+  region?: string
+  role_arn?: string
+}
+
 // --- Project DTOs ---
 
 export interface ProjectResponse {
@@ -96,11 +112,21 @@ export interface ProjectResponse {
   tags?: Record<string, string>
   created_at?: string
   note?: string
+  provider?: Provider
 }
 
 export interface ProjectCreate {
   name: string
   slug?: string
+  owner?: string
+  cost_center?: string
+  budget_cap?: number
+  tags?: Record<string, string>
+  note?: string
+}
+
+export interface ProjectUpdate {
+  name?: string
   owner?: string
   cost_center?: string
   budget_cap?: number
@@ -142,9 +168,16 @@ export interface CostBySkuResponse {
 }
 
 export interface CostDailyResponse {
-  days: Array<{ date: string; azure?: number; gcp?: number; llm?: number }>
+  days: Array<{ date: string; azure?: number; gcp?: number; llm?: number; aws?: number }>
   startDate: string
   endDate: string
+}
+
+export interface CostExportParams {
+  format: 'csv' | 'xlsx'
+  startDate: string
+  endDate: string
+  providers?: Provider[]
 }
 
 // --- Alert DTOs ---
@@ -161,11 +194,15 @@ export interface AlertRecord {
   first_seen: string
   last_seen: string
   is_acknowledged: boolean
+  acknowledged_by?: string
+  acknowledged_at?: string
+  silenced_until?: string
 }
 
 export interface AlertListResponse {
   alerts: AlertRecord[]
   count: number
+  total: number
 }
 
 export interface AlertStatsResponse {
@@ -174,7 +211,27 @@ export interface AlertStatsResponse {
   by_provider: Record<string, number>
   acknowledged: number
   pending: number
+  firing: number
   stats?: Array<{ status: string; severity: string; count: number }>
+}
+
+export interface AlertActionRequest {
+  id: string
+  duration?: number
+  reason?: string
+}
+
+export interface AlertAcknowledgment {
+  id: string
+  acknowledged: boolean
+  acknowledged_at: string
+  acknowledged_by: string
+}
+
+export interface AlertSilencing {
+  id: string
+  silenced: boolean
+  silenced_until?: string
 }
 
 // --- Extractor Registry DTOs ---
@@ -217,6 +274,7 @@ export interface ExtractorListResponse {
 
 export interface ExtractorRunTriggerRequest {
   config_id?: string
+  extractor_id?: string
 }
 
 export interface ExtractorRunTriggerResponse {
@@ -225,21 +283,17 @@ export interface ExtractorRunTriggerResponse {
   extractor_id: string
 }
 
-// --- Legacy Extractor Run DTOs ---
-
-export interface ExtractorRunRequest {
-  provider: 'azure' | 'gcp'
-  config_id: string
-  extractor_type?: string
-}
-
 export interface ExtractorRunResponse {
   id: string
   config_id: string
+  extractor_id?: string
   provider: string
   extractor_type: string
   status: string
   started_at: string
+  finished_at?: string
+  records_extracted?: number
+  error_message?: string
 }
 
 export interface ExtractorRunStatus {
@@ -253,19 +307,124 @@ export interface ExtractorRunStatus {
   error_message?: string
 }
 
+// --- Run DTOs ---
+
+export interface RunListResponse {
+  runs: Array<{
+    id: string
+    config_id: string
+    extractor_type: string
+    status: RunStatus
+    started_at: string
+    finished_at?: string
+    records_extracted?: number
+    error?: string
+  }>
+  count: number
+}
+
+// --- Configuration API DTOs ---
+
+export interface ConfigResponse {
+  id: string
+  provider: Provider
+  name: string
+  credential_type: CredentialType
+  config: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface ConfigListResponse {
+  configs: ConfigResponse[]
+  count: number
+}
+
+export interface ConfigTestRequest {
+  provider: Provider
+  credential_type: CredentialType
+  config: Record<string, unknown>
+}
+
+// --- Settings API DTOs ---
+
+export interface UserProfile {
+  id: string
+  email: string
+  name?: string
+  role: string
+  org_id: string
+  timezone: string
+  locale: string
+  created_at: string
+}
+
+export interface UserPreferences {
+  theme: 'dark' | 'light' | 'system'
+  default_window: string
+  language: string
+  notifications: {
+    email_firing: boolean
+    email_pending: boolean
+    telegram_firing: boolean
+    telegram_pending: boolean
+    slack_firing: boolean
+    slack_pending: boolean
+    telegram_chat_id?: string
+    slack_webhook?: string
+  }
+}
+
+export interface ApiKey {
+  id: string
+  name: string
+  prefix: string
+  last_four: string
+  created_at: string
+  last_used_at?: string
+  scopes: string[]
+  active: boolean
+}
+
+export interface ApiKeyCreateRequest {
+  name: string
+  scopes: string[]
+  expires_at?: string
+}
+
+export interface ApiKeyCreateResponse {
+  id: string
+  key: string
+  name: string
+  scopes: string[]
+  created_at: string
+}
+
 // --- Health DTOs ---
 
 export interface HealthResponse {
   status: 'ok' | 'degraded'
   api: string
   database: string
+  cache?: string
+  services?: Record<string, 'ok' | 'degraded' | 'error'>
+}
+
+export interface SystemStats {
+  total_projects: number
+  total_configs: number
+  total_extractors: number
+  active_runs: number
+  alerts_firing: number
+  storage_usage: number
+  storage_limit: number
 }
 
 // --- UI Store Types ---
 
 export interface ViewState {
   sidebarCollapsed: boolean
-  theme: 'dark' | 'light'
+  theme: 'dark' | 'light' | 'system'
   dateRange: {
     start: Date | null
     end: Date | null

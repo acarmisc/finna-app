@@ -21,12 +21,10 @@ export function ProviderBadge({ provider, size = 'sm', className }: ProviderBadg
   return (
     <span
       className={cn(
-        'prov',
-        provider === 'azure' ? 'azure' : provider === 'gcp' ? 'gcp' : provider === 'llm' ? 'llm' : provider === 'aws' ? 'aws' : '',
+        `prov ${provider}`,
         size === 'lg' ? 'prov-lg' : '',
         className
       )}
-      style={provider === 'ecb' ? { background: 'var(--fg-muted)' } : undefined}
     >
       {label}
     </span>
