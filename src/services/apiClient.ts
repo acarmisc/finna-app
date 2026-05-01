@@ -20,10 +20,11 @@ export class APIClient {
     }
     
     try {
-      const resp = await fetch(`http://localhost:8000/api/v1${endpoint}`, { 
-        ...options, 
-        headers, 
-        credentials: 'include' 
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+      const resp = await fetch(`${baseUrl}${endpoint}`, {
+        ...options,
+        headers,
+        credentials: 'include'
       })
       
       if (!resp.ok) {
@@ -118,6 +119,10 @@ export class APIClient {
   // --- Projects ---
   async getProject(slug: string): Promise<{ data?: any; error?: any; status: number }> {
     return this.request(`/config/projects/${slug}`)
+  }
+
+  async createProject(data: any): Promise<{ data?: any; error?: any; status: number }> {
+    return this.request('/config/projects', { method: 'POST', body: JSON.stringify(data) })
   }
 
   // --- Connections ---

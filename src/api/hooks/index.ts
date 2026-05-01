@@ -131,6 +131,16 @@ export function useProject(slug: string) {
   })
 }
 
+export function useCreateProject() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (data: Record<string, unknown>) => getApiClient().createProject(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+    },
+  })
+}
+
 // ============ Config/Connection Hooks ============
 
 export function useConnections() {

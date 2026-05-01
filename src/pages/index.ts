@@ -1,5 +1,6 @@
 export { DashboardPage }       from './DashboardPage'
 export { ProjectsListPage }   from './ProjectsListPage'
+export { ProjectCreatePage }  from './ProjectCreatePage'
 export { ProjectDetailPage }  from './ProjectDetailPage'
 export { CostsPage }          from './CostsPage'
 export { ConfigsListPage }     from './ConfigsListPage'

@@ -15,6 +15,7 @@ import './index.css'
 import {
   DashboardPage,
   ProjectsListPage,
+  ProjectCreatePage,
   ProjectDetailPage,
   CostsPage,
   ConfigsListPage,
@@ -34,6 +35,7 @@ function Router() {
       <Routes>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/projects" element={<ProjectsListPage />} />
+        <Route path="/projects/new" element={<ProjectCreatePage />} />
         <Route path="/projects/:slug" element={<ProjectDetailPage />} />
         <Route path="/costs" element={<CostsPage />} />
         <Route path="/configs" element={<ConfigsListPage />} />

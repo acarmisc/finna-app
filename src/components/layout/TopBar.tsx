@@ -336,11 +336,27 @@ const TopBar: React.FC<TopBarProps> = ({ route }) => {
     costs: 'Cost explorer',
     alerts: 'Alerts',
     settings: 'Settings',
+    runs: 'Run history',
+    sources: 'Data sources',
   }
 
-  const key = route?.base?.replace('/', '') || 'dashboard'
-  const crumbs = [{ label: 'finna', mono: true }, { label: labelFor[key] || key }]
-  if (route?.sub) crumbs.push({ label: route.sub, mono: true })
+  const location = useLocation()
+  const pathParts = (location.pathname || '/').split('/').filter(Boolean)
+  const baseSegment = pathParts[0] || 'dashboard'
+  const subSegment = pathParts[1] || null
+
+  const isNew = subSegment === 'new'
+  const subLabel = isNew
+    ? `new ${baseSegment.replace(/s$/, '')}`
+    : subSegment
+
+  const crumbs: { label: string; mono?: boolean }[] = [{ label: 'finna', mono: true }]
+  if (subLabel) {
+    crumbs.push({ label: labelFor[baseSegment] || baseSegment })
+    crumbs.push({ label: subLabel, mono: true })
+  } else {
+    crumbs.push({ label: labelFor[baseSegment] || baseSegment })
+  }
 
   const ranges: [string, string][] = [
     ['mtd', 'MTD'],
@@ -365,10 +381,6 @@ const TopBar: React.FC<TopBarProps> = ({ route }) => {
 
   const customLabel = customRange ? `${fmt(customRange.start)} — ${fmt(customRange.end)}` : null
   const label = range === 'custom' && customLabel ? customLabel : presetLabel[range] || presetLabel['mtd']
-
-  const handleNavigate = (path: string) => {
-    navigate(path)
-  }
 
   return (
     <header className="tb">
