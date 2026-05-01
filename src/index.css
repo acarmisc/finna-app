@@ -2,8 +2,7 @@
 @import "tw-animate-css";
 @import "@fontsource/inter";
 @import "@fontsource/jetbrains-mono";
-@import "@fontsource/doto";
-@import "@fontsource/vt323";
+
 
 @custom-variant dark (&:is(.dark *));
 @custom-variant light (&:is(.light *));
@@ -452,7 +451,7 @@
 /* ---------- Pixel-Art Typography ---------- */
 /* Page H1s — Doto bold pixel face */
 .page-head h1 {
-  font-family: var(--font-heading);
+  font-family: var(--font-mono);
   font-size: 28px;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -1430,7 +1429,7 @@
 
 /* Badge */
 .ui-badge {
-  font-family: var(--font-heading);
+  font-family: var(--font-mono);
   font-size: 8px;
   font-weight: 400;
   letter-spacing: 0.06em;
@@ -1475,7 +1474,7 @@
 }
 
 .ui-card-title {
-  font-family: var(--font-heading);
+  font-family: var(--font-mono);
   font-size: 8px;
   font-weight: 400;
   letter-spacing: 0.06em;
