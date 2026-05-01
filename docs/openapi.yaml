@@ -631,6 +631,15 @@ components:
                 type: number
               delta:
                 type: number
+        total:
+          type: object
+          properties:
+            mtd:
+              type: number
+            prev:
+              type: number
+            delta:
+              type: number
         window:
           type: string
           description: Time window applied (mtd, 7d, 30d, 90d)
@@ -654,8 +663,6 @@ components:
               project_id:
                 type: string
                 nullable: true
-              name:
-                type: string
               sku:
                 type: string
               mtd:
@@ -743,20 +750,35 @@ components:
       properties:
         id:
           type: string
-        title:
+        status:
           type: string
-        description:
-          type: string
+          enum: [firing, ack, resolved]
+          description: Current alert state
         severity:
           type: string
-        resource:
+          enum: [critical, warning, info]
+        description:
           type: string
-        service:
+        rule:
           type: string
+          nullable: true
+          description: Alert rule that triggered
+        project:
+          type: string
+          nullable: true
+          description: Project name associated with the alert
         provider:
           type: string
+          nullable: true
         cost_impact:
           type: number
+          nullable: true
+        resource:
+          type: string
+          nullable: true
+        service:
+          type: string
+          nullable: true
         first_seen:
           type: string
           format: date-time
@@ -765,8 +787,20 @@ components:
           type: string
           format: date-time
           nullable: true
+        triggered_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Human-readable trigger timestamp
         is_acknowledged:
           type: boolean
+        acknowledged_at:
+          type: string
+          format: date-time
+          nullable: true
+        acknowledged_by:
+          type: string
+          nullable: true
 
     AlertListResponse:
       type: object
@@ -2145,6 +2179,13 @@ paths:
           schema:
             type: string
             nullable: true
+        - name: window
+          in: query
+          schema:
+            type: string
+            enum: [mtd, 7d, 30d, 90d]
+            nullable: true
+          description: Time window shortcut (overrides start_date/end_date)
       responses:
         "200":
           description: Daily cost data by provider
@@ -2176,6 +2217,13 @@ paths:
             type: string
             format: date-time
             nullable: true
+        - name: window
+          in: query
+          schema:
+            type: string
+            enum: [mtd, 7d, 30d, 90d]
+            nullable: true
+          description: Time window shortcut (overrides start_date/end_date)
       responses:
         "200":
           description: Cost summary
@@ -2207,6 +2255,13 @@ paths:
             type: string
             format: date-time
             nullable: true
+        - name: window
+          in: query
+          schema:
+            type: string
+            enum: [mtd, 7d, 30d, 90d]
+            nullable: true
+          description: Time window shortcut (overrides start_date/end_date)
         - name: limit
           in: query
           schema:
@@ -2263,13 +2318,13 @@ paths:
           schema:
             type: string
             nullable: true
-            enum: [firing, resolved, all]
+            enum: [firing, ack, resolved, all]
         - name: severity
           in: query
           schema:
             type: string
             nullable: true
-            enum: [err, warn, ok]
+            enum: [critical, warning, info]
         - name: limit
           in: query
           schema:
