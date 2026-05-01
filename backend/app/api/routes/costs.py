@@ -454,3 +454,96 @@ async def get_skus_by_provider(
     """
     rows = query_all(sql, (provider,))
     return {"skus": [r["sku"] for r in rows if r["sku"]]}
+
+
+@router.get("/dashboard/stats", dependencies=[Depends(require_auth)])
+async def dashboard_stats(
+    range: Optional[str] = Query(None, description="Time range: mtd, 7d, 30d, 90d"),
+) -> dict[str, Any]:
+    """Aggregate cost totals + daily series + alert stats for the dashboard."""
+    window = range or "mtd"
+    end_dt = datetime.now()
+
+    if window == "mtd":
+        current_start = end_dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif window == "7d":
+        current_start = end_dt - timedelta(days=7)
+    elif window == "30d":
+        current_start = end_dt - timedelta(days=30)
+    elif window == "90d":
+        current_start = end_dt - timedelta(days=90)
+    else:
+        current_start = end_dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    prev_end = current_start - timedelta(seconds=1)
+    prev_start = prev_end - (end_dt - current_start)
+
+    from fastapi import Request
+    totals_sql = """
+        SELECT provider, SUM(net_cost_usd) as total
+        FROM cost_records
+        WHERE usage_start >= %s AND usage_start <= %s
+        GROUP BY provider
+    """
+    current_rows = query_all(totals_sql, (current_start, end_dt))
+    prev_rows = query_all(totals_sql, (prev_start, prev_end))
+
+    curr_totals: dict[str, float] = {}
+    for row in current_rows:
+        curr_totals[row["provider"]] = float(row["total"])
+    prev_totals: dict[str, float] = {}
+    for row in prev_rows:
+        prev_totals[row["provider"]] = float(row["total"])
+
+    azure_mtd = curr_totals.get("azure", 0.0)
+    gcp_mtd = curr_totals.get("gcp", 0.0)
+    llm_mtd = curr_totals.get("llm", 0.0)
+    total_mtd = azure_mtd + gcp_mtd + llm_mtd
+
+    totals = {
+        "azure": azure_mtd,
+        "gcp": gcp_mtd,
+        "llm": llm_mtd,
+        "total": total_mtd,
+    }
+
+    daily_sql = """
+        SELECT DATE(usage_start) as date, provider, SUM(net_cost_usd) as amount
+        FROM cost_records
+        WHERE usage_start >= %s AND usage_start <= %s
+        GROUP BY DATE(usage_start), provider
+        ORDER BY date ASC
+    """
+    daily_rows = query_all(daily_sql, (current_start, end_dt))
+
+    daily_map: dict[str, dict[str, Any]] = {}
+    for row in daily_rows:
+        date_str = row["date"].isoformat() if row["date"] else None
+        if not date_str:
+            continue
+        if date_str not in daily_map:
+            daily_map[date_str] = {"date": date_str}
+        daily_map[date_str][row["provider"]] = float(row["amount"])
+
+    daily = [
+        {"date": d["date"], "azure": d.get("azure", 0.0), "gcp": d.get("gcp", 0.0), "llm": d.get("llm", 0.0)}
+        for d in sorted(daily_map.values(), key=lambda x: x["date"])
+    ]
+
+    alert_sql = """
+        SELECT status, COUNT(*) as count
+        FROM alerts
+        GROUP BY status
+    """
+    alert_rows = query_all(alert_sql)
+    by_status: dict[str, int] = {"firing": 0, "ack": 0, "resolved": 0}
+    for r in alert_rows:
+        status_val = r["status"] or "firing"
+        by_status[status_val] = by_status.get(status_val, 0) + int(r["count"] or 0)
+    alert_stats = by_status
+
+    return {
+        "totals": totals,
+        "daily": daily,
+        "alertStats": alert_stats,
+    }
