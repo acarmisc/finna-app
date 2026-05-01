@@ -14,3 +14,8 @@ resources:
 
 commonLabels:
   environment: staging
+
+images:
+  - name: ghcr.io/acarmisc/finops-api
+    newName: ghcr.io/acarmisc/finops-api
+    newTag: staging-test
