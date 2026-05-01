@@ -39,25 +39,27 @@ async def list_alerts(
     LIMIT %s
     """
     rows = query_all(sql, (status, status, severity, severity, limit))
-    # Map to CLI Alert schema
     data = []
     for r in rows:
         data.append({
             "id": r.get("id"),
-            "title": r.get("title") or r.get("type") or "Alert",
-            "description": r.get("body") or r.get("description") or "",
-            "severity": r.get("severity") or "warn",
+            "status": r.get("status") or "firing",
+            "severity": r.get("severity") or "warning",
+            "description": r.get("description") or r.get("body") or r.get("title") or "",
+            "rule": r.get("rule") or "",
+            "project": r.get("project") or "",
+            "triggered_at": r.get("triggered_at").isoformat() if r.get("triggered_at") else None,
+            "cost_impact": float(r.get("cost_impact") or 0.0),
             "resource": r.get("resource") or "",
             "service": r.get("service") or "",
             "provider": r.get("provider") or "",
-            "cost_impact": float(r.get("cost_impact") or 0.0),
-            "first_seen": (r.get("created_at").isoformat()) if r.get("created_at") else None,  # type: ignore[union-attr]
-            "last_seen": (
-                r.get("updated_at").isoformat()  # type: ignore[union-attr]
-                if r.get("updated_at")
-                else (r.get("created_at").isoformat() if r.get("created_at") else None)  # type: ignore[union-attr]
-            ),
             "is_acknowledged": r.get("acknowledged_at") is not None,
+            "first_seen": (r.get("created_at").isoformat()) if r.get("created_at") else None,
+            "last_seen": (
+                r.get("updated_at").isoformat()
+                if r.get("updated_at")
+                else (r.get("created_at").isoformat() if r.get("created_at") else None)
+            ),
         })
     total = len(data)
     return {
@@ -82,25 +84,20 @@ async def get_alert_stats() -> dict[str, Any]:
     GROUP BY status, severity
     """
     rows = query_all(sql)
-    by_severity: dict[str, int] = {}
-    by_provider: dict[str, int] = {}
+    by_status: dict[str, int] = {"firing": 0, "ack": 0, "resolved": 0}
+    by_severity: dict[str, int] = {"critical": 0, "warning": 0, "info": 0}
     total = 0
-    acknowledged = 0
     for r in rows:
         count = int(r["count"] or 0)
         total += count
-        sev = r["severity"] or "unknown"
+        sev = r["severity"] or "warning"
+        status_val = r["status"] or "firing"
+        by_status[status_val] = by_status.get(status_val, 0) + count
         by_severity[sev] = by_severity.get(sev, 0) + count
-        # provider field not in alerts; use severity as proxy for by_provider
-        by_provider[sev] = by_provider.get(sev, 0) + count
-        if r["status"] == "resolved":
-            acknowledged += count
     return {
         "total": total,
+        "by_status": by_status,
         "by_severity": by_severity,
-        "by_provider": by_provider,
-        "acknowledged": acknowledged,
-        "pending": total - acknowledged,
         "stats": rows,
     }
 
@@ -120,20 +117,23 @@ async def get_active_alerts(
     for r in rows:
         data.append({
             "id": r.get("id"),
-            "title": r.get("title") or r.get("type") or "Alert",
-            "description": r.get("body") or r.get("description") or "",
-            "severity": r.get("severity") or "warn",
+            "status": r.get("status") or "firing",
+            "severity": r.get("severity") or "warning",
+            "description": r.get("description") or r.get("body") or r.get("title") or "",
+            "rule": r.get("rule") or "",
+            "project": r.get("project") or "",
+            "triggered_at": r.get("triggered_at").isoformat() if r.get("triggered_at") else None,
+            "cost_impact": float(r.get("cost_impact") or 0.0),
             "resource": r.get("resource") or "",
             "service": r.get("service") or "",
             "provider": r.get("provider") or "",
-            "cost_impact": float(r.get("cost_impact") or 0.0),
-            "first_seen": (r.get("created_at").isoformat()) if r.get("created_at") else None,  # type: ignore[union-attr]
-            "last_seen": (
-                r.get("updated_at").isoformat()  # type: ignore[union-attr]
-                if r.get("updated_at")
-                else (r.get("created_at").isoformat() if r.get("created_at") else None)  # type: ignore[union-attr]
-            ),
             "is_acknowledged": r.get("acknowledged_at") is not None,
+            "first_seen": (r.get("created_at").isoformat()) if r.get("created_at") else None,
+            "last_seen": (
+                r.get("updated_at").isoformat()
+                if r.get("updated_at")
+                else (r.get("created_at").isoformat() if r.get("created_at") else None)
+            ),
         })
     return {"alerts": data, "count": len(data)}
 
@@ -146,7 +146,7 @@ async def acknowledge_alert(
     """Acknowledge a single alert."""
     sql = """
     UPDATE alerts
-    SET acknowledged_at = now(), acknowledged_by = %s
+    SET status = 'ack', acknowledged_at = now(), acknowledged_by = %s
     WHERE id = %s AND acknowledged_at IS NULL
     RETURNING id
     """
@@ -163,7 +163,7 @@ async def acknowledge_all_alerts(
     """Bulk acknowledge all firing alerts."""
     sql = """
     UPDATE alerts
-    SET acknowledged_at = now(), acknowledged_by = %s
+    SET status = 'ack', acknowledged_at = now(), acknowledged_by = %s
     WHERE status = 'firing' AND acknowledged_at IS NULL
     RETURNING id
     """

@@ -52,7 +52,7 @@ components:
     # ── Enums ────────────────────────────────────────────────────────────────
     Provider:
       type: string
-      enum: [azure, gcp]
+      enum: [azure, gcp, llm]
       description: Cloud provider identifier
 
     CredentialType:
@@ -279,6 +279,31 @@ components:
         updated_at:
           type: string
           format: date-time
+        last_test:
+          type: string
+          nullable: true
+          description: "Last test result: ok, err, warn"
+        last_test_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the last test was run
+        tenant_id:
+          type: string
+          nullable: true
+          description: Azure tenant ID (masked)
+        subscription_id:
+          type: string
+          nullable: true
+          description: Azure subscription ID (masked)
+        project_id:
+          type: string
+          nullable: true
+          description: GCP project ID (masked)
+        err:
+          type: string
+          nullable: true
+          description: Last error message from test
 
     ProjectResponse:
       type: object
@@ -308,6 +333,10 @@ components:
           nullable: true
         note:
           type: string
+        provider:
+          type: string
+          nullable: true
+          description: Cloud provider (azure/gcp/llm)
 
     ProjectCreate:
       type: object
@@ -329,6 +358,10 @@ components:
             type: string
         note:
           type: string
+        provider:
+          type: string
+          nullable: true
+          description: Cloud provider (azure/gcp/llm)
 
     ConfigTestResult:
       type: object
@@ -491,6 +524,9 @@ components:
             properties:
               id:
                 type: string
+              config_id:
+                type: string
+                nullable: true
               provider:
                 type: string
               extractor_type:
@@ -587,7 +623,17 @@ components:
         totals:
           type: object
           additionalProperties:
-            type: number
+            type: object
+            properties:
+              mtd:
+                type: number
+              prev:
+                type: number
+              delta:
+                type: number
+        window:
+          type: string
+          description: Time window applied (mtd, 7d, 30d, 90d)
         startDate:
           type: string
           format: date-time
@@ -605,6 +651,9 @@ components:
             properties:
               prov:
                 type: string
+              project_id:
+                type: string
+                nullable: true
               name:
                 type: string
               sku:
@@ -619,6 +668,14 @@ components:
                 type: integer
         totalRows:
           type: integer
+
+    CostSkusResponse:
+      type: object
+      properties:
+        skus:
+          type: array
+          items:
+            type: string
 
     CostDailyResponse:
       type: object
@@ -741,18 +798,14 @@ components:
       properties:
         total:
           type: integer
+        by_status:
+          type: object
+          additionalProperties:
+            type: integer
         by_severity:
           type: object
           additionalProperties:
             type: integer
-        by_provider:
-          type: object
-          additionalProperties:
-            type: integer
-        acknowledged:
-          type: integer
-        pending:
-          type: integer
         stats:
           type: array
           items:
@@ -2018,6 +2071,13 @@ paths:
             type: string
             format: date-time
             nullable: true
+        - name: window
+          in: query
+          schema:
+            type: string
+            enum: [mtd, 7d, 30d, 90d]
+            nullable: true
+          description: Time window shortcut (overrides start_date/end_date)
       responses:
         "200":
           description: Cost totals by provider
@@ -2160,6 +2220,31 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CostBreakdownResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/costs/skus:
+    get:
+      tags: [costs]
+      summary: Get SKUs by provider
+      description: Returns distinct service names (SKUs) for a given cloud provider.
+      operationId: getSkusByProvider
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: provider
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [gcp, azure, llm]
+      responses:
+        "200":
+          description: List of SKUs for the provider
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CostSkusResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
 

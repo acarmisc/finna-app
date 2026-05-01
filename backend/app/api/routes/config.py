@@ -42,7 +42,8 @@ def _mask_secrets(config: dict[str, Any]) -> dict[str, Any]:
 )
 async def list_configs() -> list[dict[str, Any]]:
     sql = """
-        SELECT id, provider, name, credential_type, config, created_at, updated_at
+        SELECT id, provider, name, credential_type, config, created_at, updated_at,
+               last_test, last_test_at, err
         FROM cloud_config
         ORDER BY provider, name
     """
@@ -56,6 +57,9 @@ async def list_configs() -> list[dict[str, Any]]:
             "config": _mask_secrets(decrypt_config(r["config"])),
             "created_at": r["created_at"],
             "updated_at": r["updated_at"],
+            "last_test": r.get("last_test"),
+            "last_test_at": r.get("last_test_at"),
+            "err": r.get("err"),
         }
         for r in results
     ]
@@ -108,7 +112,7 @@ async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
 )
 async def list_projects() -> list[dict[str, Any]]:
     """List all projects."""
-    sql = ("SELECT id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note \
+    sql = ("SELECT id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note, provider \
 "  # noqa: E501
 "FROM fin_projects ORDER BY name")
     rows = query_all(sql)
@@ -124,6 +128,7 @@ async def list_projects() -> list[dict[str, Any]]:
             "tags": r["tags"] or {},
             "created": r["created_at"].isoformat() if r["created_at"] else None,
             "note": r.get("note", ""),
+            "provider": r.get("provider"),
         }
         for r in rows
     ]
@@ -141,8 +146,8 @@ async def create_project(data: dict[str, Any]) -> dict[str, Any]:
     now = datetime.now(timezone.utc)
     name = data.get("name", "Untitled")
     sql = """
-        INSERT INTO fin_projects (id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO fin_projects (id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note, provider)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
     """
     slug = data.get("slug", name.lower().replace(" ", "-")[:20])
@@ -159,6 +164,7 @@ async def create_project(data: dict[str, Any]) -> dict[str, Any]:
             data.get("tags", {}),
             now,
             data.get("note", ""),
+            data.get("provider"),
         ),
     )
     return {
@@ -172,6 +178,7 @@ async def create_project(data: dict[str, Any]) -> dict[str, Any]:
         "tags": data.get("tags", {}),
         "created": now.isoformat(),
         "note": data.get("note", ""),
+        "provider": data.get("provider"),
     }
 
 
@@ -182,7 +189,8 @@ async def create_project(data: dict[str, Any]) -> dict[str, Any]:
 )
 async def list_configs_by_provider(provider: str) -> list[dict[str, Any]]:
     sql = """
-        SELECT id, provider, name, credential_type, config, created_at, updated_at
+        SELECT id, provider, name, credential_type, config, created_at, updated_at,
+               last_test, last_test_at, err
         FROM cloud_config
         WHERE provider = %s
         ORDER BY name
@@ -197,6 +205,9 @@ async def list_configs_by_provider(provider: str) -> list[dict[str, Any]]:
             "config": _mask_secrets(decrypt_config(r["config"])),
             "created_at": r["created_at"],
             "updated_at": r["updated_at"],
+            "last_test": r.get("last_test"),
+            "last_test_at": r.get("last_test_at"),
+            "err": r.get("err"),
         }
         for r in results
     ]
@@ -336,7 +347,8 @@ async def test_config(config_id: str) -> dict[str, Any]:
 )
 async def get_config(config_id: str) -> dict[str, Any]:
     sql = """
-        SELECT id, provider, name, credential_type, config, created_at, updated_at
+        SELECT id, provider, name, credential_type, config, created_at, updated_at,
+               last_test, last_test_at, err
         FROM cloud_config
         WHERE id = %s
     """
@@ -344,14 +356,21 @@ async def get_config(config_id: str) -> dict[str, Any]:
     if not result:
         raise HTTPException(status_code=404, detail="Configuration not found")
 
+    cfg = decrypt_config(result["config"])
     return {
         "id": result["id"],
         "provider": result["provider"],
         "name": result["name"],
         "credential_type": result["credential_type"],
-        "config": _mask_secrets(decrypt_config(result["config"])),
+        "config": _mask_secrets(cfg),
         "created_at": result["created_at"],
         "updated_at": result["updated_at"],
+        "last_test": result.get("last_test"),
+        "last_test_at": result.get("last_test_at"),
+        "err": result.get("err"),
+        "tenant_id": cfg.get("tenant_id"),
+        "subscription_id": cfg.get("subscription_id"),
+        "project_id": cfg.get("project_id"),
     }
 
 
@@ -385,21 +404,29 @@ async def update_config(config_id: str, data: CloudConfigUpdate) -> dict[str, An
         UPDATE cloud_config
         SET {", ".join(updates)}
         WHERE id = %s
-        RETURNING id, provider, name, credential_type, config, created_at, updated_at
+        RETURNING id, provider, name, credential_type, config, created_at, updated_at,
+                  last_test, last_test_at, err
     """
 
     result = query_one(sql, tuple(params))
     if not result:
         raise HTTPException(status_code=404, detail="Configuration not found")
 
+    cfg = decrypt_config(result["config"])
     return {
         "id": result["id"],
         "provider": result["provider"],
         "name": result["name"],
         "credential_type": result["credential_type"],
-        "config": _mask_secrets(decrypt_config(result["config"])),
+        "config": _mask_secrets(cfg),
         "created_at": result["created_at"],
         "updated_at": result["updated_at"],
+        "last_test": result.get("last_test"),
+        "last_test_at": result.get("last_test_at"),
+        "err": result.get("err"),
+        "tenant_id": cfg.get("tenant_id"),
+        "subscription_id": cfg.get("subscription_id"),
+        "project_id": cfg.get("project_id"),
     }
 
 
@@ -420,37 +447,47 @@ async def delete_config(config_id: str) -> None:
 async def cli_config_list() -> dict[str, Any]:
     """CLI-compatible config list wrapper."""
     rows = query_all(
-        "SELECT id, provider, name, credential_type, config, created_at, updated_at "
-        "FROM cloud_config ORDER BY provider, name"
+        "SELECT id, provider, name, credential_type, config, created_at, updated_at, "
+        "last_test, last_test_at, err FROM cloud_config ORDER BY provider, name"
     )
-    data = [
-        {
+    data = []
+    for r in rows:
+        cfg = decrypt_config(r["config"]) if r.get("config") else {}
+        data.append({
             "id": r["id"],
             "provider": r["provider"],
             "name": r["name"],
             "credential_type": r["credential_type"],
             "service_category": r["credential_type"],
-            "region": "",
+            "region": cfg.get("region", ""),
+            "last_test": r.get("last_test"),
+            "last_test_at": r["last_test_at"].isoformat() if r.get("last_test_at") else None,
+            "err": r.get("err"),
             "last_updated": r["updated_at"].isoformat() if r["updated_at"] else None,
-        }
-        for r in rows
-    ]
+        })
     return {"data": data, "total": len(data), "page": 1, "page_size": len(data), "has_next": False, "has_prev": False}
 
 @router.get("/configs/{config_id}", dependencies=[Depends(require_auth)])
 async def cli_config_get(config_id: str) -> dict[str, Any]:
     """CLI-compatible config get."""
-    sql = "SELECT id, provider, name, credential_type, config, created_at, updated_at FROM cloud_config WHERE id = %s"
+    sql = "SELECT id, provider, name, credential_type, config, created_at, updated_at, last_test, last_test_at, err FROM cloud_config WHERE id = %s"
     r = query_one(sql, (config_id,))
     if not r:
         raise HTTPException(status_code=404, detail="Configuration not found")
+    cfg = decrypt_config(r["config"]) if r.get("config") else {}
     return {
         "id": r["id"],
         "provider": r["provider"],
         "name": r["name"],
         "credential_type": r["credential_type"],
         "service_category": r["credential_type"],
-        "region": "",
+        "region": cfg.get("region", ""),
+        "last_test": r.get("last_test"),
+        "last_test_at": r["last_test_at"].isoformat() if r.get("last_test_at") else None,
+        "err": r.get("err"),
+        "tenant_id": cfg.get("tenant_id"),
+        "subscription_id": cfg.get("subscription_id"),
+        "project_id": cfg.get("project_id"),
         "last_updated": r["updated_at"].isoformat() if r["updated_at"] else None,
     }
 

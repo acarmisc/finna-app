@@ -33,6 +33,29 @@ class CostFilter(BaseModel):
     granularity: str = "daily"
 
 
+def _resolve_window(
+    window: Optional[str],
+    start_date: Any,
+    end_date: datetime,
+) -> tuple[Any, datetime]:
+    """Resolve window shortcut + CLI aliases into concrete start/end dates."""
+    if window and window not in ("mtd", "7d", "30d", "90d"):
+        window = None
+
+    if window == "mtd":
+        start = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif window == "7d":
+        start = end_date - timedelta(days=7)
+    elif window == "30d":
+        start = end_date - timedelta(days=30)
+    elif window == "90d":
+        start = end_date - timedelta(days=90)
+    else:
+        start = start_date or (end_date - timedelta(days=30))
+
+    return start, end_date
+
+
 @router.get("/costs", dependencies=[Depends(require_auth)])
 async def list_costs(
     provider: Optional[str] = Query(None, description="Filter by provider: gcp, azure, llm"),
@@ -41,12 +64,19 @@ async def list_costs(
     end_date: Union[str, datetime, None] = Query(None, description="End date in ISO format"),
     start: Optional[str] = Query(None, alias="start", include_in_schema=False),
     end: Optional[str] = Query(None, alias="end", include_in_schema=False),
+    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=1000),
 ) -> dict[str, Any]:
     """Get cost records with optional filtering."""
 
-    # Build query with filters
+    if end and not end_date:
+        end_date = end
+    if start and not start_date:
+        start_date = start
+    end_date = end_date or datetime.now()
+    start_date, end_date = _resolve_window(window, start_date, end_date)
+
     conditions = []
     params = []
 
@@ -58,18 +88,9 @@ async def list_costs(
         conditions.append("project_name = %s")
         params.append(project)
 
-    # Allow CLI aliases start=/end=
-    if start and not start_date:
-        start_date = start
-    if end and not end_date:
-        end_date = end
-    # Default to last 30 days if no date range specified
-    end_date = end_date or datetime.now()
-    start_date = start_date or (end_date - timedelta(days=30))  # type: ignore[operator,assignment]
-
-    conditions.append("cost_date >= %s")
-    conditions.append("cost_date <= %s")
-    params.extend([start_date, end_date])  # type: ignore[list-item]
+    conditions.append("usage_start >= %s")
+    conditions.append("usage_start <= %s")
+    params.extend([start_date, end_date])
 
     where_clause = ""
     if conditions:
@@ -77,39 +98,38 @@ async def list_costs(
 
     sql = f"""
         SELECT
-            id,
+            record_id as id,
             provider,
+            project_id,
             project_name,
-            sku_name,
-            cost_date,
-            cost_amount,
-            currency,
-            tags,
-            created_at
+            service_name as sku_name,
+            usage_start as cost_date,
+            net_cost_usd as cost_amount,
+            currency_original,
+            tags
         FROM cost_records
         {where_clause}
-        ORDER BY cost_date DESC, cost_amount DESC
+        ORDER BY usage_start DESC, net_cost_usd DESC
         LIMIT 1000
     """
 
     results = query_all(sql, tuple(params))
 
-    # Transform results to match frontend expectations
     costs = []
     for row in results:
         costs.append({
             "id": row["id"],
             "prov": row["provider"],
+            "project_id": row["project_id"],
             "name": row["project_name"],
             "sku": row["sku_name"],
             "mtd": float(row["cost_amount"]),
-            "delta": 0.0,  # Would need comparison logic
+            "delta": 0.0,
             "prev": 0.0,
             "tags": row["tags"] or {},
             "date": row["cost_date"].isoformat() if row["cost_date"] else None,
         })
 
-    # Calculate MTD totals by provider for frontend
     provider_totals = {}
     for cost in costs:
         prov = cost["prov"]
@@ -122,9 +142,9 @@ async def list_costs(
         "costs": costs,
         "totals": provider_totals,
         "filtered": total > 0,
-        "startDate": start_date.isoformat() if hasattr(start_date, "isoformat") else str(start_date),  # type: ignore[union-attr]
-        "endDate": end_date.isoformat() if hasattr(end_date, "isoformat") else str(end_date),  # type: ignore[union-attr]
-        # CLI-compatibility wrapper
+        "startDate": start_date.isoformat() if hasattr(start_date, "isoformat") else str(start_date),
+        "endDate": end_date.isoformat() if hasattr(end_date, "isoformat") else str(end_date),
+        "window": window or "custom",
         "data": costs,
         "total": total,
         "page": page,
@@ -138,37 +158,75 @@ async def list_costs(
 async def get_cost_totals(
     start_date: Union[str, datetime, None] = Query(None),
     end_date: Union[str, datetime, None] = Query(None),
+    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
 ) -> dict[str, Any]:
-    """Get aggregated cost totals."""
+    """Get aggregated cost totals per provider with mtd/prev/delta structure."""
     end_date = end_date or datetime.now()
-    start_date = start_date or (end_date - timedelta(days=30))  # type: ignore[operator,assignment]
+    start_date = start_date or (end_date - timedelta(days=30))
+    window = window or "mtd"
+
+    if window == "mtd":
+        current_start = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif window == "7d":
+        current_start = end_date - timedelta(days=7)
+    elif window == "30d":
+        current_start = end_date - timedelta(days=30)
+    elif window == "90d":
+        current_start = end_date - timedelta(days=90)
+    else:
+        current_start = start_date
+
+    prev_end = current_start - timedelta(seconds=1)
+    prev_start = prev_end - (end_date - current_start)
 
     sql = """
         SELECT
             provider,
-            SUM(cost_amount) as total,
+            SUM(net_cost_usd) as total,
             COUNT(*) as record_count
         FROM cost_records
-        WHERE cost_date >= %s AND cost_date <= %s
+        WHERE usage_start >= %s AND usage_start <= %s
         GROUP BY provider
     """
 
-    results = query_all(sql, (start_date, end_date))
+    current_rows = query_all(sql, (current_start, end_date))
+    prev_rows = query_all(sql, (prev_start, prev_end))
 
+    curr_totals: dict[str, float] = {}
+    for row in current_rows:
+        curr_totals[row["provider"]] = float(row["total"])
+
+    prev_totals: dict[str, float] = {}
+    for row in prev_rows:
+        prev_totals[row["provider"]] = float(row["total"])
+
+    all_providers = sorted(set(list(curr_totals.keys()) + list(prev_totals.keys())))
     totals = {}
-    for row in results:
-        totals[row["provider"]] = float(row["total"])
+    grand_mtd = 0.0
+    grand_prev = 0.0
+    for prov in all_providers:
+        mtd_val = curr_totals.get(prov, 0.0)
+        prev_val = prev_totals.get(prov, 0.0)
+        delta_val = round((mtd_val - prev_val) / prev_val * 100, 1) if prev_val else 0.0
+        totals[prov] = {"mtd": mtd_val, "prev": prev_val, "delta": delta_val}
+        grand_mtd += mtd_val
+        grand_prev += prev_val
+
+    grand_delta = round((grand_mtd - grand_prev) / grand_prev * 100, 1) if grand_prev else 0.0
+    totals["total"] = {"mtd": grand_mtd, "prev": grand_prev, "delta": grand_delta}
 
     return {
         "totals": totals,
-        "startDate": start_date.isoformat() if hasattr(start_date, "isoformat") else str(start_date),  # type: ignore[union-attr]
-        "endDate": end_date.isoformat() if hasattr(end_date, "isoformat") else str(end_date),  # type: ignore[union-attr]
+        "window": window,
+        "startDate": current_start.isoformat() if hasattr(current_start, "isoformat") else str(current_start),
+        "endDate": end_date.isoformat() if hasattr(end_date, "isoformat") else str(end_date),
     }
 
 
 @router.get("/costs/by-sku", dependencies=[Depends(require_auth)])
 async def get_costs_by_sku(
     provider: Optional[str] = Query(None),
+    project: Optional[str] = Query(None, description="Filter by project name"),
     limit: int = Query(50, le=100),
 ) -> dict[str, Any]:
     """Get costs aggregated by SKU."""
@@ -179,6 +237,10 @@ async def get_costs_by_sku(
         conditions.append("provider = %s")
         params.append(provider)
 
+    if project:
+        conditions.append("project_name = %s")
+        params.append(project)
+
     where_clause = ""
     if conditions:
         where_clause = "WHERE " + " AND ".join(conditions)
@@ -186,13 +248,14 @@ async def get_costs_by_sku(
     sql = f"""
         SELECT
             provider,
+            project_id,
             project_name,
-            sku_name,
-            SUM(cost_amount) as mtd,
+            service_name as sku_name,
+            SUM(net_cost_usd) as mtd,
             COUNT(*) as instances
         FROM cost_records
         {where_clause}
-        GROUP BY provider, project_name, sku_name
+        GROUP BY provider, project_id, project_name, service_name
         ORDER BY mtd DESC
         LIMIT %s
     """
@@ -203,6 +266,7 @@ async def get_costs_by_sku(
     for row in results:
         costs.append({
             "prov": row["provider"],
+            "project_id": row["project_id"],
             "name": row["project_name"],
             "sku": row["sku_name"],
             "mtd": float(row["mtd"]),
@@ -218,13 +282,20 @@ async def get_costs_by_sku(
 async def get_daily_costs(
     start_date: Union[str, datetime, None] = Query(None),
     end_date: Union[str, datetime, None] = Query(None),
+    start: Optional[str] = Query(None, alias="start", include_in_schema=False),
+    end: Optional[str] = Query(None, alias="end", include_in_schema=False),
     provider: Optional[str] = Query(None),
+    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
 ) -> dict[str, Any]:
     """Get daily cost breakdown for chart visualization."""
+    if end and not end_date:
+        end_date = end
+    if start and not start_date:
+        start_date = start
     end_date = end_date or datetime.now()
-    start_date = start_date or (end_date - timedelta(days=30))  # type: ignore[operator,assignment]
+    start_date, end_date = _resolve_window(window, start_date, end_date)
 
-    conditions = ["DATE(cost_date) >= %s", "DATE(cost_date) <= %s"]
+    conditions = ["DATE(usage_start) >= %s", "DATE(usage_start) <= %s"]
     _sd = start_date.date() if hasattr(start_date, "date") else start_date  # type: ignore[union-attr]
     _ed = end_date.date() if hasattr(end_date, "date") else end_date  # type: ignore[union-attr]
     params = [_sd, _ed]
@@ -235,12 +306,12 @@ async def get_daily_costs(
 
     sql = f"""
         SELECT
-            DATE(cost_date) as date,
+            DATE(usage_start) as date,
             provider,
-            SUM(cost_amount) as amount
+            SUM(net_cost_usd) as amount
         FROM cost_records
         WHERE {" AND ".join(conditions)}
-        GROUP BY DATE(cost_date), provider
+        GROUP BY DATE(usage_start), provider
         ORDER BY date DESC
     """
 
@@ -276,19 +347,20 @@ async def cost_summary(
     end_date: Union[str, datetime, None] = Query(None),
     start: Optional[str] = Query(None, alias="start", include_in_schema=False),
     end: Optional[str] = Query(None, alias="end", include_in_schema=False),
+    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
 ) -> dict[str, Any]:
     """CLI-compatible cost summary endpoint."""
-    if start and not start_date:
-        start_date = start
     if end and not end_date:
         end_date = end
+    if start and not start_date:
+        start_date = start
     end_date = end_date or datetime.now()
-    start_date = start_date or (end_date - timedelta(days=30))  # type: ignore[operator,assignment]
+    start_date, end_date = _resolve_window(window, start_date, end_date)
 
     sql = (
-        "SELECT provider, SUM(cost_amount) as total "
+        "SELECT provider, SUM(net_cost_usd) as total "
         "FROM cost_records "
-        "WHERE cost_date >= %s AND cost_date <= %s GROUP BY provider"
+        "WHERE usage_start >= %s AND usage_start <= %s GROUP BY provider"
     )
     rows = query_all(sql, (start_date, end_date))  # type: ignore[list-item]
 
@@ -324,30 +396,48 @@ async def cost_breakdown(
     end_date: Union[str, datetime, None] = Query(None),
     start: Optional[str] = Query(None, alias="start", include_in_schema=False),
     end: Optional[str] = Query(None, alias="end", include_in_schema=False),
+    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
     limit: int = Query(50, le=100),
 ) -> dict[str, Any]:
     """CLI-compatible cost breakdown by SKU endpoint."""
     from ..db import query_all
-    if start and not start_date:
-        start_date = start
     if end and not end_date:
         end_date = end
+    if start and not start_date:
+        start_date = start
+    end_date = end_date or datetime.now()
+    start_date, end_date = _resolve_window(window, start_date, end_date)
     conditions = []
     params = []
     if start_date and end_date:
-        conditions.append("cost_date >= %s")
-        conditions.append("cost_date <= %s")
+        conditions.append("usage_start >= %s")
+        conditions.append("usage_start <= %s")
         params.extend([start_date, end_date])
     where_clause = ""
     if conditions:
         where_clause = "WHERE " + " AND ".join(conditions)
     sql = f"""
-        SELECT sku_name as sku, SUM(cost_amount) as cost
+        SELECT service_name as sku, SUM(net_cost_usd) as cost
         FROM cost_records {where_clause}
-        GROUP BY sku_name
+        GROUP BY service_name
         ORDER BY cost DESC
         LIMIT %s
     """
     rows = query_all(sql, tuple(params) + (limit,))
     data = [{"sku": r["sku"], "cost": float(r["cost"])} for r in rows]
     return {"data": data, "total": len(data)}
+
+
+@router.get("/costs/skus", dependencies=[Depends(require_auth)])
+async def get_skus_by_provider(
+    provider: str = Query(..., description="Cloud provider: azure, gcp, llm"),
+) -> dict[str, Any]:
+    """Get distinct SKUs (service names) for a given provider."""
+    sql = """
+        SELECT DISTINCT service_name as sku
+        FROM cost_records
+        WHERE provider = %s AND service_name IS NOT NULL
+        ORDER BY service_name
+    """
+    rows = query_all(sql, (provider,))
+    return {"skus": [r["sku"] for r in rows if r["sku"]]}

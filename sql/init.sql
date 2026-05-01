@@ -9,6 +9,55 @@ CREATE EXTENSION IF NOT EXISTS pg_partman;
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
 -- =============================================================================
+-- fin_projects — project registry
+-- =============================================================================
+
+CREATE TABLE fin_projects (
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    slug            TEXT UNIQUE NOT NULL,
+    owner           TEXT NOT NULL DEFAULT '',
+    cost_center     TEXT NOT NULL DEFAULT '',
+    budget_cap      NUMERIC(18,6) DEFAULT NULL,
+    mtd             NUMERIC(18,6) DEFAULT 0,
+    tags            JSONB DEFAULT '{}',
+    note            TEXT DEFAULT '',
+    provider        TEXT DEFAULT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_projects_slug ON fin_projects (slug);
+CREATE INDEX idx_projects_provider ON fin_projects (provider);
+
+-- =============================================================================
+-- alerts — anomaly & budget alerts
+-- =============================================================================
+
+CREATE TABLE alerts (
+    id                  TEXT PRIMARY KEY,
+    status              TEXT NOT NULL DEFAULT 'firing',
+    severity            TEXT NOT NULL DEFAULT 'warning',
+    rule                TEXT DEFAULT NULL,
+    project             TEXT DEFAULT NULL,
+    triggered_at        TIMESTAMPTZ DEFAULT NULL,
+    description         TEXT NOT NULL DEFAULT '',
+    cost_impact         NUMERIC(18,6) DEFAULT 0,
+    resource            TEXT DEFAULT '',
+    service             TEXT DEFAULT '',
+    provider            TEXT DEFAULT '',
+    acknowledged_at     TIMESTAMPTZ DEFAULT NULL,
+    acknowledged_by     TEXT DEFAULT NULL,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_alerts_status ON alerts (status);
+CREATE INDEX idx_alerts_severity ON alerts (severity);
+CREATE INDEX idx_alerts_project ON alerts (project);
+CREATE INDEX idx_alerts_triggered ON alerts (triggered_at);
+
+-- =============================================================================
 -- cost_records — partitioned by month on usage_start
 -- =============================================================================
 
@@ -26,6 +75,9 @@ CREATE TABLE cost_records (
     team            TEXT,
     service_category TEXT NOT NULL,
     service_name    TEXT NOT NULL,
+    resource_type   TEXT DEFAULT NULL,
+    region          TEXT DEFAULT NULL,
+    charge_type     TEXT DEFAULT NULL,
     resource_id     TEXT,
     cost_usd        NUMERIC(18,6) NOT NULL,
     currency_original TEXT NOT NULL,
@@ -300,3 +352,16 @@ INSERT INTO exchange_rates (currency, rate_to_usd, rate_date, source) VALUES
     ('NOK', 0.0920, current_date, 'ecb'),
     ('DKK', 0.1450, current_date, 'ecb'),
     ('INR', 0.0120, current_date, 'ecb');
+
+-- =============================================================================
+-- Migrations — add columns/tables to existing deployments
+-- Run these on top of older init.sql versions
+-- =============================================================================
+
+ALTER TABLE cost_records ADD COLUMN IF NOT EXISTS resource_type TEXT DEFAULT NULL;
+ALTER TABLE cost_records ADD COLUMN IF NOT EXISTS region TEXT DEFAULT NULL;
+ALTER TABLE cost_records ADD COLUMN IF NOT EXISTS charge_type TEXT DEFAULT NULL;
+
+ALTER TABLE cloud_config ADD COLUMN IF NOT EXISTS last_test TEXT DEFAULT NULL;
+ALTER TABLE cloud_config ADD COLUMN IF NOT EXISTS last_test_at TIMESTAMPTZ DEFAULT NULL;
+ALTER TABLE cloud_config ADD COLUMN IF NOT EXISTS err TEXT DEFAULT NULL;
