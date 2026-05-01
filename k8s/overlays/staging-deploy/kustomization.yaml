@@ -18,4 +18,4 @@ commonLabels:
 images:
   - name: ghcr.io/acarmisc/finops-api
     newName: ghcr.io/acarmisc/finops-api
-    newTag: staging-test
+    newTag: latest
