@@ -18,13 +18,14 @@ jobs:
 
       - name: Update k8s manifests to latest images
         run: |
-          # Update API image in staging deployment
+          # Get latest tag from ghcr.io that matches semver pattern (for staging, use staging-test tag)
           IMAGE_TAG=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://ghcr.io/v2/${{ github.repository }}/finops-api/tags/list" | \
             jq -r '.tags[]' | grep -E '^[0-9]+\.' | sort -V | tail -1)
 
           if [ -n "$IMAGE_TAG" ]; then
-            sed -i "s|ghcr.io/.*/finops-api:staging-test|ghcr.io/${{ github.repository }}/finops-api:${IMAGE_TAG}|g" k8s/overlays/staging-deploy/kustomization.yaml
+            # Update kustomization.yaml with newTag
+            sed -i "s|newTag:.*|newTag: ${IMAGE_TAG}|g" k8s/overlays/staging-deploy/kustomization.yaml
             echo "Updated API to ${IMAGE_TAG}"
           fi
 
