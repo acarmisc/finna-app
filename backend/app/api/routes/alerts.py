@@ -48,17 +48,17 @@ async def list_alerts(
             "description": r.get("description") or r.get("body") or r.get("title") or "",
             "rule": r.get("rule") or "",
             "project": r.get("project") or "",
-            "triggered_at": r.get("triggered_at").isoformat() if r.get("triggered_at") else None,
+            "triggered_at": r["triggered_at"].isoformat() if r.get("triggered_at") else None,
             "cost_impact": float(r.get("cost_impact") or 0.0),
             "resource": r.get("resource") or "",
             "service": r.get("service") or "",
             "provider": r.get("provider") or "",
             "is_acknowledged": r.get("acknowledged_at") is not None,
-            "first_seen": (r.get("created_at").isoformat()) if r.get("created_at") else None,
+            "first_seen": r["created_at"].isoformat() if r.get("created_at") else None,
             "last_seen": (
-                r.get("updated_at").isoformat()
+                r["updated_at"].isoformat()
                 if r.get("updated_at")
-                else (r.get("created_at").isoformat() if r.get("created_at") else None)
+                else (r["created_at"].isoformat() if r.get("created_at") else None)
             ),
         })
     total = len(data)
@@ -122,17 +122,17 @@ async def get_active_alerts(
             "description": r.get("description") or r.get("body") or r.get("title") or "",
             "rule": r.get("rule") or "",
             "project": r.get("project") or "",
-            "triggered_at": r.get("triggered_at").isoformat() if r.get("triggered_at") else None,
+            "triggered_at": r["triggered_at"].isoformat() if r.get("triggered_at") else None,
             "cost_impact": float(r.get("cost_impact") or 0.0),
             "resource": r.get("resource") or "",
             "service": r.get("service") or "",
             "provider": r.get("provider") or "",
             "is_acknowledged": r.get("acknowledged_at") is not None,
-            "first_seen": (r.get("created_at").isoformat()) if r.get("created_at") else None,
+            "first_seen": r["created_at"].isoformat() if r.get("created_at") else None,
             "last_seen": (
-                r.get("updated_at").isoformat()
+                r["updated_at"].isoformat()
                 if r.get("updated_at")
-                else (r.get("created_at").isoformat() if r.get("created_at") else None)
+                else (r["created_at"].isoformat() if r.get("created_at") else None)
             ),
         })
     return {"alerts": data, "count": len(data)}
