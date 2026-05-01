@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 class Provider(str, Enum):
     AZURE = "azure"
     GCP = "gcp"
+    LLM = "llm"
 
 
 class CredentialType(str, Enum):
@@ -86,6 +87,12 @@ class CloudConfigResponse(BaseModel):
     config: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+    last_test: Optional[str] = None
+    last_test_at: Optional[datetime] = None
+    tenant_id: Optional[str] = None
+    subscription_id: Optional[str] = None
+    project_id: Optional[str] = None
+    err: Optional[str] = None
 
 
 # ============================================================================
@@ -122,6 +129,7 @@ class ExtractorStatusResponse(BaseModel):
     """Response schema for extractor status."""
 
     id: str
+    config_id: Optional[str] = None
     provider: str
     extractor_type: str
     status: str
@@ -265,3 +273,81 @@ class ExtractorRunTriggerResponse(BaseModel):
     run_id: str
     status: str
     extractor_id: str
+
+
+# ============================================================================
+# Alert schemas
+# ============================================================================
+
+
+class AlertStatus(str, Enum):
+    FIRING = "firing"
+    ACKNOWLEDGED = "ack"
+    RESOLVED = "resolved"
+
+
+class AlertSeverity(str, Enum):
+    CRITICAL = "critical"
+    WARNING = "warning"
+    INFO = "info"
+
+
+class AlertRecord(BaseModel):
+    """Response schema for a single alert."""
+
+    id: str
+    status: AlertStatus
+    severity: AlertSeverity
+    description: str
+    rule: Optional[str] = None
+    project: Optional[str] = None
+    triggered_at: Optional[str] = None
+    cost_impact: float = 0.0
+    resource: str = ""
+    service: str = ""
+    provider: str = ""
+    is_acknowledged: bool = False
+    first_seen: Optional[str] = None
+    last_seen: Optional[str] = None
+
+
+class AlertStatsResponse(BaseModel):
+    """Response schema for alert statistics."""
+
+    by_status: dict[str, int] = {}
+    by_severity: dict[str, int] = {}
+    total: int = 0
+
+
+# ============================================================================
+# Project schemas
+# ============================================================================
+
+
+class ProjectResponse(BaseModel):
+    """Response schema for a project."""
+
+    id: str
+    name: str
+    slug: str
+    owner: str
+    cost_center: str
+    budget_cap: Optional[float] = None
+    mtd: float = 0.0
+    tags: dict[str, Any] = {}
+    note: str = ""
+    provider: Optional[str] = None
+    created: Optional[str] = None
+
+
+class ProjectCreate(BaseModel):
+    """Request schema for creating a project."""
+
+    name: str
+    slug: Optional[str] = None
+    owner: Optional[str] = None
+    cost_center: Optional[str] = None
+    budget_cap: Optional[float] = None
+    tags: dict[str, Any] = {}
+    note: str = ""
+    provider: Optional[str] = None

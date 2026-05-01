@@ -55,7 +55,11 @@ CREATE TABLE IF NOT EXISTS alerts (
     channels TEXT[] DEFAULT '{}',
     status TEXT NOT NULL DEFAULT 'firing',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    resolved_at TIMESTAMPTZ
+    resolved_at TIMESTAMPTZ,
+    acknowledged_at TIMESTAMPTZ,
+    acknowledged_by TEXT,
+    project TEXT,
+    triggered_at TIMESTAMPTZ
 );
 
 -- ─── Extractor runs ─────────────────────────────────────────────────────────
@@ -103,7 +107,8 @@ CREATE TABLE IF NOT EXISTS fin_projects (
     mtd NUMERIC(18,6) NOT NULL DEFAULT 0,
     tags JSONB DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    note TEXT
+    note TEXT,
+    provider TEXT NOT NULL DEFAULT 'azure'
 );
 
 -- ─── Cloud config (existing) ───────────────────────────────────────────────
@@ -149,11 +154,11 @@ VALUES ('admin', 'admin@finops.local',
 ON CONFLICT (username) DO UPDATE SET hashed_password = EXCLUDED.hashed_password;
 
 -- Fin projects
-INSERT INTO fin_projects (id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note) VALUES
-('p_platform', 'Platform', 'platform', 'platform-eng@acme.co', 'eng-001', 14000, 8412.22, '{"env":"prod","business_unit":"core"}'::jsonb, now() - interval '30 days', 'Core platform + shared data infra.'),
-('p_ml', 'ML & AI', 'ml-ai', 'ml-team@acme.co', 'ml-002', 3500, 1241.40, '{"env":"mixed","business_unit":"ai"}'::jsonb, now() - interval '20 days', 'Training, serving and LLM spend.'),
-('p_analytics', 'Analytics', 'analytics', 'data@acme.co', 'data-004', 10000, 4094.41, '{"env":"prod","business_unit":"data"}'::jsonb, now() - interval '60 days', 'BI, dashboards, warehouse.'),
-('p_dev', 'Dev & Staging', 'dev', 'devops@acme.co', 'eng-002', 900, 208.00, '{"env":"dev","business_unit":"core"}'::jsonb, now() - interval '25 days', 'Developer sandboxes and CI.')
+INSERT INTO fin_projects (id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note, provider) VALUES
+('p_platform', 'Platform', 'platform', 'platform-eng@acme.co', 'eng-001', 14000, 8412.22, '{"env":"prod","business_unit":"core"}'::jsonb, now() - interval '30 days', 'Core platform + shared data infra.', 'azure'),
+('p_ml', 'ML & AI', 'ml-ai', 'ml-team@acme.co', 'ml-002', 3500, 1241.40, '{"env":"mixed","business_unit":"ai"}'::jsonb, now() - interval '20 days', 'Training, serving and LLM spend.', 'gcp'),
+('p_analytics', 'Analytics', 'analytics', 'data@acme.co', 'data-004', 10000, 4094.41, '{"env":"prod","business_unit":"data"}'::jsonb, now() - interval '60 days', 'BI, dashboards, warehouse.', 'azure'),
+('p_dev', 'Dev & Staging', 'dev', 'devops@acme.co', 'eng-002', 900, 208.00, '{"env":"dev","business_unit":"core"}'::jsonb, now() - interval '25 days', 'Developer sandboxes and CI.', 'gcp')
 ON CONFLICT (id) DO NOTHING;
 
 -- Cloud configs linked to projects
@@ -182,28 +187,28 @@ ON CONFLICT (id) DO NOTHING;
 -- cost_records seed data removed — populated via extractors
 
 -- Seeded alerts
-INSERT INTO alerts (id, type, severity, title, body, rule, firing, channels, status, created_at)
+INSERT INTO alerts (id, type, severity, title, body, rule, firing, channels, status, created_at, project, triggered_at)
 VALUES
-    ('a1', 'budget', 'err', 'rg-analytics over budget',
+    ('a1', 'budget', 'critical', 'rg-analytics over budget',
      '$8,200 of $10,000 used. Forecast exceeds cap by Nov 28.',
      'cost_mtd rg-analytics > 0.8 * budget',
-     now() - interval '12 minutes', ARRAY['finops-slack', 'oncall@acme.co'], 'firing', now() - interval '12 minutes'),
-    ('a2', 'anomaly', 'warn', 'LLM cost anomaly claude-sonnet-4',
+     now() - interval '12 minutes', ARRAY['finops-slack', 'oncall@acme.co'], 'firing', now() - interval '12 minutes', 'analytics', now() - interval '12 minutes'),
+    ('a2', 'anomaly', 'warning', 'LLM cost anomaly claude-sonnet-4',
      '+120% vs 7d average. 3 traces flagged for review.',
      'zscore cost_1d claude-sonnet-4 window=7 > 2.0',
-     now() - interval '2 hours', ARRAY['finops-slack'], 'firing', now() - interval '2 hours'),
-    ('a3', 'sla', 'ok', 'Nightly extraction SLA',
+     now() - interval '2 hours', ARRAY['finops-slack'], 'firing', now() - interval '2 hours', 'ml-ai', now() - interval '2 hours'),
+    ('a3', 'sla', 'info', 'Nightly extraction SLA',
      'All 4 extractors completed within 15 min window.',
      'extractor_health.last_success < 6h',
-     NULL, ARRAY['oncall@acme.co'], 'resolved', now() - interval '1 hour'),
-    ('a4', 'freshness', 'ok', 'Exchange rates freshness',
+     NULL, ARRAY['oncall@acme.co'], 'resolved', now() - interval '1 hour', 'platform', now() - interval '1 hour'),
+    ('a4', 'freshness', 'info', 'Exchange rates freshness',
      'ECB rates updated at 16:05 UTC within 24h threshold.',
      'max exchange_rates.fetched_at < 24h',
-     NULL, ARRAY['finops-slack'], 'resolved', now() - interval '1 hour'),
-    ('a5', 'spike', 'warn', 'BigQuery scan cost spike prod-platform',
+     NULL, ARRAY['finops-slack'], 'resolved', now() - interval '1 hour', NULL, now() - interval '1 hour'),
+    ('a5', 'spike', 'warning', 'BigQuery scan cost spike prod-platform',
      '$412 in the last 6 hours across 18 queries. Dashboard auto-refresh suspected.',
      'sum cost_1h prod-platform sku=BigQuery > 60 for 3h',
-     now() - interval '42 minutes', ARRAY['finops-slack'], 'firing', now() - interval '42 minutes')
+     now() - interval '42 minutes', ARRAY['finops-slack'], 'firing', now() - interval '42 minutes', 'platform', now() - interval '42 minutes')
 ON CONFLICT (id) DO NOTHING;
 
 -- Seeded extractor runs

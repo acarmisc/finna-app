@@ -21,8 +21,8 @@ spec:
         fsGroup: 1000
       containers:
       - name: api
-        image: finops-api:latest
-        imagePullPolicy: IfNotPresent
+        image: ghcr.io/acarmisc/finops-api:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8000
           name: http
