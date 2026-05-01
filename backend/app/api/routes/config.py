@@ -470,7 +470,10 @@ async def cli_config_list() -> dict[str, Any]:
 @router.get("/configs/{config_id}", dependencies=[Depends(require_auth)])
 async def cli_config_get(config_id: str) -> dict[str, Any]:
     """CLI-compatible config get."""
-    sql = "SELECT id, provider, name, credential_type, config, created_at, updated_at, last_test, last_test_at, err FROM cloud_config WHERE id = %s"
+    sql = (
+        "SELECT id, provider, name, credential_type, config, created_at, "
+        "updated_at, last_test, last_test_at, err FROM cloud_config WHERE id = %s"
+    )
     r = query_one(sql, (config_id,))
     if not r:
         raise HTTPException(status_code=404, detail="Configuration not found")

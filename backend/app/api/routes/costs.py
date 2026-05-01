@@ -162,6 +162,8 @@ async def get_cost_totals(
 ) -> dict[str, Any]:
     """Get aggregated cost totals per provider with mtd/prev/delta structure."""
     end_date = end_date or datetime.now()
+    if not isinstance(end_date, datetime):
+        end_date = datetime.fromisoformat(end_date)  # type: ignore[assignment]
     start_date = start_date or (end_date - timedelta(days=30))
     window = window or "mtd"
 
@@ -293,6 +295,8 @@ async def get_daily_costs(
     if start and not start_date:
         start_date = start
     end_date = end_date or datetime.now()
+    if not isinstance(end_date, datetime):
+        end_date = datetime.fromisoformat(end_date)  # type: ignore[assignment]
     start_date, end_date = _resolve_window(window, start_date, end_date)
 
     conditions = ["DATE(usage_start) >= %s", "DATE(usage_start) <= %s"]
@@ -406,6 +410,8 @@ async def cost_breakdown(
     if start and not start_date:
         start_date = start
     end_date = end_date or datetime.now()
+    if not isinstance(end_date, datetime):
+        end_date = datetime.fromisoformat(end_date)  # type: ignore[assignment]
     start_date, end_date = _resolve_window(window, start_date, end_date)
     conditions = []
     params = []
