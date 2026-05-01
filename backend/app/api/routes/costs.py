@@ -75,7 +75,7 @@ async def list_costs(
     if start and not start_date:
         start_date = start
     end_date = end_date or datetime.now()
-    start_date, end_date = _resolve_window(window, start_date, end_date)
+    start_date, end_date = _resolve_window(window, start_date, end_date)  # type: ignore[arg-type]
 
     conditions = []
     params = []
@@ -176,7 +176,7 @@ async def get_cost_totals(
     elif window == "90d":
         current_start = end_date - timedelta(days=90)
     else:
-        current_start = start_date
+        current_start = start_date  # type: ignore[assignment]
 
     prev_end = current_start - timedelta(seconds=1)
     prev_start = prev_end - (end_date - current_start)  # type: ignore[assignment]
@@ -297,7 +297,7 @@ async def get_daily_costs(
     end_date = end_date or datetime.now()
     if not isinstance(end_date, datetime):
         end_date = datetime.fromisoformat(end_date)  # type: ignore[assignment]
-    start_date, end_date = _resolve_window(window, start_date, end_date)
+    start_date, end_date = _resolve_window(window, start_date, end_date)  # type: ignore[arg-type]
 
     conditions = ["DATE(usage_start) >= %s", "DATE(usage_start) <= %s"]
     _sd = start_date.date() if hasattr(start_date, "date") else start_date  # type: ignore[union-attr]
@@ -359,7 +359,9 @@ async def cost_summary(
     if start and not start_date:
         start_date = start
     end_date = end_date or datetime.now()
-    start_date, end_date = _resolve_window(window, start_date, end_date)
+    if not isinstance(end_date, datetime):
+        end_date = datetime.fromisoformat(end_date)  # type: ignore[assignment]
+    start_date, end_date = _resolve_window(window, start_date, end_date)  # type: ignore[arg-type]
 
     sql = (
         "SELECT provider, SUM(net_cost_usd) as total "
