@@ -90,7 +90,7 @@ async def list_costs(
 
     conditions.append("usage_start >= %s")
     conditions.append("usage_start <= %s")
-    params.extend([start_date, end_date])
+    params.extend([start_date, end_date])  # type: ignore[list-item]
 
     where_clause = ""
     if conditions:
@@ -179,7 +179,7 @@ async def get_cost_totals(
         current_start = start_date
 
     prev_end = current_start - timedelta(seconds=1)
-    prev_start = prev_end - (end_date - current_start)
+    prev_start = prev_end - (end_date - current_start)  # type: ignore[assignment]
 
     sql = """
         SELECT
@@ -412,7 +412,12 @@ async def cost_breakdown(
     end_date = end_date or datetime.now()
     if not isinstance(end_date, datetime):
         end_date = datetime.fromisoformat(end_date)  # type: ignore[assignment]
-    start_date, end_date = _resolve_window(window, start_date, end_date)
+    if isinstance(start_date, str):
+        start_date = datetime.fromisoformat(start_date)  # type: ignore[assignment]
+    if isinstance(end_date, str):
+        end_date = datetime.fromisoformat(end_date)  # type: ignore[assignment]
+    start_date, end_date = _resolve_window(window, start_date, end_date)  # type: ignore[arg-type]
+
     conditions = []
     params = []
     if start_date and end_date:
