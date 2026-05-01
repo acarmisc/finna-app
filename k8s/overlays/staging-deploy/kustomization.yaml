@@ -16,6 +16,9 @@ commonLabels:
   environment: staging
 
 images:
+  - name: europe-west1-docker.pkg.dev/abs-digital-playground/finna-app-staging/frontend
+    newName: europe-west1-docker.pkg.dev/abs-digital-playground/finna-app-staging/frontend
+    newTag: v0.1.1
   - name: ghcr.io/acarmisc/finops-api
     newName: ghcr.io/acarmisc/finops-api
     newTag: latest
