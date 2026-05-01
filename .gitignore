@@ -60,3 +60,6 @@ test_gcp_sa.py
 node_modules/
 package-lock.json
 *.tsbuildinfo
+
+# Claude/GStack worktrees (embedded repos that should never be committed)
+.claude/
