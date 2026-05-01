@@ -1,0 +1,37 @@
+name: Update Images from ghcr.io
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # Every Monday
+  workflow_dispatch:
+
+jobs:
+  update-staging:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Update k8s manifests to latest images
+        run: |
+          # Update API image in staging deployment
+          IMAGE_TAG=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://ghcr.io/v2/${{ github.repository }}/finops-api/tags/list" | \
+            jq -r '.tags[]' | grep -E '^[0-9]+\.' | sort -V | tail -1)
+
+          if [ -n "$IMAGE_TAG" ]; then
+            sed -i "s|ghcr.io/.*/finops-api:staging-test|ghcr.io/${{ github.repository }}/finops-api:${IMAGE_TAG}|g" k8s/overlays/staging-deploy/kustomization.yaml
+            echo "Updated API to ${IMAGE_TAG}"
+          fi
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: "chore: update k8s manifests to latest images"
+          branch: "update-images-${{ github.sha }}"
+          title: "chore: Update k8s manifests to latest images"
+          body: "Auto-update Kubernetes manifests to use latest images from ghcr.io"
