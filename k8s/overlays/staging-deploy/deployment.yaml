@@ -23,7 +23,7 @@ spec:
         fsGroup: 1000
       containers:
       - name: api
-        image: ghcr.io/acarmisc/finops-api:latest
+        image: ghcr.io/acarmisc/finops-api:staging-test
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
