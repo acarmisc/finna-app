@@ -52,6 +52,8 @@ interface IconProps {
 
 export function Icon({ name, size = 14, stroke = 1.5, className, style }: IconProps) {
   const path = ICONS[name] || ICONS['info']
+  const title = name.replace(/-/g, ' ')
+  
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
@@ -65,7 +67,10 @@ export function Icon({ name, size = 14, stroke = 1.5, className, style }: IconPr
       strokeLinejoin="miter"
       className={className}
       style={style}
+      role="img"
+      aria-label={title}
     >
+      <title>{title}</title>
       <path d={path} />
     </svg>
   )
