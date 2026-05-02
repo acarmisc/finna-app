@@ -950,6 +950,68 @@
   color: var(--color-fg);
 }
 
+/* ---------- Pixel breadcrumb for stepped form ---------- */
+.steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.steps .step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.steps .step .n {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-fg-muted);
+  font-weight: 700;
+}
+
+.steps .step.on {
+  color: var(--color-fg);
+  border-color: var(--color-primary);
+  background: color-mix(in oklab, var(--color-primary) 10%, var(--color-surface));
+}
+
+.steps .step.on .n {
+  background: var(--color-primary);
+  color: var(--color-primary-fg);
+  border-color: var(--color-primary);
+}
+
+.steps .step.done {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.steps .step.done .n {
+  background: var(--color-accent);
+  color: #0d1117;
+  border-color: var(--color-accent);
+}
+
+.steps .sep {
+  color: var(--color-fg-subtle);
+  font-family: var(--font-mono);
+}
+
 .tb-actions {
   margin-left: auto;
   display: flex;
@@ -1290,6 +1352,70 @@
 
 .card-bd {
   padding: 16px;
+}
+
+/* ---------- Table styles ---------- */
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.tbl th {
+  padding: 12px 16px;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-fg-muted);
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.tbl th.num,
+.tbl td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tbl td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-fg);
+}
+
+.tbl tr:last-child td {
+  border-bottom: none;
+}
+
+.tbl tr.clickable {
+  cursor: pointer;
+}
+
+.tbl tr.clickable:hover td {
+  background: var(--color-surface-2);
+}
+
+.tbl tfoot td {
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-fg-muted);
+  border-top: 1px solid var(--color-border);
+}
+
+.tbl td .mono {
+  font-family: var(--font-mono);
+}
+
+.tbl .id {
+  color: var(--color-fg-muted);
+  font-family: var(--font-mono);
 }
 
 .card-ft {
