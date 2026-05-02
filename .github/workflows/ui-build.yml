@@ -1,4 +1,4 @@
-name: Build & Push Docker Image
+name: UI Build & Push Docker Image
 
 on:
   push:
@@ -64,7 +64,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       - name: Authenticate to Google Cloud
-        uses: google-github-auth@v2
+        uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
