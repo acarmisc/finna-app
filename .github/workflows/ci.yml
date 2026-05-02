@@ -247,7 +247,7 @@ jobs:
 
       - name: Generate SBOM
         run: |
-          docker run --rm aquasecurity/trivy:latest \
+          docker run --rm ghcr.io/aquasecurity/trivy:latest \
             image ghcr.io/${{ github.repository }}/finops-api:latest \
             --format spdx -o sbom.spdx.json
 
@@ -256,13 +256,6 @@ jobs:
         with:
           name: sbom
           path: sbom.spdx.json
-
-      - name: Push to registry
-        if: github.event_name == 'push'
-        run: |
-          for tag in $(echo "${{ steps.meta.outputs.tags }}" | tr ',' '\n'); do
-            docker push $tag
-          done
 
   # ─────────────────────────────────────────────────────────────
   # STABLE: Release (only on tags)
@@ -296,8 +289,6 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           bodyPath: CHANGELOG.md
-          assets: |
-            sbom.spdx.json
           generateReleaseNotes: true
 
   # ─────────────────────────────────────────────────────────────
