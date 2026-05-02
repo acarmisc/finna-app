@@ -2,7 +2,26 @@
 
 FastAPI backend for the FinOps platform — multi-cloud cost extraction, aggregation, and API.
 
-> The frontend lives in the sibling repo [finna-app-ui](https://github.com/acarmisc/finna-app-ui).
+> The frontend lives in the [`ui/`](./ui) subdirectory of this monorepo.
+
+## Repository layout
+
+```
+finna-app/
+├── backend/        # FastAPI app (Python 3.12, uv)
+├── extractors/     # GCP/Azure/AWS/LLM cost extractors
+├── models/         # shared Python data models
+├── alembic/        # DB migrations
+├── sql/            # init + seed SQL
+├── ui/             # React/Vite/Tailwind frontend (was finna-app-ui)
+├── k8s/            # kustomize manifests (base + overlays)
+├── docs/           # architecture and integration docs
+├── Dockerfile.api  # backend image
+├── Dockerfile.extractor  # extractor cronjob image
+└── ui/Dockerfile   # nginx-served UI image
+```
+
+Run the full stack locally with `docker compose up --build`.
 
 ## Quick Start
 

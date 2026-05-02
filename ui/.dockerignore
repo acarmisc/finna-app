@@ -1,0 +1,27 @@
+# Version control
+.git
+.gitignore
+
+# Node
+node_modules/
+*.log
+npm-debug.log*
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker artifacts (prevent recursive builds)
+docker-compose*.yml
+Dockerfile*
+
+# Environment files
+.env
+.env.*

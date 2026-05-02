@@ -1,0 +1,94 @@
+name: UI Build & Push Docker Image
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+
+defaults:
+  run:
+    working-directory: ui
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/finna-app-ui
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
+      - name: Build and push to GitHub Container Registry
+        uses: docker/build-push-action@v6
+        with:
+          context: ui
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        run: gcloud auth configure-docker europe-west1-docker.pkg.dev
+
+      - name: Extract metadata for GCR
+        id: meta-gcr
+        uses: docker/metadata-action@v5
+        with:
+          images: europe-west1-docker.pkg.dev/abs-digital-playground/finna-app-staging/frontend
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
+      - name: Build and push to Google Container Registry
+        uses: docker/build-push-action@v6
+        with:
+          context: ui
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta-gcr.outputs.tags }}
+          labels: ${{ steps.meta-gcr.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

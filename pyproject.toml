@@ -36,6 +36,14 @@ dependencies = [
     "opentelemetry-exporter-otlp-proto-grpc>=1.20",
 ]
 
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["backend*", "extractors*", "models*", "config*", "utils*"]
+exclude = ["tests*", "ui*", "k8s*", "sql*", "data*", "queries*", "alembic*", "superset*", "terraform*", "docs*", "scripts*"]
+
 [project.optional-dependencies]
 dev = [
     "ruff>=0.4",

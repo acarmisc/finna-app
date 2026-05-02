@@ -9,6 +9,8 @@ resources:
   - secret.yaml
   - api-deployment.yaml
   - api-service.yaml
+  - ui-deployment.yaml
+  - ui-service.yaml
   - cronjob-gcp.yaml
   - cronjob-azure.yaml
   - cronjob-exchange-rates.yaml
@@ -21,4 +23,7 @@ images:
   - name: finops-api
     newTag: latest
   - name: finops-extractor
+    newTag: latest
+  - name: finna-app-ui
+    newName: finna-app-ui
     newTag: latest

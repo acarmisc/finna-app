@@ -5,6 +5,9 @@ on:
     branches: [main]
     tags:
       - 'v*'
+    paths-ignore:
+      - 'ui/**'
+      - 'docs/**'
   workflow_dispatch:
     inputs:
       tag:
