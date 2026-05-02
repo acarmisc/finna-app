@@ -1,0 +1,519 @@
+/* =========================================================================
+   PIXEL-ART LAYER
+   Push the aesthetic harder: chunky pixel shadows, dither textures,
+   8-bit headline font, scanlines, sprite borders.
+   Layered on top of the base — base CSS stays readable on its own.
+   ========================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+:root {
+  --pxshadow-1: 2px 2px 0 0 rgba(0,0,0,0.6);
+  --pxshadow-2: 4px 4px 0 0 rgba(0,0,0,0.55);
+  --pxshadow-3: 6px 6px 0 0 rgba(0,0,0,0.5);
+  --pxshadow-primary: 3px 3px 0 0 var(--primary);
+  --pxshadow-danger: 3px 3px 0 0 var(--danger);
+}
+[data-theme="light"] {
+  --pxshadow-1: 2px 2px 0 0 rgba(0,0,0,0.18);
+  --pxshadow-2: 4px 4px 0 0 rgba(0,0,0,0.14);
+  --pxshadow-3: 6px 6px 0 0 rgba(0,0,0,0.12);
+}
+
+/* ---------- Pixel scanlines on dark theme background ---------- */
+[data-theme="dark"] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(255,255,255,0.012) 0px,
+      rgba(255,255,255,0.012) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+  mix-blend-mode: overlay;
+}
+
+/* ---------- Pixel headline typography ---------- */
+/* Press Start 2P reserved for TITLES only (page H1s, logo, login headlines,
+   table-head, steps, empty-state titles). Stat values, badges, body, etc.
+   use JetBrains Mono / Inter. */
+
+.pixel-headline,
+.pixel-h1 {
+  font-family: 'Press Start 2P', 'JetBrains Mono', monospace;
+  letter-spacing: 0;
+  line-height: 1.4;
+  text-rendering: geometricPrecision;
+}
+
+/* Stat values: clean tabular mono, no retro display face */
+.stat-val {
+  font-family: 'JetBrains Mono', ui-monospace, monospace !important;
+  font-size: 26px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+.stat-val .ccy {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-left: 6px !important;
+  color: var(--fg-muted);
+  vertical-align: 2px;
+}
+.stat-lbl {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  line-height: 1.4;
+}
+.stat-meta {
+  font-size: 11px !important;
+}
+
+/* Page H1s get pixel-style treatment */
+.page-head h1 {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 16px !important;
+  letter-spacing: 0 !important;
+  line-height: 1.5 !important;
+  text-transform: none !important;
+  font-weight: 400 !important;
+}
+.page-head .sub {
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Sidebar logo wordmark */
+.sb-logo .wm {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 11px !important;
+  letter-spacing: 0 !important;
+}
+
+.card-hd h3 {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Card / panel chunky shadow + double border ---------- */
+.card {
+  box-shadow: var(--pxshadow-1);
+  position: relative;
+}
+/* Inner highlight line for an embossed pixel-window feel */
+[data-theme="dark"] .card::after {
+  content:'';
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(255,255,255,0.03);
+  pointer-events: none;
+}
+
+/* Card header gets a subtle dithered band */
+.card-hd {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      transparent 0,
+      transparent 3px,
+      rgba(255,255,255,0.015) 3px,
+      rgba(255,255,255,0.015) 4px
+    ),
+    var(--surface-2);
+}
+[data-theme="light"] .card-hd {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      transparent 0,
+      transparent 3px,
+      rgba(0,0,0,0.025) 3px,
+      rgba(0,0,0,0.025) 4px
+    ),
+    var(--surface-2);
+}
+
+/* ---------- Buttons: chunky pixel shadow + press animation ---------- */
+.btn {
+  box-shadow: var(--pxshadow-1);
+  transition: transform 60ms steps(2), box-shadow 60ms steps(2), background 60ms;
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+.btn:hover { transform: translate(-1px, -1px); box-shadow: 3px 3px 0 0 rgba(0,0,0,0.7); }
+.btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 0 rgba(0,0,0,0);
+}
+.btn-primary {
+  box-shadow: 2px 2px 0 0 color-mix(in oklab, var(--primary) 40%, #000);
+}
+.btn-primary:hover {
+  box-shadow: 3px 3px 0 0 color-mix(in oklab, var(--primary) 30%, #000);
+}
+.btn-danger {
+  box-shadow: 2px 2px 0 0 color-mix(in oklab, var(--danger) 40%, #000);
+}
+.btn-ghost { box-shadow: none !important; }
+.btn-ghost:active { transform: none; }
+
+/* Brackets get a subtle pulsing primary glow on primary buttons */
+.btn-primary .brackets-l,
+.btn-primary .brackets-r { opacity: 1; }
+
+/* ---------- Inputs ---------- */
+.inp:focus, .inp:focus-within {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary);
+  border-color: var(--primary);
+}
+.inp { box-shadow: inset 1px 1px 0 0 rgba(0,0,0,0.25); }
+[data-theme="light"] .inp { box-shadow: inset 1px 1px 0 0 rgba(0,0,0,0.05); }
+
+/* ---------- Sidebar pixel-art ---------- */
+.sidebar {
+  background:
+    linear-gradient(180deg, var(--surface) 0%, var(--bg) 100%);
+  border-right: 2px solid var(--border);
+}
+.sb-item {
+  position: relative;
+}
+.sb-item.active {
+  box-shadow: inset 3px 0 0 0 var(--primary);
+  background: var(--surface-2);
+}
+.sb-item.active::before {
+  content: '▸';
+  position: absolute;
+  left: -2px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--primary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  text-shadow: 1px 0 0 var(--primary);
+}
+
+/* ---------- Topbar pixel border ---------- */
+.topbar {
+  border-bottom: 2px solid var(--border);
+}
+
+/* ---------- Badges: NES sprite shadow ---------- */
+.badge {
+  box-shadow: 1px 1px 0 0 rgba(0,0,0,0.6);
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  padding: 3px 7px !important;
+  line-height: 1.2 !important;
+}
+[data-theme="light"] .badge { box-shadow: 1px 1px 0 0 rgba(0,0,0,0.15); }
+
+.provider-badge {
+  box-shadow: 1px 1px 0 0 rgba(0,0,0,0.6);
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  padding: 3px 6px !important;
+  line-height: 1.2 !important;
+}
+[data-theme="light"] .provider-badge { box-shadow: 1px 1px 0 0 rgba(0,0,0,0.15); }
+
+/* ---------- Dialog: thick pixel window ---------- */
+.dialog {
+  box-shadow:
+    var(--pxshadow-3),
+    0 0 0 2px var(--border);
+  border: 1px solid var(--border) !important;
+}
+.dialog-hd {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      var(--primary) 0,
+      var(--primary) 4px,
+      color-mix(in oklab, var(--primary) 70%, #000) 4px,
+      color-mix(in oklab, var(--primary) 70%, #000) 8px
+    );
+  color: var(--primary-fg);
+  border-bottom: 2px solid var(--border);
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 10px !important;
+  letter-spacing: 0 !important;
+  padding: 10px 14px;
+}
+.dialog-hd .close {
+  background: var(--primary-fg);
+  color: var(--primary);
+  width: 18px; height: 18px;
+  display: grid; place-items: center;
+  border: 1px solid var(--primary-fg);
+  font-family: monospace;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ---------- Toast: pixel sprite ---------- */
+.toast {
+  box-shadow: var(--pxshadow-2);
+}
+
+/* ---------- Progress bar: chunky pixel blocks ---------- */
+.pbar {
+  height: 12px !important;
+  border: 1px solid var(--border);
+  background:
+    repeating-linear-gradient(
+      90deg,
+      var(--surface-2) 0,
+      var(--surface-2) 6px,
+      var(--bg) 6px,
+      var(--bg) 7px
+    );
+  overflow: hidden;
+  padding: 1px;
+}
+.pbar > div {
+  height: 100%;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      var(--primary) 0,
+      var(--primary) 6px,
+      color-mix(in oklab, var(--primary) 70%, #000) 6px,
+      color-mix(in oklab, var(--primary) 70%, #000) 7px
+    ) !important;
+  image-rendering: pixelated;
+}
+
+/* ---------- Steps wizard ---------- */
+.steps .step {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 8px !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  padding: 8px 14px !important;
+  box-shadow: 2px 2px 0 0 rgba(0,0,0,0.4);
+}
+
+/* ---------- KPI / stat card chunky frame ---------- */
+.stat {
+  box-shadow:
+    var(--pxshadow-2),
+    inset 0 0 0 1px rgba(255,255,255,0.02);
+}
+[data-theme="light"] .stat { box-shadow: var(--pxshadow-2); }
+
+/* ---------- Table: pixel-stitch row separators ---------- */
+.tbl tr:hover td {
+  background: var(--surface-2);
+}
+.tbl th {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      var(--surface-2) 0,
+      var(--surface-2) 4px,
+      var(--surface-3) 4px,
+      var(--surface-3) 5px
+    ) !important;
+  border-bottom: 2px solid var(--border) !important;
+}
+
+/* ---------- Tabs: bracket-frame the active ---------- */
+.tabs .tab.active {
+  position: relative;
+}
+.tabs .tab.active::before {
+  content: '▸ ';
+  color: var(--primary);
+}
+
+/* ---------- Login: dithered hero, pixel mark ---------- */
+.login-brand {
+  background:
+    radial-gradient(circle at 25% 15%, color-mix(in oklab, var(--primary) 25%, transparent) 0%, transparent 45%),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 2px,
+      rgba(255,255,255,0.02) 2px,
+      rgba(255,255,255,0.02) 3px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 2px,
+      rgba(255,255,255,0.02) 2px,
+      rgba(255,255,255,0.02) 3px
+    ),
+    var(--bg);
+}
+
+.login-brand-mark {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 22px !important;
+  letter-spacing: 0 !important;
+}
+
+.login-brand-headline h1 {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 22px !important;
+  line-height: 1.5 !important;
+  letter-spacing: 0 !important;
+  font-weight: 400 !important;
+}
+.login-brand-headline h1 .accent {
+  color: var(--primary);
+  text-shadow:
+    2px 0 0 color-mix(in oklab, var(--primary) 50%, #000),
+    0 2px 0 color-mix(in oklab, var(--primary) 50%, #000);
+}
+.login-brand-headline p {
+  font-size: 13px;
+  line-height: 1.6;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.login-brand-stats .item {
+  border: 1px solid var(--border);
+  box-shadow: var(--pxshadow-1);
+  padding: 10px 12px;
+  background: var(--surface);
+}
+.login-brand-stats .item .v {
+  font-family: 'JetBrains Mono', monospace !important;
+  font-size: 22px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.login-form h2 {
+  font-family: 'Press Start 2P', monospace !important;
+  font-size: 14px !important;
+  letter-spacing: 0 !important;
+  line-height: 1.5 !important;
+  font-weight: 400 !important;
+}
+
+.sso-btn {
+  box-shadow: var(--pxshadow-1);
+  transition: transform 60ms steps(2), box-shadow 60ms steps(2);
+}
+.sso-btn:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 0 rgba(0,0,0,0.65);
+}
+.sso-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 0 transparent;
+}
+
+/* ---------- Cursor: keep default OS pointer ---------- */
+button, .btn, .sb-item, [role="button"], a { cursor: pointer; }
+
+/* ---------- Pixel grid background pattern (used on hero panels) ---------- */
+.pixel-grid-bg {
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 16px 16px;
+  background-position: -1px -1px;
+}
+
+/* ---------- Chip / breadcrumb pixel feel ---------- */
+.chip {
+  box-shadow: 1px 1px 0 0 rgba(0,0,0,0.5);
+  font-family: 'JetBrains Mono', monospace !important;
+}
+[data-theme="light"] .chip { box-shadow: 1px 1px 0 0 rgba(0,0,0,0.1); }
+
+/* ---------- Skeleton: pixelated shimmer ---------- */
+.skel {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      var(--surface-2) 0,
+      var(--surface-2) 4px,
+      var(--surface-3) 4px,
+      var(--surface-3) 8px
+    );
+}
+
+/* ---------- Image rendering: keep SVGs crisp ---------- */
+svg, img {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+/* …except lucide icons should stay smooth */
+.icon, [data-lucide] svg, svg[data-lucide], svg.lucide {
+  image-rendering: auto;
+}
+
+/* ---------- Empty state ---------- */
+.empty .msg {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+.empty h3 {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+/* ---------- Avatar pixel frame ---------- */
+.avatar {
+  box-shadow:
+    inset 0 0 0 1px rgba(0,0,0,0.4),
+    1px 1px 0 0 rgba(0,0,0,0.5);
+}
+
+/* ---------- Code-style block / kbd ---------- */
+kbd {
+  display: inline-block;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: 1px 1px 0 0 rgba(0,0,0,0.5);
+  padding: 1px 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* ---------- Hover border accent on focusable rows ---------- */
+.tbl tbody tr {
+  transition: none;
+}
+.tbl tbody tr:hover {
+  outline: 1px solid var(--primary);
+  outline-offset: -1px;
+}
+
+/* ---------- Reduce motion support ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .btn, .sso-btn { transition: none; }
+  [data-theme="dark"] body::before { display: none; }
+}
