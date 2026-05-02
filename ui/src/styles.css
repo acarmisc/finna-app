@@ -238,7 +238,59 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .icon-btn:hover { background: var(--surface-2); border-color: var(--border); color: var(--fg); }
 .icon-btn svg { width: 14px; height: 14px; }
 
-/* ---------- Topbar ---------- */
+/* ---------- Sidebar Toggle (collapse/expand button) ---------- */
+.sidebar-toggle {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 100;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--fg-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.sidebar-toggle:hover {
+  background: var(--surface-2);
+  border-color: var(--fg-subtle);
+  color: var(--fg);
+}
+.app:not(.collapsed) .sidebar-toggle .expand-icon,
+.app.collapsed .sidebar-toggle .collapse-icon { display: none; }
+
+/* Collapsed sidebar - show tooltips and proper spacing */
+.app.collapsed .sb-nav { padding: 4px 4px; }
+.app.collapsed .sb-item {
+  justify-content: center;
+  padding: 10px;
+  position: relative;
+}
+.app.collapsed .sb-item .label,
+.app.collapsed .sb-item .count { display: none; }
+.app.collapsed .sb-item:hover::after {
+  content: attr(data-label);
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--fg);
+  white-space: nowrap;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/*---------- Topbar ---------- */
 .tb {
   grid-area: topbar;
   height: 48px;
