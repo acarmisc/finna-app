@@ -11,6 +11,7 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingress.yaml
+  - finna-app-ui-deployment.yaml
 
 commonLabels:
   environment: staging
