@@ -1,3 +1,5 @@
+> **Note**: This is the frontend portion of the [finna-app](https://github.com/acarmisc/finna-app) monorepo. Backend code lives at `../backend/`.
+
 # FinOps Console
 
 **FinOps Console** è una dashboard multi-cloud per il monitoraggio dei costi di Azure, GCP e LLM API.
