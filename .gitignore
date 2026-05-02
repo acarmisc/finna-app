@@ -63,3 +63,7 @@ package-lock.json
 
 # Claude/GStack worktrees (embedded repos that should never be committed)
 .claude/
+
+# Tooling caches
+.playwright-mcp/
+test-results/
