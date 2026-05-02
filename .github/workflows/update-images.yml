@@ -11,22 +11,44 @@ jobs:
     permissions:
       contents: read
       packages: write
+      pull-requests: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Update k8s manifests to latest images
+      - name: Install yq
         run: |
-          # Get latest tag from ghcr.io that matches semver pattern (for staging, use staging-test tag)
-          IMAGE_TAG=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://ghcr.io/v2/${{ github.repository }}/finops-api/tags/list" | \
-            jq -r '.tags[]' | grep -E '^[0-9]+\.' | sort -V | tail -1)
+          sudo wget -qO /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
 
-          if [ -n "$IMAGE_TAG" ]; then
-            # Update kustomization.yaml with newTag
-            sed -i "s|newTag:.*|newTag: ${IMAGE_TAG}|g" k8s/overlays/staging-deploy/kustomization.yaml
-            echo "Updated API to ${IMAGE_TAG}"
+      - name: Bump API image tag
+        run: |
+          API_TAG=$(curl -s -H "Authorization: Bearer $(echo ${{ secrets.GITHUB_TOKEN }} | base64)" \
+            "https://ghcr.io/v2/${{ github.repository_owner }}/finops-api/tags/list" | \
+            jq -r '.tags[]?' | grep -E '^[0-9]+\.' | sort -V | tail -1)
+          if [ -n "$API_TAG" ]; then
+            yq -i \
+              "(.images[] | select(.name == \"ghcr.io/acarmisc/finops-api\").newTag) = \"$API_TAG\"" \
+              k8s/overlays/staging-deploy/kustomization.yaml
+            echo "API → $API_TAG"
+          else
+            echo "No semver tag found for API; skipping"
+          fi
+
+      - name: Bump UI image tag
+        run: |
+          UI_TAG=$(curl -s -H "Authorization: Bearer $(echo ${{ secrets.GITHUB_TOKEN }} | base64)" \
+            "https://ghcr.io/v2/${{ github.repository_owner }}/finna-app-ui/tags/list" | \
+            jq -r '.tags[]?' | grep -E '^[0-9]+\.' | sort -V | tail -1)
+          if [ -n "$UI_TAG" ]; then
+            yq -i \
+              "(.images[] | select(.name == \"finna-app-ui\").newTag) = \"$UI_TAG\"" \
+              k8s/overlays/staging-deploy/kustomization.yaml
+            echo "UI → $UI_TAG"
+          else
+            echo "No semver tag found for UI; skipping"
           fi
 
       - name: Create Pull Request
@@ -35,4 +57,8 @@ jobs:
           commit-message: "chore: update k8s manifests to latest images"
           branch: "update-images-${{ github.sha }}"
           title: "chore: Update k8s manifests to latest images"
-          body: "Auto-update Kubernetes manifests to use latest images from ghcr.io"
+          body: |
+            Auto-update Kubernetes manifests to use latest images from ghcr.io.
+
+            - API: `ghcr.io/acarmisc/finops-api`
+            - UI: `ghcr.io/acarmisc/finna-app-ui` (mapped to GCR via overlay)
