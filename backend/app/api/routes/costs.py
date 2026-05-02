@@ -478,7 +478,6 @@ async def dashboard_stats(
     prev_end = current_start - timedelta(seconds=1)
     prev_start = prev_end - (end_dt - current_start)
 
-    from fastapi import Request
     totals_sql = """
         SELECT provider, SUM(net_cost_usd) as total
         FROM cost_records

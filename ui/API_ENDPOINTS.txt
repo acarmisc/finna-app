@@ -1,0 +1,855 @@
+FINNA-APP API ENDPOINT SPECIFICATION
+====================================
+Source: /root/projects/finna-app/backend/app/api
+Last Updated: 2026-04-26
+
+API BASE URL: /api/v1
+AUTH: JWT Bearer token required on all /api/v1/* endpoints except:
+- GET  /healthz (no auth)
+- POST /api/v1/auth/token (auth endpoint)  
+
+================================================================================
+SECTION 1: API ROUTES WITH HTTP METHOD, PATH, PARAMETERS
+================================================================================
+
+--- AUTHENTICATION ---
+1. POST /api/v1/auth/token
+   Description: Obtain JWT access token
+   Request Body:
+     - username: string (required)
+     - password: string (required)
+   Response:
+     - JSON: { "token": "jwt_token_string" }
+   Status Codes: 200, 401, 403
+
+2. POST /api/v1/auth/gcp/register
+   Description: Register GCP project credentials
+   Auth: Required
+   Request Body:
+     - project_id: string (required) - GCP project ID
+     - key_file_content: string (optional) - Service account key JSON
+   Response:
+     - JSON: { "config_id": "uuid", "project_id": "string" }
+   Status Codes: 200, 401
+
+3. POST /api/v1/auth/azure/service-account
+   Description: Register Azure service principal credentials
+   Auth: Required
+   Request Body:
+     - tenant_id: string (required)
+     - client_id: string (required)
+     - client_secret: string (optional)
+     - subscription_id: string (optional)
+   Response:
+     - JSON: { "config_id": "uuid", "message": "success message" }
+   Status Codes: 200, 401
+
+4. POST /api/v1/auth/login
+   Description: CLI-compatible alias for /api/v1/auth/token
+   Request Body:
+     - username: string (required)
+     - password: string (required)
+   Response: { "access_token": "jwt_token", "token_type": "bearer" }
+   Status Codes: 200, 401, 403
+
+
+--- CONFIGURATION MANAGEMENT ---
+5. GET /api/v1/config
+   Description: List all cloud configurations
+   Auth: Required
+   Response: Array of CloudConfigResponse objects
+   Status Codes: 200, 401, 422
+
+6. POST /api/v1/config
+   Description: Create a new cloud configuration
+   Auth: Required
+   Request Body (CloudConfigCreate):
+     - provider: "azure" | "gcp" (required)
+     - name: string (required)
+     - credential_type: CredentialType enum (required)
+     - config: object (required)
+   Response: CloudConfigResponse
+   Status Codes: 201, 401
+
+7. GET /api/v1/config/{config_id}
+   Description: Get a specific cloud configuration
+   Auth: Required
+   Path Parameters:
+     - config_id: string (UUID, required)
+   Response: CloudConfigResponse
+   Status Codes: 200, 404, 401
+
+8. PUT /api/v1/config/{config_id}
+   Description: Update a cloud configuration
+   Auth: Required
+   Path Parameters:
+     - config_id: string (UUID, required)
+   Request Body (CloudConfigUpdate):
+     - name: string (optional)
+     - credential_type: CredentialType enum (optional)
+     - config: object (optional)
+   Response: CloudConfigResponse
+   Status Codes: 200, 400, 404, 401
+
+9. DELETE /api/v1/config/{config_id}
+   Description: Delete a cloud configuration
+   Auth: Required
+   Path Parameters:
+     - config_id: string (UUID, required)
+   Response: 204 No Content
+   Status Codes: 204, 404, 401
+
+10. GET /api/v1/config/provider/{provider}
+    Description: List configurations filtered by provider
+    Auth: Required
+    Path Parameters:
+      - provider: "azure" | "gcp" (required)
+    Response: Array of CloudConfigResponse objects
+    Status Codes: 200, 401
+
+11. POST /api/v1/config/{config_id}/test
+    Description: Test cloud credentials without extraction
+    Auth: Required
+    Path Parameters:
+      - config_id: string (UUID, required)
+    Request Body: None
+    Response: ConfigTestResult
+      - ok: boolean
+      - provider: "azure" | "gcp"
+      - token_expires_at: integer (Azure only)
+      - checks: object with auth details
+      - error: string (if failed)
+    Status Codes: 200, 404, 401
+
+12. GET /api/v1/config/projects
+    Description: List all FinOps projects
+    Auth: Required
+    Response: Array of ProjectResponse objects
+    Status Codes: 200, 401
+
+13. POST /api/v1/config/projects
+    Description: Create a new FinOps project
+    Auth: Required
+    Request Body:
+      - name: string (required)
+      - slug: string (optional)
+      - owner: string (optional)
+      - cost_center: string (optional)
+      - budget_cap: number (optional)
+      - tags: object (optional)
+      - note: string (optional)
+    Response: ProjectResponse with id
+    Status Codes: 201, 401
+
+
+--- EXTRACTOR MANAGEMENT (Legacy) ---
+14. GET /api/v1/extractors/status
+    Description: List extractor runs (legacy endpoint)
+    Auth: Required
+    Query Parameters:
+      - limit: integer (default: 50, max: 50)
+      - provider: "azure" | "gcp" (optional)
+    Response: { "runs": [run objects], "count": int }
+    Status Codes: 200, 401, 429
+
+15. GET /api/v1/extractors/runs
+    Description: Alias for /extractors/status (CLI compatibility)
+    Auth: Required
+    Query Parameters:
+      - limit: integer (default: 50)
+      - provider: string (optional)
+    Response: { "runs": [run objects], "count": int }
+    Status Codes: 200, 401
+
+16. POST /api/v1/extractors/run
+    Description: Trigger an extractor run
+    Auth: Required
+    Request Body:
+      - provider: "azure" | "gcp" (required)
+      - config_id: string (UUID, required)
+      - extractor_type: string (optional)
+    Response: { "run_id": "uuid", "status": "started" }
+    Status Codes: 200, 400, 401
+
+17. GET /api/v1/extractors/run/{run_id}
+    Description: Get status of an extractor run
+    Auth: Required
+    Path Parameters:
+      - run_id: string (UUID, required)
+    Response: ExtractorRunStatus object
+      - id: string
+      - provider: string
+      - extractor_type: string
+      - status: string
+      - started_at: datetime
+      - finished_at: datetime (optional)
+      - records_extracted: integer
+      - error_message: string (optional)
+    Status Codes: 200, 404, 401
+
+18. POST /api/v1/extractors/run/{run_id}/cancel
+    Description: Cancel a running extractor
+    Auth: Required
+    Path Parameters:
+      - run_id: string (UUID, required)
+    Response: { "status": "cancelled" }
+    Status Codes: 200, 404, 401
+
+
+--- EXTRACTOR REGISTRY (New CRUD) ---
+19. GET /api/v1/extractors
+    Description: List extractor registry entries
+    Auth: Required
+    Query Parameters:
+      - provider: string (optional filter)
+      - limit: integer (default: 50)
+    Response: { "extractors": [ExtractorResponse], "count": int }
+    Status Codes: 200, 401
+
+20. GET /api/v1/extractors/{extractor_id}
+    Description: Get a single extractor
+    Auth: Required
+    Path Parameters:
+      - extractor_id: string (UUID, required)
+    Response: ExtractorResponse object
+    Status Codes: 200, 404, 401
+
+21. POST /api/v1/extractors
+    Description: Create a new extractor
+    Auth: Required
+    Request Body:
+      - name: string (required)
+      - provider: string (required)
+      - extractor_type: string (required)
+      - enabled: boolean (default: true)
+      - schedule: string (optional, cron expression)
+      - config_id: string (optional, UUID)
+    Response: ExtractorResponse object
+    Status Codes: 201, 401
+
+22. PUT /api/v1/extractors/{extractor_id}
+    Description: Update an extractor
+    Auth: Required
+    Path Parameters:
+      - extractor_id: string (UUID, required)
+    Request Body:
+      - name: string (optional)
+      - enabled: boolean (optional)
+      - schedule: string (optional)
+      - config_id: string (optional)
+    Response: ExtractorResponse object
+    Status Codes: 200, 400, 404, 401
+
+23. DELETE /api/v1/extractors/{extractor_id}
+    Description: Delete an extractor
+    Auth: Required
+    Path Parameters:
+      - extractor_id: string (UUID, required)
+    Response: 204 No Content
+    Status Codes: 204, 404, 401
+
+24. POST /api/v1/extractors/{extractor_id}/trigger
+    Description: Trigger a run for an extractor
+    Auth: Required
+    Path Parameters:
+      - extractor_id: string (UUID, required)
+    Request Body (optional):
+      - config_id: string (optional, overrides extractor's default)
+    Response: { "run_id": "uuid", "status": "started", "extractor_id": "string" }
+    Status Codes: 200, 400, 404, 401
+
+
+--- COST QUERIES ---
+25. GET /api/v1/costs
+    Description: List cost records with filters
+    Auth: Required
+    Query Parameters:
+      - provider: "gcp" | "azure" | "llm" (optional)
+      - project: string (optional)
+      - start_date: ISO datetime (optional)
+      - end_date: ISO datetime (optional)
+    Response: CostListResponse
+      - costs: array of CostRecord
+      - totals: { provider: sum }
+      - filtered: boolean
+      - startDate/endDate: date strings
+    Status Codes: 200, 401
+
+26. GET /api/v1/costs/totals
+    Description: Get aggregated cost totals by provider
+    Auth: Required
+    Query Parameters:
+      - start_date: ISO datetime (optional)
+      - end_date: ISO datetime (optional)
+    Response: { "totals": {provider: total}, "startDate": "...", "endDate": "..." }
+    Status Codes: 200, 401
+
+27. GET /api/v1/costs/by-sku
+    Description: Costs aggregated by SKU
+    Auth: Required
+    Query Parameters:
+      - provider: string (optional)
+      - limit: integer (default: 50, max: 100)
+    Response: { "costs": [sku records], "totalRows": int }
+    Status Codes: 200, 401
+
+28. GET /api/v1/costs/daily
+    Description: Daily cost breakdown for charts
+    Auth: Required
+    Query Parameters:
+      - start_date: ISO datetime (optional)
+      - end_date: ISO datetime (optional)
+      - provider: string (optional)
+    Response: CostDailyResponse
+      - days: [{date, azure, gcp, llm}]
+      - startDate/endDate: date strings
+    Status Codes: 200, 401
+
+29. GET /api/v1/costs/summary
+    Description: CLI-compatible cost summary
+    Auth: Required
+    Query Parameters:
+      - start_date: ISO datetime (optional)
+      - end_date: ISO datetime (optional)
+    Response: { "total": float, "by_provider": object, "by_service": object }
+    Status Codes: 200, 401
+
+30. GET /api/v1/costs/breakdown
+    Description: CLI-compatible cost breakdown by SKU
+    Auth: Required
+    Query Parameters:
+      - start_date: ISO datetime (optional)
+      - end_date: ISO datetime (optional)
+      - limit: integer (default: 50)
+    Response: { "data": [{sku, cost}], "total": int }
+    Status Codes: 200, 401
+
+
+--- ALERT MANAGEMENT ---
+31. GET /api/v1/alerts
+    Description: List alerts with filters
+    Auth: Required
+    Query Parameters:
+      - status: "firing" | "resolved" | "all" (optional)
+      - severity: "err" | "warn" | "ok" (optional)
+      - limit: integer (default: 50, max: 100)
+    Response: AlertListResponse
+      - alerts: [alert objects]
+      - count: int
+    Status Codes: 200, 401
+
+32. GET /api/v1/alerts/stats
+    Description: Get alert statistics
+    Auth: Required
+    Response: { "total": int, "by_severity": object, "by_provider": object, "acknowledged": int }
+    Status Codes: 200, 401
+
+33. GET /api/v1/alerts/active
+    Description: Get all active (firing, unacknowledged) alerts
+    Auth: Required
+    Response: { "alerts": [alerts], "count": int }
+    Status Codes: 200, 401
+
+34. POST /api/v1/alerts/{alert_id}/acknowledge
+    Description: Acknowledge a single alert
+    Auth: Required
+    Path Parameters:
+      - alert_id: string (required)
+    Response: { "id": "string", "acknowledged": true }
+    Status Codes: 200, 404, 401
+
+35. POST /api/v1/alerts/acknowledge-all
+    Description: Bulk acknowledge all alerts
+    Auth: Required
+    Response: { "acknowledged_count": int, "ids": [...] }
+    Status Codes: 200, 401
+
+
+--- INTERNAL / ADMIN ---
+36. GET /api/v1/db/stats
+    Description: Database connection pool statistics
+    Auth: Required
+    Response:
+      - async: { min_size, max_size, size }
+      - sync: { min_size, max_size, size }
+    Status Codes: 200, 401
+
+37. GET /api/v1/db/costs (dev only)
+    Description: Raw cost_records rows
+    Auth: Required
+    Query Parameters:
+      - limit: integer (default: 50, max: 1000)
+    Response: { "data": [rows], "count": int }
+    Status Codes: 200, 401
+
+38. GET /api/v1/db/alerts (dev only)
+    Description: Raw alerts rows
+    Auth: Required
+    Query Parameters:
+      - limit: integer (default: 50)
+    Response: { "data": [rows], "count": int }
+    Status Codes: 200, 401
+
+39. GET /api/v1/db/configs (dev only)
+    Description: Raw cloud_config rows
+    Auth: Required
+    Query Parameters:
+      - limit: integer (default: 50)
+    Response: { "data": [rows], "count": int }
+    Status Codes: 200, 401
+
+40. GET /api/v1/db/extractors (dev only)
+    Description: Raw extractor_runs rows
+    Auth: Required
+    Query Parameters:
+      - limit: integer (default: 50)
+    Response: { "data": [rows], "count": int }
+    Status Codes: 200, 401
+
+
+--- HEALTH CHECK ---
+41. GET /healthz
+    Description: Basic health check (no auth required)
+    Response:
+      - status: "ok" | "degraded"
+      - api: "finops-orchestrator"
+      - database: "ok" | error message
+    Status Codes: 200, 503
+
+================================================================================
+SECTION 2: REQUEST/RESPONSE DTO STRUCTURES
+================================================================================
+
+--- Enums ---
+
+Provider (string enum):
+  - "azure"
+  - "gcp"
+
+CredentialType (string enum):
+  - "service_principal"
+  - "managed_identity"
+  - "cli"
+  - "device_code"
+
+
+--- Cloud Configuration DTOs ---
+
+CloudConfigCreate (POST /api/v1/config request):
+  {
+    "provider": "azure" | "gcp",
+    "name": "string",
+    "credential_type": "CredentialType",
+    "config": { /* provider-specific config */ }
+  }
+
+CloudConfigUpdate (PUT /api/v1/config/{id} request):
+  {
+    "name": "string | null",
+    "credential_type": "CredentialType | null",
+    "config": { /* object */ } | null
+  }
+
+CloudConfigResponse (GET response):
+  {
+    "id": "uuid",
+    "provider": "azure" | "gcp",
+    "name": "string",
+    "credential_type": "string",
+    "config": { /* decrypted + masked secrets */ },
+    "created_at": "2026-04-26T...",
+    "updated_at": "2026-04-26T..."
+  }
+
+AzureConfigInput (legacy):
+  {
+    "tenant_id": "string",
+    "client_id": "string",
+    "client_secret": "string",
+    "subscription_id": "string",
+    "resource_groups": ["string"],
+    "scope": "resourcegroup" | "subscription",
+    "environment": "prod" | "staging" | "dev",
+    "team": "string"
+  }
+
+GCPConfigInput (legacy):
+  {
+    "project_id": "string",
+    "billing_account_id": "string",
+    "bigquery_dataset": "string",
+    "bigquery_table": "string",
+    "environment": "prod" | "staging" | "dev",
+    "team": "string"
+  }
+
+
+--- Project DTOs ---
+
+ProjectResponse (GET /api/v1/config/projects response):
+  {
+    "id": "uuid",
+    "name": "string",
+    "slug": "string",
+    "owner": "string",
+    "cost_center": "string",
+    "budget_cap": "number | null",
+    "mtd": "number",
+    "tags": { "key": "value" },
+    "created": "2026-04-26T...",
+    "note": "string"
+  }
+
+ProjectCreate (POST /api/v1/config/projects request):
+  {
+    "name": "string",
+    "slug": "string",
+    "owner": "string",
+    "cost_center": "string",
+    "budget_cap": "number",
+    "tags": { "key": "value" },
+    "note": "string"
+  }
+
+
+--- Extractor Registry DTOs ---
+
+ExtractorCreate (POST /api/v1/extractors request):
+  {
+    "name": "string",
+    "provider": "string",
+    "extractor_type": "string",
+    "enabled": true,
+    "schedule": "cron expression",
+    "config_id": "uuid"
+  }
+
+ExtractorUpdate (PUT /api/v1/extractors/{id} request):
+  {
+    "name": "string",
+    "enabled": "boolean",
+    "schedule": "string",
+    "config_id": "uuid"
+  }
+
+ExtractorResponse (GET response):
+  {
+    "id": "uuid",
+    "name": "string",
+    "provider": "string",
+    "extractor_type": "string",
+    "enabled": true,
+    "schedule": "string | null",
+    "config_id": "uuid | null",
+    "status": "idle" | "running" | "completed" | "failed",
+    "last_run_id": "uuid | null",
+    "last_run_at": "datetime | null",
+    "created_at": "datetime",
+    "updated_at": "datetime"
+  }
+
+ExtractorListResponse:
+  {
+    "extractors": [ExtractorResponse],
+    "count": "integer"
+  }
+
+ExtractorRunTriggerRequest (POST trigger request):
+  {
+    "config_id": "uuid" | null
+  }
+
+ExtractorRunTriggerResponse (POST trigger response):
+  {
+    "run_id": "uuid",
+    "status": "string",
+    "extractor_id": "string"
+  }
+
+
+--- Cost DTOs ---
+
+CostRecord:
+  {
+    "id": "uuid",
+    "prov": "azure" | "gcp" | "llm",
+    "name": "project name",
+    "sku": "service/sku name",
+    "mtd": "number",
+    "delta": "number",
+    "prev": "number",
+    "tags": { "key": "value" },
+    "date": "2026-04-26" | null
+  }
+
+CostListResponse (GET /api/v1/costs):
+  {
+    "costs": [CostRecord],
+    "totals": { "azure": 100.50, "gcp": 50.25 },
+    "filtered": true,
+    "startDate": "2026-03-26T...",
+    "endDate": "2026-04-26T..."
+  }
+
+CostTotalsResponse (GET /api/v1/costs/totals):
+  {
+    "totals": { "provider": total },
+    "startDate": "...",
+    "endDate": "..."
+  }
+
+CostBySkuResponse (GET /api/v1/costs/by-sku):
+  {
+    "costs": [
+      { "prov": "...", "name": "...", "sku": "...", "mtd": 100, "delta": 0, "prev": 0, "instances": 5 }
+    ],
+    "totalRows": 20
+  }
+
+CostDailyResponse (GET /api/v1/costs/daily):
+  {
+    "days": [
+      { "date": "2026-04-26", "azure": 100.5, "gcp": 50.25, "llm": 10.1 }
+    ],
+    "startDate": "...",
+    "endDate": "..."
+  }
+
+
+--- Alert DTOs ---
+
+AlertRecord:
+  {
+    "id": "uuid",
+    "title": "string",
+    "description": "string",
+    "severity": "err" | "warn" | "ok",
+    "resource": "string",
+    "service": "string",
+    "provider": "string",
+    "cost_impact": "number",
+    "first_seen": "datetime",
+    "last_seen": "datetime",
+    "is_acknowledged": "boolean"
+  }
+
+AlertListResponse:
+  {
+    "alerts": [AlertRecord],
+    "count": "integer"
+  }
+
+AlertStatsResponse:
+  {
+    "total": "integer",
+    "by_severity": { "err": 10, "warn": 5 },
+    "by_provider": { "azure": 12, "gcp": 3 },
+    "acknowledged": "integer",
+    "pending": "integer",
+    "stats": [ { "status": "...", "severity": "...", "count": 10 } ]
+  }
+
+
+--- Authentication DTOs ---
+
+TokenRequest:
+  { "username": "string", "password": "string" }
+
+TokenResponse:
+  { "token": "jwt_token_string" }
+
+GCPRegisterRequest:
+  { "project_id": "string", "key_file_content": "string" }
+
+AzureServiceAccountRegisterRequest:
+  {
+    "tenant_id": "string",
+    "client_id": "string",
+    "client_secret": "string",
+    "subscription_id": "string"
+  }
+
+
+--- Device Code Flow DTOs (if implemented) ---
+
+DeviceCodeStartRequest:
+  {
+    "tenant_id": "string",
+    "client_id": "string"
+  }
+
+DeviceCodeStartResponse:
+  {
+    "verification_uri": "https://...",
+    "user_code": "ABCDEFGH",
+    "device_code": "uuid",
+    "expires_in": 900,
+    "interval": 5,
+    "message": "message"
+  }
+
+DeviceCodePollResponse:
+  {
+    "status": "pending" | "completed" | "expired" | "failed",
+    "config_id": "uuid" | null
+  }
+
+
+--- Response Metadata ---
+
+PaginationHeadersSchema (in OpenAPI responses):
+  - Link: string (RFC 5988 pagination links)
+  - X-Total-Count: integer
+  - X-Page: integer
+  - X-Page-Count: integer
+  - X-Limit: integer
+
+RateLimitingHeadersSchema:
+  - X-RateLimit-Limit: integer
+  - X-RateLimit-Remaining: integer
+  - X-RateLimit-Reset: integer
+  - Retry-After: integer
+
+Error Response Format:
+  {
+    "detail": "error message",
+    "error": "error_type"  // optional
+  }
+
+
+--- Extractor Run DTOs ---
+
+ExtractorRunRequest (legacy POST /extractors/run):
+  {
+    "provider": "azure" | "gcp",
+    "config_id": "uuid",
+    "extractor_type": "string"
+  }
+
+ExtractorRunResponse (legacy):
+  {
+    "id": "uuid",
+    "config_id": "uuid",
+    "provider": "string",
+    "extractor_type": "string",
+    "status": "string",
+    "started_at": "datetime"
+  }
+
+ExtractorStatusResponse:
+  {
+    "id": "uuid",
+    "provider": "string",
+    "extractor_type": "string",
+    "status": "string",
+    "started_at": "datetime",
+    "finished_at": "datetime",
+    "records_extracted": 0,
+    "error_message": "string"
+  }
+
+
+--- Other ---
+
+ConfigTestResult (POST /config/{id}/test):
+  {
+    "ok": "boolean",
+    "provider": "azure" | "gcp",
+    "token_expires_at": "integer",
+    "checks": {
+      "auth": "ok" | "error",
+      "scope": "/subscriptions/...",
+      "cost_management_api": "ok" | "failed",
+      "sample_rows": 0
+    },
+    "error": "string"  // if failed
+  }
+
+
+================================================================================
+SECTION 3: DB SCHEMA FOR REFERENCE
+================================================================================
+
+cost_records table:
+  - id, record_id, provider, service_category, cost_usd
+  - currency_original, usage_start, usage_end, region
+  - ingestion_ts, cost_date, project_name, sku_name, cost_amount
+
+cloud_config table:
+  - id, provider, name, credential_type, config (JSON)
+  - created_at, updated_at
+
+fin_projects table:
+  - id, name, slug, owner, cost_center, budget_cap, mtd, tags, note
+  - created_at
+
+alerts table:
+  - id, type, severity, title, body, status
+  - resource, service, provider, cost_impact
+  - acknowledged_at, acknowledged_by
+  - created_at, updated_at
+
+extractors_registry table:
+  - id, name, provider, config_id, enabled, schedule
+  - created_at, updated_at
+
+extractors table:
+  - id, name, provider, extractor_type, enabled, schedule
+  - config_id, status, last_run_id, last_run_at
+  - created_at, updated_at
+
+extractor_runs table:
+  - id, config_id, provider, extractor_type, status
+  - started_at, finished_at, records_extracted, error_message
+
+auth_users table:
+  - id, username, hashed_password, is_active, is_admin
+
+
+================================================================================
+SECTION 4: AUTHENTICATION REQUIREMENTS
+================================================================================
+
+Protected Endpoints (/api/v1/* requires Bearer token):
+  1. All config endpoints (GET POST PUT DELETE /config/*)
+  2. All extractors endpoints
+  3. All costs endpoints
+  4. All alerts endpoints
+  5. All db (internal) endpoints
+
+Public Endpoints (no auth required):
+  1. GET  /healthz
+  2. POST /api/v1/auth/token
+  3. POST /api/v1/auth/login
+
+Auth Flow:
+  1. POST /api/v1/auth/token with {username, password}
+  2. Receive token in response
+  3. Include in Authorization header: "Bearer <token>"
+  4. Token expires based on JWT_EXPIRATION_MINUTES env variable (default 60)
+
+
+================================================================================
+SECTION 5: RATE LIMITING
+================================================================================
+
+Configuration:
+  - RATE_LIMIT_REQUESTS: 100 (requests per window)
+  - RATE_LIMIT_WINDOW: 60 (seconds)
+
+Headers returned on all requests:
+  - X-RateLimit-Limit: 100
+  - X-RateLimit-Remaining: <remaining count>
+  - X-RateLimit-Reset: <unix timestamp>
+
+Error Response (429):
+  - { "detail": "Rate limit exceeded", "retry_after": 60 }
+  - Retry-After: 60
+  - X-RateLimit-Limit: 100
+  - X-RateLimit-Remaining: 0
+  - X-RateLimit-Reset: <timestamp>
+
+
+================================================================================
+END OF API ENDPOINT SPECIFICATION
+================================================================================
