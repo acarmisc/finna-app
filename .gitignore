@@ -24,3 +24,18 @@ Thumbs.db
 # Secrets
 *.pem
 *.key
+
+# Test/coverage output
+coverage/
+test-results/
+
+# Tooling caches
+.claude/
+.playwright-mcp/
+
+# Stray screenshots/snapshots at repo root
+/page-*.yml
+/dashboard-*.png
+/login-*.png
+/live-*.png
+/projects.png
