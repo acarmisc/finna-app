@@ -245,7 +245,7 @@ jobs:
           fi
           echo "No critical vulnerabilities found"
 
-- name: Generate SBOM
+      - name: Generate SBOM
         run: |
           docker run --rm aquasecurity/trivy:latest \
             image ghcr.io/${{ github.repository }}/finops-api:latest \
