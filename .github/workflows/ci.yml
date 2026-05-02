@@ -221,19 +221,13 @@ jobs:
       - name: Install kustomize
         run: |
           curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash && mv kustomize /usr/local/bin/
-      - name: Update staging image tag
+      - name: Update staging kustomize and push
         run: |
-          # Get first tag (removing newlines)
           IMAGE=$(echo "${{ needs.build.outputs.image }}" | tr '\n' ',' | cut -d',' -f1)
           cd k8s/overlays/staging
           kustomize edit set image finops-api=$IMAGE
-      - name: Create PR for staging update
-        uses: peter-evans/create-pull-request@v6
-        with:
-          commit-message: "chore: update staging to ${{ github.sha }}"
-          branch: "update-staging-${{ github.sha }}"
-          title: "chore: Update staging image"
-          body: |
-            Auto-update staging Kubernetes manifests to use latest image from CI.
-            Image: ${{ needs.build.outputs.image }}
-            Commit: ${{ github.sha }}
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add .
+          git diff --staged --quiet || git commit -m "chore: update staging to ${{ github.sha }}"
+          git push
