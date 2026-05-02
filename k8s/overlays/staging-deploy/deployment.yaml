@@ -22,23 +22,13 @@ spec:
         runAsUser: 1000
         fsGroup: 1000
       containers:
-      - name: api
-        image: ghcr.io/acarmisc/finops-api:staging-test
+      - name: monolith
+        image: ghcr.io/acarmisc/finops-api:latest
         imagePullPolicy: Always
         ports:
-        - containerPort: 8000
+        - containerPort: 80
           name: http
         env:
-        - name: HOST
-          valueFrom:
-            configMapKeyRef:
-              name: finops-config
-              key: API_HOST
-        - name: PORT
-          valueFrom:
-            configMapKeyRef:
-              name: finops-config
-              key: API_PORT
         - name: PG_DSN
           valueFrom:
             secretKeyRef:
@@ -59,14 +49,14 @@ spec:
         startupProbe:
           httpGet:
             path: /healthz
-            port: 8000
+            port: 80
           initialDelaySeconds: 20
           periodSeconds: 5
           failureThreshold: 30
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 8000
+            port: 80
           initialDelaySeconds: 30
           periodSeconds: 30
           timeoutSeconds: 5
@@ -74,7 +64,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /healthz
-            port: 8000
+            port: 80
           initialDelaySeconds: 20
           periodSeconds: 10
           timeoutSeconds: 3

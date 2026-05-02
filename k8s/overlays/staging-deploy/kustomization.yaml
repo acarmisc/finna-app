@@ -11,15 +11,11 @@ resources:
   - deployment.yaml
   - service.yaml
   - ingress.yaml
-  - finna-app-ui-deployment.yaml
 
 commonLabels:
   environment: staging
 
 images:
-  - name: finna-app-ui
-    newName: europe-west1-docker.pkg.dev/abs-digital-playground/finna-app-staging/frontend
-    newTag: v0.1.1
   - name: ghcr.io/acarmisc/finops-api
     newName: ghcr.io/acarmisc/finops-api
     newTag: latest

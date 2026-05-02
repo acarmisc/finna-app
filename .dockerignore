@@ -60,5 +60,6 @@ onboarding/
 .env
 .env.*
 
-# UI subtree (built and served via separate Dockerfile)
-ui/
+# UI subtree - but we need it for monolith build
+# (build.context will include it, Dockerfile will handle it)
+# ui/
