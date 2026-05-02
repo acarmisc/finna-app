@@ -146,8 +146,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    outputs:
-      image: ${{ steps.meta.outputs.tags }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Docker Buildx
@@ -202,32 +200,3 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           bodyPath: CHANGELOG.md
           generateReleaseNotes: true
-
-  deploy-staging:
-    name: Deploy to Staging
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment:
-      name: staging
-      url: https://staging.finna.example.com
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-      - name: Install kustomize
-        run: |
-          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash && mv kustomize /usr/local/bin/
-      - name: Update staging kustomize and push
-        run: |
-          IMAGE=$(echo "${{ needs.build.outputs.image }}" | tr '\n' ',' | cut -d',' -f1)
-          cd k8s/overlays/staging
-          kustomize edit set image finops-api=$IMAGE
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add .
-          git diff --staged --quiet || git commit -m "chore: update staging to ${{ github.sha }}"
-          git push
