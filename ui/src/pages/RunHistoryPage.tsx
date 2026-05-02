@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ProviderBadge } from '@/components/shared/provider-badge'
@@ -18,6 +17,7 @@ const RUNS = [
 export function RunHistoryPage() {
   const [q, setQ] = useState('')
   const [provFilter, setProvFilter] = useState<string>('all')
+  const [expanded, setExpanded] = useState<string | null>(null)
   const rows = RUNS.filter(r =>
     (!q || r.run_id.includes(q) || r.extractor_type.includes(q)) &&
     (provFilter==='all' || r.provider===provFilter)
@@ -36,64 +36,64 @@ export function RunHistoryPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
+      <div className="card">
+        <div className="card-hd">
           <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-muted-foreground"/>
-              <Input className="pl-8 font-mono text-xs" placeholder="filter run id / extractor…"
+            <div className="inp-group" style={{ maxWidth: 240 }}>
+              <Input className="inp font-mono text-xs" placeholder="filter run id / extractor…"
                 value={q} onChange={e=>setQ(e.target.value)}/>
             </div>
             <div className="flex gap-1">
               {['all','azure','gcp','llm'].map(p => (
                 <button key={p} onClick={()=>setProvFilter(p)}
-                  className="px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider border transition-colors"
-                  style={{
-                    background: provFilter===p ? 'var(--primary/10)' : 'transparent',
-                    borderColor: provFilter===p ? 'var(--primary)' : 'var(--border)',
-                    color: provFilter===p ? 'var(--primary)' : 'var(--fg-muted)',
-                  }}>
+                  className="chip">
                   {p}
                 </button>
               ))}
             </div>
           </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-surface-alt">
-                  <th className="text-left px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-normal">Provider</th>
-                  <th className="text-left px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-normal">Extractor</th>
-                  <th className="text-left px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-normal">Status</th>
-                  <th className="text-right px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-normal">Records</th>
-                  <th className="text-right px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-normal">Duration</th>
-                  <th className="text-left px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-normal">Started</th>
-                  <th className="text-left px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-normal">Finished</th>
-                  <th className="text-left px-4 py-2 text-[10px] font-mono uppercase tracking-widest text-muted-foreground font-normal">Run ID</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {rows.map(r => (
-                  <tr key={r.run_id} className="hover:bg-surface-alt transition-colors cursor-pointer">
-                    <td className="px-4 py-2"><ProviderBadge provider={r.provider}/></td>
-                    <td className="px-4 py-2 font-mono text-xs text-foreground">{r.extractor_type}</td>
-                    <td className="px-4 py-2"><StatusBadge status={r.status}/></td>
-                    <td className="px-4 py-2 text-right font-mono text-xs text-foreground tabular-nums">
-                      {r.records_extracted > 0 ? r.records_extracted.toLocaleString() : '—'}
-                    </td>
-                    <td className="px-4 py-2 text-right font-mono text-xs text-muted-foreground tabular-nums">{r.duration}</td>
-                    <td className="px-4 py-2 font-mono text-[10px] text-foreground">{r.started_at}</td>
-                    <td className="px-4 py-2 font-mono text-[10px] text-muted-foreground">{r.finished_at}</td>
-                    <td className="px-4 py-2 font-mono text-[10px] text-muted-foreground">{r.run_id}</td>
+        </div>
+        <div className="card-bd p0" style={{ maxHeight: 640, overflowY: 'auto' }}>
+          <table className="tbl">
+            <thead><tr>
+              <th>Status</th><th>Run ID</th><th>Extractor</th><th>Provider</th>
+              <th>Started</th><th>Finished</th><th className="num">Records</th><th className="num">Duration</th>
+            </tr></thead>
+            <tbody>
+              {rows.map(r => (
+                <React.Fragment key={r.run_id}>
+                  <tr className="clickable" onClick={()=>setExpanded(e => e===r.run_id ? null : r.run_id)}>
+                    <td><StatusBadge status={r.status}/></td>
+                    <td><span className="id">{r.run_id}</span></td>
+                    <td className="mono">{r.extractor_type}</td>
+                    <td><ProviderBadge provider={r.provider}/></td>
+                    <td className="mono muted">{r.started_at}</td>
+                    <td className="mono muted">{r.finished_at || '—'}</td>
+                    <td className="num mono">{r.records_extracted ? r.records_extracted.toLocaleString() : '—'}</td>
+                    <td className="num mono">{r.duration}</td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                  {expanded === r.run_id && (
+                    <tr>
+                      <td colSpan={8} style={{ background: 'var(--bg)', padding: 16 }}>
+                        <div className="row row-2">
+                          <div>
+                            <div className="label">run details</div>
+                            <pre className="mono" style={{ fontSize: 11, margin: 0, background: 'var(--surface)', border: '1px solid var(--border)', padding: 10, color: 'var(--fg)' }}>{JSON.stringify({ run_id: r.run_id, extractor: r.extractor_type, provider: r.provider, status: r.status, records: r.records_extracted, duration: r.duration }, null, 2)}</pre>
+                          </div>
+                          <div>
+                            <div className="label">error / stderr</div>
+                            <div className="empty" style={{ padding: 16 }}><div className="msg">no errors</div></div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   )
 }
