@@ -3,20 +3,14 @@ import { useAuthStore } from '@/store/auth'
 // Full API Client for Hooks
 // Simplified version - uses Zustand auth store
 export class APIClient {
-  private token: string | null
-
-  constructor() {
-    const store = useAuthStore.getState()
-    this.token = store.token || null
-  }
-
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<{ data?: T; error?: any; status: number }> {
+    const token = useAuthStore.getState().token
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...Object.fromEntries(new Headers(options.headers).entries()),
     }
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
     }
     
     try {
@@ -62,7 +56,6 @@ export class APIClient {
     }
     const token = r.data?.access_token || r.data?.token
     if (token) {
-      this.token = token
       useAuthStore.getState().setToken(token)
     }
     return { 
