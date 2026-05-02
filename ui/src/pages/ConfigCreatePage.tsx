@@ -42,24 +42,17 @@ export function ConfigCreatePage() {
       </div>
 
       {/* Stepper */}
-      <div className="flex items-center gap-3 mb-6 font-mono text-xs">
+      <div className="steps">
         {[
           {n:1, label:'provider'},
           {n:2, label:'credentials'},
           {n:3, label:'review'},
         ].map(({n,label}, i, arr) => (
           <React.Fragment key={n}>
-            <div className="flex items-center gap-1.5">
-              <span className={`w-5 h-5 flex items-center justify-center border text-[10px] ${
-                step>n ? 'border-accent bg-accent/10 text-accent' :
-                step===n ? 'border-primary bg-primary/10 text-primary' :
-                'border-border text-muted-foreground'
-              }`}>
-                {step>n ? '✓' : n}
-              </span>
-              <span className={step>=n ? 'text-foreground' : 'text-muted-foreground'}>{label}</span>
-            </div>
-            {i < arr.length-1 && <span className="text-muted-foreground">→</span>}
+            <span className={`step ${step>n ? 'done' : step===n ? 'on' : ''}`}>
+              <span className="n">{step>n ? '✓' : n}</span>{label}
+            </span>
+            {i < arr.length-1 && <span className="sep">→</span>}
           </React.Fragment>
         ))}
       </div>
