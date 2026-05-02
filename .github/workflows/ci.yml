@@ -224,11 +224,15 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Run Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ghcr.io/${{ github.repository }}/finops-api:latest
-          format: sarif
-          output: trivy-results.sarif
+        run: |
+          # Get the first tag from metadata (sha-xxx format)
+          IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | cut -d',' -f1)
+          docker buildx imagetools inspect $IMAGE_TAG --raw > /tmp/image.tar || \
+          docker tag $IMAGE_TAG scan-target:latest
+          docker run --rm -v /tmp:/tmp aquasecurity/trivy:latest \
+            image --input /tmp/image.tar --format sarif -o trivy-results.sarif || \
+            docker run --rm aquasecurity/trivy:latest \
+            image scan-target:latest --format sarif -o trivy-results.sarif
 
       - name: Upload Trivy results
         uses: actions/upload-artifact@v4
@@ -247,8 +251,13 @@ jobs:
 
       - name: Generate SBOM
         run: |
-          docker run --rm -v $(pwd):/workspace aquasecurity/trivy:latest \
-            image --format spdx -o sbom.spdx.json ${{ steps.meta.outputs.tags }}
+          IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | cut -d',' -f1)
+          docker buildx imagetools inspect $IMAGE_TAG --raw > /tmp/image.tar || \
+          docker tag $IMAGE_TAG scan-target:latest
+          docker run --rm -v /tmp:/tmp aquasecurity/trivy:latest \
+            image --input /tmp/image.tar --format spdx -o sbom.spdx.json || \
+            docker run --rm aquasecurity/trivy:latest \
+            image scan-target:latest --format spdx -o sbom.spdx.json
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
