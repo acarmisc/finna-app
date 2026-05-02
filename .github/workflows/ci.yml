@@ -213,6 +213,7 @@ jobs:
       url: https://staging.finna.example.com
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
