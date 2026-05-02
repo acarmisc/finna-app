@@ -79,10 +79,6 @@ const AppShell: React.FC<AppShellProps> = ({
             })
           : children}
       </main>
-      <div className="sidebar-toggle" onClick={handleToggle}>
-        <span className="expand-icon">☰</span>
-        <span className="collapse-icon">✕</span>
-      </div>
     </div>
   )
 }
