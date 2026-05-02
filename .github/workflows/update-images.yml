@@ -52,7 +52,7 @@ jobs:
           fi
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v8
         with:
           commit-message: "chore: update k8s manifests to latest images"
           branch: "update-images-${{ github.sha }}"
