@@ -32,10 +32,35 @@ Multi-cloud FinOps platform: Python FastAPI backend + React/Vite/Tailwind fronte
 ## CI
 
 Path-filtered workflows live in `.github/workflows/`:
-- `api-build.yml`, `ci.yml` — trigger on backend changes (skip `ui/**`).
-- `ui-ci.yml`, `ui-build.yml` — trigger on `ui/**` changes only.
+- `api-build.yml` — monolith build (FE + BE) on push to main or tags.
+- `ui-ci.yml` — frontend lint/typecheck only.
 - `docker-build.yml` — extractor image (`Dockerfile.extractor`).
 - `update-images.yml` — bumps k8s image tags.
+
+## CI/CD Architecture
+
+### Monolithic Container
+The project now uses a **single Docker image** containing both frontend and backend:
+- `Dockerfile.api` — for API/monolith builds (default)
+- `Dockerfile.monolith` — explicit monolith build
+
+**Container structure:**
+- nginx on port 80 → serves frontend + proxies `/api/` to backend
+- FastAPI backend on port 8000 (internal only)
+- Frontend build output in `/app/ui/`
+
+**Docker commands:**
+```bash
+# Build monolith
+docker build -f Dockerfile.api -t finops-api .
+
+# Run (local dev)
+docker run --rm -p 80:80 -e PG_DSN=... -e JWT_SECRET=... finops-api
+```
+
+### Multi-Platform Builds
+Images are built for `linux/amd64` and `linux/arm64` using Docker Buildx.
+The cluster runs on `linux/amd64`; Apple Silicon dev machines use `linux/arm64`.
 
 ## Frontend conventions
 

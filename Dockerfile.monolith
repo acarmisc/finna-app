@@ -1,0 +1,73 @@
+# ---------------------------------------------------------------------------#
+# FinOps Monorepo — Unified Docker Image (FE + BE)
+#
+# This Dockerfile builds a single image containing both the FastAPI backend
+# and the React frontend, served together using nginx as a reverse proxy.
+#
+# Build:  docker build -f Dockerfile.monolith -t finops-monolith .
+# Run:    docker run --rm -p 80:80 -e PG_DSN=... -e JWT_SECRET=... finops-monolith
+# ---------------------------------------------------------------------------#
+
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
+
+# Copy backend dependencies first for better caching
+COPY pyproject.toml .
+
+RUN uv pip install --system --no-cache -r pyproject.toml
+
+# Copy backend source
+COPY backend/ ./backend/
+COPY config/ ./config/
+COPY models/ ./models/
+COPY extractors/ ./extractors/
+COPY sql/ ./sql/
+COPY utils/ ./utils/
+
+# Stage 2: Build frontend
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /build-ui
+
+# Copy frontend source
+COPY ui/package*.json ./ui/
+RUN cd ui && npm ci --if-present
+
+COPY ui/ ./ui/
+RUN cd ui && npm run build
+
+# Stage 3: Runtime - combine FE and BE
+FROM python:3.12-slim
+
+RUN groupadd --gid 1000 appuser && \
+    useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser && \
+    apt-get update && apt-get install -y --no-install-recommends \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy Python dependencies and backend
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+COPY backend/ ./backend/
+COPY config/ ./config/
+COPY models/ ./models/
+COPY extractors/ ./extractors/
+COPY sql/ ./sql/
+COPY utils/ ./utils/
+
+# Copy frontend build output
+COPY --from=frontend-builder /build-ui/ui/dist/ /app/ui/
+COPY --from=frontend-builder /build-ui/ui/nginx.conf /etc/nginx/conf.d/default.conf
+
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+USER appuser
+
+ENV HOST=0.0.0.0
+ENV PORT=8000
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

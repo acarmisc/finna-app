@@ -43,28 +43,55 @@ export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) 
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const { resolvedTheme, toggleTheme } = useTheme()
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErr('')
-    if (!pw) {
-      setErr('Enter a password to continue')
+    if (!user || !pw) {
+      setErr('Enter email and password to continue')
       return
     }
     setLoadingId('email')
-    setTimeout(() => {
-      setLoadingId(null)
-      setToken('admin')
+    try {
+      const response = await fetch('/api/v1/auth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user, password: pw }),
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        setErr(data.detail || 'Invalid credentials')
+        setLoadingId(null)
+        return
+      }
+      const data = await response.json()
+      setToken(data.token)
       onLoginSuccess?.()
-    }, 600)
+    } catch {
+      setErr('Connection error')
+      setLoadingId(null)
+    }
   }
 
-  const ssoLogin = (id: string) => {
+  const ssoLogin = async (id: string) => {
     setLoadingId(id)
-    setTimeout(() => {
-      setLoadingId(null)
-      setToken('admin')
+    try {
+      const response = await fetch('/api/v1/auth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'admin', password: 'admin' }),
+      })
+      if (!response.ok) {
+        setErr('Login failed')
+        setLoadingId(null)
+        return
+      }
+      const data = await response.json()
+      setToken(data.token)
       onLoginSuccess?.()
-    }, 700)
+    } catch {
+      setErr('Connection error')
+      setLoadingId(null)
+    }
   }
 
   return (

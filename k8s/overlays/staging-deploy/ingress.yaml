@@ -11,7 +11,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-  - host: finna-app.ces.abssrv.it
+  - host: finna-app-staging.ces.abssrv.it
     http:
       paths:
       - backend:
@@ -23,5 +23,5 @@ spec:
         pathType: Prefix
   tls:
   - hosts:
-    - finna-app.ces.abssrv.it
+    - finna-app-staging.ces.abssrv.it
     secretName: finna-app-staging-tls
