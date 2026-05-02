@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuthStore } from '@/store/auth'
 import { Button } from '@/components/shared/Button'
 import { Icon } from '@/components/shared/Icon'
+import { useTheme } from '@/contexts/ThemeContext'
 
 interface LoginComponentProps {
   onLoginSuccess?: () => void
@@ -22,29 +23,6 @@ const SSO_PROVIDERS = [
     ),
   },
   {
-    id: 'microsoft',
-    name: 'Continue with Microsoft',
-    meta: 'OAuth',
-    svg: (
-      <svg viewBox="0 0 18 18" width="18" height="18">
-        <rect x="1" y="1" width="7.5" height="7.5" fill="#F25022" />
-        <rect x="9.5" y="1" width="7.5" height="7.5" fill="#7FBA00" />
-        <rect x="1" y="9.5" width="7.5" height="7.5" fill="#00A4EF" />
-        <rect x="9.5" y="9.5" width="7.5" height="7.5" fill="#FFB900" />
-      </svg>
-    ),
-  },
-  {
-    id: 'okta',
-    name: 'Continue with Okta',
-    meta: 'SAML',
-    svg: (
-      <svg viewBox="0 0 18 18" width="18" height="18">
-        <circle cx="9" cy="9" r="7" fill="none" stroke="#007DC1" strokeWidth="3" />
-      </svg>
-    ),
-  },
-  {
     id: 'github',
     name: 'Continue with GitHub',
     meta: 'OAuth',
@@ -59,10 +37,11 @@ const SSO_PROVIDERS = [
 export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) {
   const { setToken } = useAuthStore()
   const [showEmail, setShowEmail] = useState(false)
-  const [user, setUser] = useState('finops@acme.co')
+  const [user, setUser] = useState('')
   const [pw, setPw] = useState('')
   const [err, setErr] = useState('')
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const { resolvedTheme, toggleTheme } = useTheme()
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -108,6 +87,13 @@ export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) 
 
       <div className="login-pane">
         <div className="login-card">
+          <button
+            className="theme-toggle"
+            onClick={toggleTheme}
+            title={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} theme`}
+          >
+            <Icon name={resolvedTheme === 'dark' ? 'sun' : 'moon'} size={16} />
+          </button>
           <h2 className="title">Sign in to Finna</h2>
           <p className="subtitle">Use your work account to access the FinOps console.</p>
 
@@ -119,10 +105,10 @@ export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) 
                 <span className="meta">{p.meta}</span>
               </button>
             ))}
-            <button className="sso-btn" onClick={() => ssoLogin('saml')} disabled={!!loadingId}>
+            <button className="sso-btn" onClick={() => ssoLogin('oidc')} disabled={!!loadingId}>
               <span className="ico"><Icon name="key-round" size={16} /></span>
-              <span className="name">{loadingId === 'saml' ? 'Redirecting…' : 'SAML SSO'}</span>
-              <span className="meta">Enterprise</span>
+              <span className="name">{loadingId === 'oidc' ? 'Redirecting…' : 'Enterprise SSO'}</span>
+              <span className="meta">OIDC</span>
             </button>
           </div>
 
@@ -145,10 +131,7 @@ export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) 
                 />
               </div>
               <div className="field">
-                <div className="row" style={{ marginBottom: 6 }}>
-                  <span className="label" style={{ margin: 0 }}>Password</span>
-                  <a href="#" onClick={e => e.preventDefault()}>Forgot?</a>
-                </div>
+                <div className="label">Password</div>
                 <input
                   type="password"
                   className={`inp ${err ? 'error' : ''}`}
@@ -156,6 +139,9 @@ export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) 
                   onChange={e => setPw(e.target.value)}
                   placeholder="••••••••"
                 />
+                <div className="row" style={{ marginTop: 6, justifyContent: 'flex-end' }}>
+                  <a href="#" onClick={e => e.preventDefault()} style={{ fontSize: '11px' }}>Forgot password?</a>
+                </div>
                 {err && <div className="hint error" style={{ marginTop: 6 }}>{err}</div>}
               </div>
               <Button variant="primary" type="submit" bracket block disabled={loadingId === 'email'}>

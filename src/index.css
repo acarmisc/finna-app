@@ -1677,7 +1677,27 @@
   justify-content: center;
   padding: 56px 32px;
 }
-.login-card { width: 100%; max-width: 380px; }
+.login-card { width: 100%; max-width: 380px; position: relative; }
+.login-card .theme-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-fg-muted);
+  cursor: pointer;
+  transition: background 0.08s, border-color 0.08s, color 0.08s;
+}
+.login-card .theme-toggle:hover {
+  background: var(--color-surface);
+  border-color: var(--color-fg-subtle);
+  color: var(--color-fg);
+}
 .login-card .title {
   font-size: 22px;
   font-weight: 600;
