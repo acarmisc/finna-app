@@ -222,17 +222,18 @@ jobs:
           platforms: linux/amd64,linux/arm64
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          outputs: type=image,name=${{ steps.meta.outputs.tags }},push=false
 
       - name: Run Trivy vulnerability scan
         run: |
           # Get the first tag from metadata (sha-xxx format)
           IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | cut -d',' -f1)
-          docker buildx imagetools inspect $IMAGE_TAG --raw > /tmp/image.tar || \
-          docker tag $IMAGE_TAG scan-target:latest
+          # Export the image from buildx to a tar file
+          docker buildx imagetools inspect $IMAGE_TAG > /tmp/image.tar 2>/dev/null || \
+          docker save -o /tmp/image.tar $IMAGE_TAG
+          # Scan the image tar
           docker run --rm -v /tmp:/tmp aquasecurity/trivy:latest \
-            image --input /tmp/image.tar --format sarif -o trivy-results.sarif || \
-            docker run --rm aquasecurity/trivy:latest \
-            image scan-target:latest --format sarif -o trivy-results.sarif
+            image --input /tmp/image.tar --format sarif -o trivy-results.sarif
 
       - name: Upload Trivy results
         uses: actions/upload-artifact@v4
@@ -249,15 +250,15 @@ jobs:
           fi
           echo "No critical vulnerabilities found"
 
-      - name: Generate SBOM
+- name: Generate SBOM
         run: |
           IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | cut -d',' -f1)
-          docker buildx imagetools inspect $IMAGE_TAG --raw > /tmp/image.tar || \
-          docker tag $IMAGE_TAG scan-target:latest
+          # Use existing image tar or save again
+          if [ ! -f /tmp/image.tar ]; then
+            docker save -o /tmp/image.tar $IMAGE_TAG
+          fi
           docker run --rm -v /tmp:/tmp aquasecurity/trivy:latest \
-            image --input /tmp/image.tar --format spdx -o sbom.spdx.json || \
-            docker run --rm aquasecurity/trivy:latest \
-            image scan-target:latest --format spdx -o sbom.spdx.json
+            image --input /tmp/image.tar --format spdx -o sbom.spdx.json
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
