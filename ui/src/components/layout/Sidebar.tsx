@@ -48,6 +48,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, activeBase = '/d
             <a
               key={item.id}
               className={cn('sb-item', active && 'active')}
+              data-label={item.label}
               onClick={(e) => {
                 e.preventDefault()
                 handleNavigate(item.path!)
