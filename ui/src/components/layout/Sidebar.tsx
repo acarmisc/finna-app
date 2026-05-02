@@ -35,10 +35,9 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, activeBase = '/d
 
   return (
     <aside className={cn('sb', collapsed && 'sb-collapsed')}>
-      <div className="sb-logo" onClick={onToggle} title={collapsed ? 'Expand' : 'Collapse'}>
-        <span className="caret">&gt;</span>
-        <span className="wordmark">finna</span>
-        <span className="cursor" />
+      <div className="sb-logo" onClick={onToggle}>
+        <span className="caret">{collapsed ? '‹' : '›'}</span>
+        {!collapsed && <><span className="wordmark">finna</span><span className="cursor" /></>}
       </div>
       <nav className="sb-nav">
         {NAV.map((item, i) => {
@@ -48,6 +47,8 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, activeBase = '/d
             <a
               key={item.id}
               className={cn('sb-item', active && 'active')}
+              data-label={item.label}
+              title={collapsed ? item.label : undefined}
               onClick={(e) => {
                 e.preventDefault()
                 handleNavigate(item.path!)
