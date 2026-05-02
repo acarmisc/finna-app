@@ -222,10 +222,10 @@ jobs:
           curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash && mv kustomize /usr/local/bin/
       - name: Update staging image tag
         run: |
-          IMAGE=${{ needs.build.outputs.image }}
-          IMAGE_NAME=$(echo "$IMAGE" | cut -d',' -f1)
+          # Get first tag (removing newlines)
+          IMAGE=$(echo "${{ needs.build.outputs.image }}" | tr '\n' ',' | cut -d',' -f1)
           cd k8s/overlays/staging
-          kustomize edit set image finops-api=$IMAGE_NAME
+          kustomize edit set image finops-api=$IMAGE
       - name: Create PR for staging update
         uses: peter-evans/create-pull-request@v6
         with:
