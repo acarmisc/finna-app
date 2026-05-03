@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import Any, Optional, Union
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from .. import auth as auth_module
@@ -152,6 +153,47 @@ async def list_costs(
         "has_next": total > page * page_size,
         "has_prev": page > 1,
     }
+
+
+@router.get("/costs/export", dependencies=[Depends(require_auth)])
+async def export_costs(
+    provider: Optional[str] = Query(None),
+    project: Optional[str] = Query(None),
+    start_date: Union[str, datetime, None] = Query(None),
+    end_date: Union[str, datetime, None] = Query(None),
+    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
+) -> StreamingResponse:
+    """Export cost data as CSV."""
+    end_date = end_date or datetime.now()
+    start_date, end_date = _resolve_window(window, start_date, end_date)
+
+    conditions, params = [], []
+    if provider:
+        conditions.append("provider = %s")
+        params.append(provider)
+    if project:
+        conditions.append("project_name = %s")
+        params.append(project)
+    conditions.extend(["usage_start >= %s", "usage_start <= %s"])
+    params.extend([start_date, end_date])
+
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+    sql = f"""SELECT record_id, provider, project_name, service_name, usage_start, net_cost_usd, currency_original
+        FROM cost_records {where} ORDER BY usage_start DESC LIMIT 10000"""
+
+    results = query_all(sql, tuple(params))
+
+    import csv, io
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["id", "provider", "project", "sku", "date", "amount", "currency"])
+    for r in results:
+        w.writerow([r["record_id"], r["provider"], r["project_name"], r["service_name"],
+            r["usage_start"].isoformat() if r["usage_start"] else "", r["net_cost_usd"], r.get("currency_original", "USD")])
+
+    return StreamingResponse(iter([out.getvalue()]), media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=costs.csv"})
 
 
 @router.get("/costs/totals", dependencies=[Depends(require_auth)])
