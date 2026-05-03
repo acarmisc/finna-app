@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Link } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,6 +8,8 @@ import { ProviderBadge } from '@/components/shared/provider-badge'
 import { ArrowLeft } from 'lucide-react'
 
 export function ConfigCreatePage() {
+  const { id } = useParams<{ id: string }>()
+  const isEdit = Boolean(id)
   const [step, setStep] = useState(1)
   const [prov, setProv] = useState<'azure'|'gcp'|null>(null)
   const [cred, setCred] = useState('service_principal')
@@ -16,7 +18,46 @@ export function ConfigCreatePage() {
     subscription_id:'', project_id:'', key_file:'',
   })
 
+  useEffect(() => {
+    if (isEdit && id) {
+      const token = localStorage.getItem('finna_token')
+      fetch(`/api/v1/configs/${id}`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => r.json())
+        .then(data => {
+          if (data.name) setFields({ name: data.name ?? '', tenant_id: data.config?.tenant_id ?? '', client_id: data.config?.client_id ?? '', client_secret: '', subscription_id: data.config?.subscription_id ?? '', project_id: data.config?.project_id ?? '', key_file: data.config?.key_file ?? '' })
+          if (data.provider) setProv(data.provider)
+        })
+        .catch(console.error)
+    }
+  }, [isEdit, id])
+
   const set = (k: string, v: string) => setFields(f => ({...f, [k]:v}))
+
+  const handleSubmit = async () => {
+    const token = localStorage.getItem('finna_token')
+    const method = isEdit ? 'PUT' : 'POST'
+    const url = isEdit ? `/api/v1/configs/${id}` : '/api/v1/configs'
+    const body = {
+      name: fields.name, provider: prov, credential_type: cred,
+      ...(prov==='azure' ? {
+        tenant_id: fields.tenant_id,
+        client_id: fields.client_id,
+        client_secret: fields.client_secret,
+        subscription_id: fields.subscription_id,
+      } : {
+        project_id: fields.project_id,
+        key_file: fields.key_file,
+      })
+    }
+    const res = await fetch(url, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (res.ok) {
+      window.location.href = '#/configs'
+    }
+  }
 
   const canNext =
     (step===1 && prov) ||
@@ -36,8 +77,8 @@ export function ConfigCreatePage() {
           <Link to="/configs" className="font-mono text-[11px] text-muted-foreground hover:text-foreground">
             ← configs
           </Link>
-          <h1 style={{marginTop:6}}>New cloud config</h1>
-          <div className="sub">// 3-step setup · POST /api/v1/config</div>
+          <h1 style={{marginTop:6}}>{isEdit ? 'Edit config' : 'New cloud config'}</h1>
+          <div className="sub">// {isEdit ? 'edit existing' : '3-step setup'} · {isEdit ? 'PUT' : 'POST'} /api/v1/config</div>
         </div>
       </div>
 
@@ -170,7 +211,7 @@ export function ConfigCreatePage() {
             <div>
               <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-3">review</div>
               <div className="border border-border bg-background p-4 font-mono text-xs">
-                <div className="text-[10px] text-muted-foreground mb-2"># POST /api/v1/config</div>
+                <div className="text-[10px] text-muted-foreground mb-2"># {isEdit ? 'PUT' : 'POST'} /api/v1/configs</div>
                 <pre className="text-foreground whitespace-pre-wrap leading-relaxed">{JSON.stringify({
                   name: fields.name, provider: prov, credential_type: cred,
                   ...(prov==='azure' ? {
@@ -193,7 +234,7 @@ export function ConfigCreatePage() {
           {step < 3 ? (
             <Button size="sm" variant="default" disabled={!canNext} onClick={()=>setStep(s=>s+1)}>next step →</Button>
           ) : (
-            <Button size="sm" variant="default">create config</Button>
+            <Button size="sm" variant="default" onClick={handleSubmit}>{isEdit ? 'save changes' : 'create config'}</Button>
           )}
         </div>
       </Card>
