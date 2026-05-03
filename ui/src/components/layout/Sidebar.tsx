@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Icon } from '@/components/shared'
 import { cn } from '@/lib/utils'
@@ -8,6 +8,159 @@ export interface SidebarProps {
   onToggle?: () => void
   activeBase?: string
   onLogout?: () => void
+  counts?: Record<string, number>
+}
+
+// Reusable Logo component
+const Logo: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ collapsed, onToggle }) => (
+  <div className="sb-logo" onClick={onToggle} role="button" tabIndex={0} aria-label="Toggle navigation">
+    <span className="caret">{collapsed ? '‹' : '›'}</span>
+    {!collapsed && (
+      <>
+        <span className="wordmark">finna</span>
+        <span className="cursor" aria-hidden="true" />
+      </>
+    )}
+  </div>
+)
+
+// Reusable NavItem component
+interface NavItemProps {
+  item: NonNullable<typeof NAV[number]>
+  active: boolean
+  collapsed: boolean
+  counts: Record<string, number>
+  onNavigate: (path: string) => void
+}
+
+const NavItem: React.FC<NavItemProps> = ({ item, active, collapsed, counts, onNavigate }) => {
+  // Only render sections as dividers, skip navigation items for sections
+  if (item.sec) return null
+
+  const handleClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault()
+    onNavigate(item.path!)
+  }, [item.path, onNavigate])
+
+  return (
+    <a
+      key={item.id}
+      className={cn('sb-item', active && 'active')}
+      href={`#${item.path}`}
+      onClick={handleClick}
+      data-label={item.label}
+      title={collapsed ? item.label : undefined}
+      aria-current={active ? 'page' : undefined}
+    >
+      <Icon name={item.icon!} size={16} aria-hidden="true" />
+      <span className="label">{item.label}</span>
+      {item.countKey && counts[item.countKey] > 0 && (
+        <span className="count" aria-label={`${item.label} count: ${counts[item.countKey]}`}>
+          {counts[item.countKey]}
+        </span>
+      )}
+    </a>
+  )
+}
+
+// Reusable UserMenu component
+interface UserMenuProps {
+  open: boolean
+  onToggle: () => void
+  onNavigateToSettings: () => void
+  onLogout: () => void
+}
+
+const UserMenu: React.FC<UserMenuProps> = ({ open, onToggle, onNavigateToSettings, onLogout }) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onToggle()
+    }
+  }, [onToggle])
+
+  return (
+    <>
+      <button
+        className="icon-btn"
+        onClick={onToggle}
+        title="Account"
+        aria-haspopup="true"
+        aria-expanded={open}
+        onKeyDown={handleKeyDown}
+      >
+        <Icon name="chevron-up" size={14} aria-hidden="true" />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          style={{
+            position: 'absolute',
+            bottom: 'calc(100% + 4px)',
+            right: 8,
+            left: 8,
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            boxShadow: '0 4px 0 rgba(0,0,0,0.3)',
+            zIndex: 20,
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              onToggle()
+            }
+          }}
+        >
+          <a
+            href="#/settings"
+            onClick={(e) => {
+              e.preventDefault()
+              onToggle()
+              onNavigateToSettings()
+            }}
+            role="menuitem"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 12px',
+              fontSize: 12,
+              color: 'var(--fg)',
+              borderBottom: '1px solid var(--border-2)',
+              cursor: 'pointer',
+            }}
+          >
+            <Icon name="settings-2" size={14} aria-hidden="true" />
+            <span>Settings</span>
+          </a>
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              onToggle()
+              onLogout()
+            }}
+            role="menuitem"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 12px',
+              fontSize: 12,
+              color: 'var(--danger)',
+              cursor: 'pointer',
+              fontFamily: 'JetBrains Mono, monospace',
+              background: 'none',
+              border: 'none',
+              width: '100%',
+              textAlign: 'left',
+            }}
+          >
+            <Icon name="log-out" size={14} aria-hidden="true" />
+            <span>Log out</span>
+          </button>
+        </div>
+      )}
+    </>
+  )
 }
 
 const NAV = [
@@ -23,112 +176,87 @@ const NAV = [
   { id: 'settings', label: 'Settings', icon: 'settings-2', path: '/settings' },
 ]
 
-const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, activeBase = '/dashboard', onLogout }) => {
-  const [menu, setMenu] = useState(false)
+const Sidebar: React.FC<SidebarProps> = ({
+  collapsed,
+  onToggle,
+  activeBase = '/dashboard',
+  onLogout,
+  counts: incomingCounts = {},
+}) => {
+  const [menuOpen, setMenuOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
-  const counts: Record<string, number> = { alerts: 3 }
 
-  const handleNavigate = (path: string) => {
+  // Memoize counts object to prevent unnecessary recalculations
+  const counts = useMemo(() => ({
+    alerts: 3, // This would ideally come from state or props
+    ...incomingCounts,
+  }), [incomingCounts])
+
+  // Use useCallback for event handlers to prevent unnecessary re-renders
+  const handleNavigate = useCallback((path: string) => {
     navigate(path)
-  }
+  }, [navigate])
+
+  const handleNavigateToSettings = useCallback(() => {
+    navigate('/settings')
+  }, [navigate])
+
+  const handleLogout = useCallback(() => {
+    onLogout?.()
+  }, [onLogout])
+
+  // Handle keyboard events for logo button
+  const handleLogoKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onToggle?.()
+    }
+  }, [onToggle])
 
   return (
-    <aside className={cn('sb', collapsed && 'sb-collapsed')}>
-      <div className="sb-logo" onClick={onToggle}>
-        <span className="caret">{collapsed ? '‹' : '›'}</span>
-        {!collapsed && <><span className="wordmark">finna</span><span className="cursor" /></>}
-      </div>
-      <nav className="sb-nav">
-        {NAV.map((item, i) => {
-          if (item.sec) return <div key={i} className="sb-section">{item.sec}</div>
+    <aside className={cn('sb', collapsed && 'sb-collapsed')} aria-label="Main navigation">
+      <Logo collapsed={collapsed} onToggle={onToggle || (() => {})} />
+      
+      <nav className="sb-nav" aria-label="Primary navigation">
+        {NAV.map((item) => {
+          if (item.sec) {
+            return (
+              <div key={item.sec} className="sb-section" role="separator" aria-label={item.sec}>
+                {item.sec}
+              </div>
+            )
+          }
+          
           const active = activeBase === item.path
+          
           return (
-            <a
+            <NavItem
               key={item.id}
-              className={cn('sb-item', active && 'active')}
-              data-label={item.label}
-              title={collapsed ? item.label : undefined}
-              onClick={(e) => {
-                e.preventDefault()
-                handleNavigate(item.path!)
-              }}
-              href={`#${item.path}`}
-            >
-              <Icon name={item.icon!} size={16} />
-              <span className="label">{item.label}</span>
-              {item.countKey && counts[item.countKey] > 0 && (
-                <span className="count">{counts[item.countKey]}</span>
-              )}
-            </a>
+              item={item as typeof item & { sec?: undefined }}
+              active={active}
+              collapsed={collapsed}
+              counts={counts}
+              onNavigate={handleNavigate}
+            />
           )
         })}
       </nav>
+      
       <div className="sb-foot" style={{ position: 'relative' }}>
-        <div className="avatar">FN</div>
+        <div className="avatar" aria-label="User avatar">FN</div>
         <div className="who">
           <div className="name">finops@acme.co</div>
           <div className="org">API · healthy</div>
         </div>
-        <span className="health" title="API healthy" />
-        <button className="icon-btn" onClick={() => setMenu((m) => !m)} title="Account">
-          <Icon name="chevron-up" size={14} />
-        </button>
-        {menu && (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 'calc(100% + 4px)',
-              right: 8,
-              left: 8,
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              boxShadow: '0 4px 0 rgba(0,0,0,0.3)',
-              zIndex: 20,
-            }}
-          >
-            <a
-              href="#/settings"
-              onClick={(e) => {
-                e.preventDefault()
-                setMenu(false)
-                navigate('/settings')
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '8px 12px',
-                fontSize: 12,
-                color: 'var(--fg)',
-                borderBottom: '1px solid var(--border-2)',
-                cursor: 'pointer',
-              }}
-            >
-              <Icon name="settings-2" size={14} />
-              <span>Settings</span>
-            </a>
-            <a
-              onClick={() => {
-                setMenu(false)
-                onLogout?.()
-              }}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '8px 12px',
-                fontSize: 12,
-                color: 'var(--danger)',
-                cursor: 'pointer',
-                fontFamily: 'JetBrains Mono, monospace',
-              }}
-            >
-              <Icon name="log-out" size={14} />
-              <span>Log out</span>
-            </a>
-          </div>
-        )}
+        <span className="health" title="API healthy" aria-label="API status: healthy" />
+        
+        <UserMenu
+          open={menuOpen}
+          onToggle={() => setMenuOpen((m) => !m)}
+          onNavigateToSettings={handleNavigateToSettings}
+          onLogout={handleLogout}
+        />
       </div>
     </aside>
   )
