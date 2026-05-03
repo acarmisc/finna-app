@@ -31,11 +31,14 @@ Multi-cloud FinOps platform: Python FastAPI backend + React/Vite/Tailwind fronte
 
 ## CI
 
-Path-filtered workflows live in `.github/workflows/`:
-- `api-build.yml` — monolith build (FE + BE) on push to main or tags.
-- `ui-ci.yml` — frontend lint/typecheck only.
-- `docker-build.yml` — extractor image (`Dockerfile.extractor`).
-- `update-images.yml` — bumps k8s image tags.
+All CI is in `.github/workflows/ci.yml` — consolidated pipeline that runs on main/tags:
+- **Fast**: lint (ruff), typecheck (mypy + tsc), tests (pytest + jest)
+- **Full**: multi-platform Docker build (amd64 + arm64) → ghcr.io
+- **Stable**: GitHub release on tags, direct commit to staging k8s manifests
+
+`docker-build.yml` — extractor image only (runs on tags).
+
+**Important**: Repo blocks Actions from creating PRs — staging deploy commits directly to main.
 
 ## CI/CD Architecture
 
