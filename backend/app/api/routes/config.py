@@ -112,9 +112,10 @@ async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
 )
 async def list_projects() -> list[dict[str, Any]]:
     """List all projects."""
-    sql = ("SELECT id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note, provider \
-"  # noqa: E501
-"FROM fin_projects ORDER BY name")
+    sql = (
+        "SELECT id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note, provider "
+        "FROM fin_projects ORDER BY name"
+    )
     rows = query_all(sql)
     return [
         {
