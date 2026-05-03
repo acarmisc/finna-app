@@ -10,7 +10,6 @@ Multi-cloud FinOps platform: Python FastAPI backend + React/Vite/Tailwind fronte
 - `ui/` — frontend (React + Vite + Tailwind v4 + Zustand + TanStack Query).
 - `k8s/` — kustomize manifests for staging/prod.
 - `tests/` — pytest suite for backend.
-- `ui/` has its own Jest suite — see `ui/AGENTS.md` for frontend-specific conventions.
 
 ## Common commands
 
@@ -31,46 +30,49 @@ Multi-cloud FinOps platform: Python FastAPI backend + React/Vite/Tailwind fronte
 
 ## CI
 
-All CI is in `.github/workflows/ci.yml` — consolidated pipeline that runs on main/tags:
-- **Fast**: lint (ruff), typecheck (mypy + tsc), tests (pytest + jest)
-- **Full**: multi-platform Docker build (amd64 + arm64) → ghcr.io
-- **Stable**: GitHub release on tags, direct commit to staging k8s manifests
+`.github/workflows/ci.yml` — builds and pushes Docker images to ghcr.io on main/tags:
+1. **Fast**: lint (ruff), typecheck (mypy + tsc), tests (pytest + jest)
+2. **Build**: multi-platform Docker image (amd64 + arm64) → ghcr.io/acarmisc/finops-api
 
-`docker-build.yml` — extractor image only (runs on tags).
+**No deployment steps** — CI only builds and pushes images.
 
-**Important**: Repo blocks Actions from creating PRs — staging deploy commits directly to main.
+`docker-build.yml` — separate workflow for extractor image (runs on tags).
 
 ## CI/CD Architecture
 
 ### Monolithic Container
-The project now uses a **single Docker image** containing both frontend and backend:
-- `Dockerfile.api` — for API/monolith builds (default)
-- `Dockerfile.monolith` — explicit monolith build
-
-**Container structure:**
+- `Dockerfile.api` — builds both frontend + backend into single image
 - nginx on port 80 → serves frontend + proxies `/api/` to backend
-- FastAPI backend on port 8000 (internal only)
-- Frontend build output in `/app/ui/`
-
-**Docker commands:**
-```bash
-# Build monolith
-docker build -f Dockerfile.api -t finops-api .
-
-# Run (local dev)
-docker run --rm -p 80:80 -e PG_DSN=... -e JWT_SECRET=... finops-api
-```
+- FastAPI on port 8000 (internal only)
 
 ### Multi-Platform Builds
-Images are built for `linux/amd64` and `linux/arm64` using Docker Buildx.
-The cluster runs on `linux/amd64`; Apple Silicon dev machines use `linux/arm64`.
+Images built for `linux/amd64` and `linux/arm64` using Docker Buildx.
 
-## Frontend conventions
+## Design System
+
+**Fonts** (loaded from Google Fonts in `ui/src/styles.css`):
+- **Inter** — body text
+- **JetBrains Mono** — numbers, IDs, labels
+- **Press Start 2P** — pixel titles (login page, headers)
+
+**Theme**: Dark-first pixel-art corporate style (radius 0, 1px borders, no blur shadows).
+
+**Provider colors**: Azure (#0078d4), GCP (#ea4335), LLM (#7c3aed), AWS (#ff9900)
+
+See `ui/design/wip/handoff/02-design-system.md` for full design tokens.
+
+## Frontend
 
 See `ui/AGENTS.md` for routes, state, styling, auth specifics.
 
-## Backend conventions
+## Backend
 
 - Type-hint everything; mypy strict on routes and services.
 - Use psycopg async with the connection pool from `backend.app.api.db`.
 - JWT in `Authorization: Bearer ...`; configured via `backend.app.api.auth`.
+
+## Known issues / gotchas
+
+- **Docker build**: Use Python 3.14 paths in COPY commands (not 3.12)
+- **Colima users**: If buildx cache corrupts, run `colima stop && colima start`
+- **Dev server**: proxies `/api` to `http://localhost:8000`
