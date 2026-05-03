@@ -47,7 +47,29 @@ async def init_async_pool() -> AsyncConnectionPool:
         return _async_pool
 
     if os.environ.get("TESTING"):
-        return _async_pool  # type: ignore[return-value]
+        # In testing, initialize a minimal pool to avoid None returns
+        config = {"min_size": 1, "max_size": 1}
+        dsn = get_pg_dsn()
+
+        logger.info(
+            "Initializing async connection pool for testing (min=%d, max=%d)",
+            config["min_size"],
+            config["max_size"],
+        )
+
+        _async_pool = AsyncConnectionPool(
+            dsn,
+            min_size=config["min_size"],
+            max_size=config["max_size"],
+            kwargs={
+                "connect_timeout": 10,
+                "row_factory": dict_row,
+            },
+        )
+
+        await _async_pool.wait(timeout=30)
+        logger.info("Async connection pool initialized successfully for testing")
+        return _async_pool
 
     config = get_pool_config()
     dsn = get_pg_dsn()
@@ -80,7 +102,29 @@ def init_sync_pool() -> ConnectionPool:
         return _sync_pool
 
     if os.environ.get("TESTING"):
-        return _sync_pool  # type: ignore[return-value]
+        # In testing, initialize a minimal pool to avoid None returns
+        config = {"min_size": 1, "max_size": 1}
+        dsn = get_pg_dsn()
+
+        logger.info(
+            "Initializing sync connection pool for testing (min=%d, max=%d)",
+            config["min_size"],
+            config["max_size"],
+        )
+
+        _sync_pool = ConnectionPool(
+            dsn,
+            min_size=config["min_size"],
+            max_size=config["max_size"],
+            kwargs={
+                "connect_timeout": 10,
+                "row_factory": dict_row,
+            },
+        )
+
+        _sync_pool.wait(timeout=30)
+        logger.info("Sync connection pool initialized successfully for testing")
+        return _sync_pool
 
     config = get_pool_config()
     dsn = get_pg_dsn()
@@ -106,20 +150,26 @@ def init_sync_pool() -> ConnectionPool:
     return _sync_pool
 
 
-async def get_async_pool() -> AsyncConnectionPool | None:
+async def get_async_pool() -> AsyncConnectionPool:
     """Get or create async connection pool."""
     global _async_pool
     if os.environ.get("TESTING"):
+        if _async_pool is None:
+            # In testing, initialize a minimal pool if needed
+            return await init_async_pool()
         return _async_pool
     if _async_pool is None:
         await init_async_pool()
     return _async_pool
 
 
-def get_sync_pool() -> ConnectionPool | None:
+def get_sync_pool() -> ConnectionPool:
     """Get or create sync connection pool."""
     global _sync_pool
     if os.environ.get("TESTING"):
+        if _sync_pool is None:
+            # In testing, initialize a minimal pool if needed
+            return init_sync_pool()
         return _sync_pool
     if _sync_pool is None:
         init_sync_pool()
@@ -130,7 +180,6 @@ def get_sync_pool() -> ConnectionPool | None:
 async def get_async_connection() -> AsyncIterator[AsyncConnection]:
     """Get an async PostgreSQL connection from the pool."""
     pool = await get_async_pool()
-    assert pool is not None
     try:
         async with pool.connection() as conn:
             yield conn
@@ -145,22 +194,42 @@ async def get_async_connection() -> AsyncIterator[AsyncConnection]:
 def get_connection() -> psycopg.Connection:
     """Get a sync PostgreSQL connection from the pool."""
     pool = get_sync_pool()
-    assert pool is not None
     try:
         conn = pool.getconn()
         if conn is None or conn.closed:
-            conn = psycopg.connect(pool.dsn, row_factory=dict_row)  # type: ignore[attr-defined,arg-type]
+            logger.warning("Got invalid connection from pool, creating new one")
+            # Create a new connection but track it properly
+            # Handle both string and callable conninfo
+            conninfo = pool.conninfo
+            if callable(conninfo):
+                conninfo = conninfo()
+            conn = psycopg.connect(
+                conninfo,
+                connect_timeout=10,
+                row_factory=dict_row,
+            )
         return conn
     except PoolTimeout:
         logger.error("Connection pool exhausted - no available connections")
         raise
+    except psycopg.Error as e:
+        logger.exception("Failed to get connection from pool: %s", e)
+        raise
 
 
-def release_connection(conn: psycopg.Connection) -> None:
+def release_connection(conn: Optional[psycopg.Connection]) -> None:
     """Return a connection to the pool."""
     global _sync_pool
     if _sync_pool is not None and conn is not None:
-        _sync_pool.putconn(conn)
+        try:
+            _sync_pool.putconn(conn)
+        except Exception as e:
+            logger.exception("Failed to release connection: %s", e)
+            # Don't raise here as we're already in a cleanup path
+            try:
+                conn.close()
+            except Exception:
+                pass  # Best effort to close
 
 
 def close_pools() -> None:
@@ -168,21 +237,35 @@ def close_pools() -> None:
     import asyncio
 
     global _async_pool, _sync_pool
+    
+    # Close async pool
     if _async_pool is not None:
         logger.info("Closing async connection pool")
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                loop.create_task(_async_pool.close())
+            # Try to close with timeout
+            if asyncio.get_event_loop().is_running():
+                # Create a task and wait for it with timeout
+                loop = asyncio.get_event_loop()
+                task = loop.create_task(_async_pool.close())
+                loop.run_until_complete(asyncio.wait_for(task, timeout=10.0))
             else:
-                loop.run_until_complete(_async_pool.close())
-        except Exception:
-            pass
-        _async_pool = None
+                asyncio.run(asyncio.wait_for(_async_pool.close(), timeout=10.0))
+        except asyncio.TimeoutError:
+            logger.warning("Timeout closing async connection pool")
+        except Exception as e:
+            logger.exception("Error closing async connection pool: %s", e)
+        finally:
+            _async_pool = None
+    
+    # Close sync pool
     if _sync_pool is not None:
         logger.info("Closing sync connection pool")
-        _sync_pool.close()
-        _sync_pool = None
+        try:
+            _sync_pool.close()
+        except Exception as e:
+            logger.exception("Error closing sync connection pool: %s", e)
+        finally:
+            _sync_pool = None
 
 
 def get_pool_stats() -> dict[str, Any]:
@@ -341,7 +424,9 @@ def insert_and_return(sql: str, params: tuple, returning: str = "id") -> str:
             cur.execute(sql, tuple(converted))
             result = cur.fetchone()
         conn.commit()
-        return result[returning] if result else None  # type: ignore[return-value]
+        if result is None:
+            raise ValueError(f"No result returned for returning clause: {returning}")
+        return str(result[returning])
     except Exception:
         conn.rollback()
         raise
