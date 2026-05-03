@@ -142,18 +142,15 @@ export function ExtractorsPage() {
           <div className="card-hd">
             <h3>Run history</h3>
             <div className="hstack">
-              <select className="sel" style={{ width: 'auto' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-                <option value="all">status: all</option>
-                <option value="running">running</option>
-                <option value="completed">completed</option>
-                <option value="failed">failed</option>
-              </select>
-              <select className="sel" style={{ width: 'auto' }} value={provFilter} onChange={e => setProvFilter(e.target.value)}>
-                <option value="all">provider: all</option>
-                <option value="azure">azure</option>
-                <option value="gcp">gcp</option>
-                <option value="llm">llm</option>
-              </select>
+              <span className={`chip ${statusFilter === 'all' ? '' : ''}`} onClick={() => setStatusFilter('all')} style={{ cursor: 'pointer', background: statusFilter === 'all' ? 'var(--primary)' : 'var(--surface)', color: statusFilter === 'all' ? 'var(--primary-fg)' : 'var(--fg)' }}>status: <b>{statusFilter === 'all' ? 'all' : statusFilter}</b></span>
+              {['running', 'completed', 'failed'].map(s => (
+                <span key={s} className="chip" onClick={() => setStatusFilter(s)} style={{ cursor: 'pointer', background: statusFilter === s ? 'var(--primary)' : 'var(--surface)', color: statusFilter === s ? 'var(--primary-fg)' : 'var(--fg)' }}>{s}</span>
+              ))}
+              <span style={{ width: 8, background: 'var(--border)' }} />
+              <span className="chip" onClick={() => setProvFilter('all')} style={{ cursor: 'pointer', background: provFilter === 'all' ? 'var(--primary)' : 'var(--surface)', color: provFilter === 'all' ? 'var(--primary-fg)' : 'var(--fg)' }}>provider: <b>{provFilter === 'all' ? 'all' : provFilter}</b></span>
+              {['azure', 'gcp', 'llm'].map(p => (
+                <span key={p} className="chip" onClick={() => setProvFilter(p)} style={{ cursor: 'pointer', background: provFilter === p ? 'var(--primary)' : 'var(--surface)', color: provFilter === p ? 'var(--primary-fg)' : 'var(--fg)' }}>{p}</span>
+              ))}
             </div>
           </div>
           <div className="card-bd p0" style={{ maxHeight: 640, overflowY: 'auto' }}>
@@ -186,8 +183,12 @@ export function ExtractorsPage() {
                               </pre>
                             </div>
                             <div>
-                              <div className="label">logs / stderr</div>
-                              <ExtractorLogs runId={r.id} />
+                              <div className="label">error / stderr</div>
+                              {r.error_message ? (
+                                <pre className="mono" style={{ fontSize: 11, margin: 0, background: 'color-mix(in oklab, var(--danger) 10%, var(--surface))', border: '1px solid var(--danger)', padding: 10, color: 'var(--danger)' }}>{r.error_message}</pre>
+                              ) : (
+                                <div className="empty" style={{ padding: 16 }}><div className="msg">no errors</div></div>
+                              )}
                             </div>
                           </div>
                         </td>
