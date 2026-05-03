@@ -416,11 +416,11 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   background: var(--surface-2);
   color: var(--fg);
   cursor: pointer;
-  transition: background 80ms linear, border-color 80ms linear;
+  transition: transform 60ms steps(2), box-shadow 60ms steps(2), background 80ms linear, border-color 80ms linear;
   user-select: none;
 }
-.btn:hover { background: var(--surface-3); border-color: var(--fg-subtle); }
-.btn:active { background: var(--surface); }
+.btn:hover { background: var(--surface-3); border-color: var(--fg-subtle); transform: translate(-1px, -1px); box-shadow: var(--pxshadow-1); }
+.btn:active { background: var(--surface); transform: translate(2px, 2px); box-shadow: none; }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn svg { width: 12px; height: 12px; }
 
@@ -429,12 +429,15 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   color: var(--primary-fg);
   border-color: var(--primary);
   font-weight: 600;
+  box-shadow: 2px 2px 0 0 color-mix(in oklab, var(--primary) 40%, #000);
 }
 .btn-primary:hover {
   background: color-mix(in oklab, var(--primary) 85%, #fff);
   border-color: color-mix(in oklab, var(--primary) 85%, #fff);
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 0 color-mix(in oklab, var(--primary) 30%, #000);
 }
-.btn-primary:active { background: color-mix(in oklab, var(--primary) 70%, #000); }
+.btn-primary:active { background: color-mix(in oklab, var(--primary) 70%, #000); transform: translate(2px, 2px); box-shadow: none; }
 
 .btn-danger {
   background: var(--danger);
