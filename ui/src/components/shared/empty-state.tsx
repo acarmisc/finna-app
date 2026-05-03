@@ -16,9 +16,9 @@ export function EmptyState({ icon = 'inbox', title, message, action, className }
         <Icon name={icon} size={20} />
       </div>
       {title && (
-        <div style={{ color: 'var(--fg)', fontFamily: 'JetBrains Mono, monospace', fontSize: 13, marginBottom: 4 }}>
+        <h3 style={{ color: 'var(--fg)', marginBottom: 4, margin: 0 }}>
           {title}
-        </div>
+        </h3>
       )}
       <div className="msg">{message}</div>
       {action && <div style={{ marginTop: 16 }}>{action}</div>}

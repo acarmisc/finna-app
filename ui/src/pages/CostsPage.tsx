@@ -18,6 +18,7 @@ function formatLabel(iso: string) {
 export function CostsPage() {
   const { state } = useDateRange()
   const [tab, setTab] = useState<'overview' | 'sku' | 'daily'>('overview')
+  const [showFilters, setShowFilters] = useState(true)
   const [providers, setProviders] = useState<Record<Provider, boolean>>({ azure: true, gcp: true, llm: true, aws: false })
   const [projSel, setProjSel] = useState<string[]>([])
   const [sku, setSku] = useState('')
@@ -29,6 +30,27 @@ export function CostsPage() {
     setProjSel([])
     setSku('')
     setApplied({ providers: { azure: true, gcp: true, llm: true, aws: false }, proj: [], sku: '' })
+  }
+
+  const exportCsv = async () => {
+    const params = new URLSearchParams()
+    if (applied.providers.azure) params.append('provider', 'azure')
+    if (applied.providers.gcp) params.append('provider', 'gcp')
+    if (applied.providers.llm) params.append('provider', 'llm')
+    if (applied.providers.aws) params.append('provider', 'aws')
+    params.append('start_date', state.start)
+    params.append('end_date', state.end)
+    const token = localStorage.getItem('finna_token')
+    const res = await fetch(`/api/v1/costs/export?${params}`, { headers: { Authorization: `Bearer ${token}` } })
+    if (res.ok) {
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `costs-${state.start}-${state.end}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
   }
 
   const { data: costsResp } = useCosts({ startDate: state.start, endDate: state.end })
@@ -81,12 +103,12 @@ export function CostsPage() {
           <div className="sub">// {filtered.length} records · {money(grand)} · normalized USD · cost_records</div>
         </div>
         <div className="actions">
-          <Button icon="filter" bracket>add filter</Button>
-          <Button icon="download" variant="primary" bracket>export csv</Button>
+          <Button icon="filter" bracket onClick={() => setShowFilters(f => !f)}>add filter</Button>
+          <Button icon="download" variant="primary" bracket onClick={exportCsv}>export csv</Button>
         </div>
       </div>
 
-      <div className="card">
+      {showFilters && <div className="card">
         <div className="card-hd">
           <h3>Filters</h3>
           <div className="hstack">
@@ -141,7 +163,7 @@ export function CostsPage() {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
       <div className="tabs mt-4">
         {(['overview', 'sku', 'daily'] as const).map(k => (

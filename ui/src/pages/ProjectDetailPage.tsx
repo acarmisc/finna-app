@@ -46,7 +46,20 @@ export function ProjectDetailPage() {
   const { data: costsResp } = useCosts({ project: slug })
 
   const [note, setNote] = useState('')
+  const [showDel, setShowDel] = useState(false)
   useEffect(() => { setNote((p as any)?.note ?? '') }, [(p as any)?.note])
+
+  const handleDelete = async () => {
+    const token = localStorage.getItem('finna_token')
+    const res = await fetch(`/api/v1/projects/${slug}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+    if (res.ok) {
+      toast.showSuccess('Project deleted')
+      navigate('/projects')
+    } else {
+      toast.showError('Failed to delete project')
+    }
+    setShowDel(false)
+  }
 
   if (isLoading) {
     return <div className="page"><div className="muted mono" style={{ textAlign: 'center', padding: 48 }}>// loading project…</div></div>
@@ -95,8 +108,8 @@ export function ProjectDetailPage() {
           </div>
         </div>
         <div className="actions">
-          <Button icon="edit-3" bracket>edit</Button>
-          <Button icon="trash-2" variant="danger" bracket>delete</Button>
+          <Button icon="edit-3" bracket onClick={() => navigate(`/projects/${slug}/edit`)}>edit</Button>
+          <Button icon="trash-2" variant="danger" bracket onClick={() => setShowDel(true)}>delete</Button>
         </div>
       </div>
 
@@ -173,6 +186,21 @@ export function ProjectDetailPage() {
           </table>
         </div>
       </div>
+
+      {showDel && (
+        <div className="dlg-scrim" onClick={() => setShowDel(false)}>
+          <div className="dlg" onClick={e => e.stopPropagation()}>
+            <div className="dlg-hd"><h3>Delete project?</h3></div>
+            <div className="dlg-bd">
+              <p className="mono" style={{ fontSize: 13 }}>this will permanently delete "{p.name}" and all associated cost data.</p>
+            </div>
+            <div className="dlg-ft">
+              <Button onClick={() => setShowDel(false)} bracket>cancel</Button>
+              <Button variant="danger" bracket onClick={handleDelete}>delete</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
