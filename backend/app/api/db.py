@@ -63,7 +63,7 @@ async def init_async_pool() -> AsyncConnectionPool:
             max_size=config["max_size"],
             kwargs={
                 "connect_timeout": 10,
-                "row_factory": dict_row,
+                "row_factory": dict_row,  # type: ignore[arg-type]
             },
         )
 
@@ -86,7 +86,7 @@ async def init_async_pool() -> AsyncConnectionPool:
         max_size=config["max_size"],
         kwargs={
             "connect_timeout": 10,
-            "row_factory": dict_row,
+            "row_factory": dict_row,  # type: ignore[arg-type]
         },
     )
 
@@ -118,7 +118,7 @@ def init_sync_pool() -> ConnectionPool:
             max_size=config["max_size"],
             kwargs={
                 "connect_timeout": 10,
-                "row_factory": dict_row,
+                "row_factory": dict_row,  # type: ignore[arg-type]
             },
         )
 
@@ -141,7 +141,7 @@ def init_sync_pool() -> ConnectionPool:
         max_size=config["max_size"],
         kwargs={
             "connect_timeout": 10,
-            "row_factory": dict_row,
+            "row_factory": dict_row,  # type: ignore[arg-type]
         },
     )
 
@@ -155,11 +155,12 @@ async def get_async_pool() -> AsyncConnectionPool:
     global _async_pool
     if os.environ.get("TESTING"):
         if _async_pool is None:
-            # In testing, initialize a minimal pool if needed
-            return await init_async_pool()
+            await init_async_pool()
+        assert _async_pool is not None
         return _async_pool
     if _async_pool is None:
         await init_async_pool()
+    assert _async_pool is not None
     return _async_pool
 
 
@@ -168,11 +169,12 @@ def get_sync_pool() -> ConnectionPool:
     global _sync_pool
     if os.environ.get("TESTING"):
         if _sync_pool is None:
-            # In testing, initialize a minimal pool if needed
-            return init_sync_pool()
+            init_sync_pool()
+        assert _sync_pool is not None
         return _sync_pool
     if _sync_pool is None:
         init_sync_pool()
+    assert _sync_pool is not None
     return _sync_pool
 
 
@@ -206,7 +208,7 @@ def get_connection() -> psycopg.Connection:
             conn = psycopg.connect(
                 conninfo,
                 connect_timeout=10,
-                row_factory=dict_row,
+                row_factory=dict_row,  # type: ignore[arg-type]
             )
         return conn
     except PoolTimeout:
@@ -237,7 +239,7 @@ def close_pools() -> None:
     import asyncio
 
     global _async_pool, _sync_pool
-    
+
     # Close async pool
     if _async_pool is not None:
         logger.info("Closing async connection pool")
@@ -256,7 +258,7 @@ def close_pools() -> None:
             logger.exception("Error closing async connection pool: %s", e)
         finally:
             _async_pool = None
-    
+
     # Close sync pool
     if _sync_pool is not None:
         logger.info("Closing sync connection pool")
@@ -326,7 +328,7 @@ def query_one(sql: str, params: tuple | None = None) -> dict[str, Any] | None:
         params = tuple(converted)
 
     try:
-        with conn.cursor(row_factory=dict_row) as cur:
+        with conn.cursor(row_factory=dict_row) as cur:  # type: ignore[arg-type]
             cur.execute(sql, params)
             row = cur.fetchone()
 
@@ -361,7 +363,7 @@ def query_all(sql: str, params: tuple | None = None) -> list[dict[str, Any]]:
         params = tuple(converted)
 
     try:
-        with conn.cursor(row_factory=dict_row) as cur:
+        with conn.cursor(row_factory=dict_row) as cur:  # type: ignore[arg-type]
             cur.execute(sql, params)
             rows = cur.fetchall()
 
@@ -420,7 +422,7 @@ def insert_and_return(sql: str, params: tuple, returning: str = "id") -> str:
             converted.append(p)
 
     try:
-        with conn.cursor(row_factory=dict_row) as cur:
+        with conn.cursor(row_factory=dict_row) as cur:  # type: ignore[arg-type]
             cur.execute(sql, tuple(converted))
             result = cur.fetchone()
         conn.commit()
