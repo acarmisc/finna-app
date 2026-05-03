@@ -26,14 +26,70 @@ apiClient.interceptors.request.use(
   }
 )
 
+// Track refresh attempts to prevent infinite loops
+let isRefreshing = false
+let failedQueue: Array<{ resolve: (value: unknown) => void; reject: (reason?: unknown) => void }> = []
+
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
     return response
   },
-  (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      useAuthStore.getState().logout()
+  async (error: AxiosError) => {
+    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean }
+
+    // Handle 401 errors
+    if (error.response?.status === 401 && originalRequest) {
+      if (isRefreshing) {
+        // If we're already refreshing, add to queue
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject })
+        })
+          .then(() => apiClient(originalRequest))
+          .catch((err) => Promise.reject(err))
+      }
+
+      isRefreshing = true
+
+      try {
+        // Attempt token refresh
+        const refreshResponse = await apiClient.post('/auth/refresh', {}, {
+          withCredentials: true,
+        })
+
+        if (refreshResponse.data?.access_token) {
+          // Update token in store
+          useAuthStore.getState().setToken(refreshResponse.data.access_token)
+
+          // Retry original request with new token
+          if (originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${refreshResponse.data.access_token}`
+          }
+
+          // Process queued requests
+          failedQueue.forEach(({ resolve }) => resolve(null))
+          failedQueue = []
+
+          return apiClient(originalRequest as AxiosRequestConfig)
+        }
+      } catch (refreshError) {
+        // Refresh failed - clear tokens and redirect
+        useAuthStore.getState().logout()
+
+        // Redirect to login with expired reason
+        if (typeof window !== 'undefined') {
+          window.location.href = '/#/'
+        }
+
+        // Process queued requests with error
+        failedQueue.forEach(({ reject }) => reject(refreshError))
+        failedQueue = []
+
+        return Promise.reject(refreshError)
+      } finally {
+        isRefreshing = false
+      }
     }
+
     return Promise.reject(error)
   }
 )
