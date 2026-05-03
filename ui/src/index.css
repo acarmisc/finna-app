@@ -760,7 +760,7 @@
 .sb {
   grid-area: sidebar;
   background: var(--color-surface);
-  border-right: 1px solid var(--color-border);
+  border-right: 2px solid var(--color-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -941,7 +941,7 @@
   grid-area: topbar;
   height: 48px;
   background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 2px solid var(--color-border);
   display: flex;
   align-items: center;
   padding: 0 16px;
