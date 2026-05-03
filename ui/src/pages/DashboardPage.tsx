@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { StatCard } from '@/components/shared/stat-card'
 import { LineChart } from '@/components/shared/line-chart'
 import { HBarList } from '@/components/shared/hbar-list'
@@ -35,6 +36,7 @@ export function DashboardPage() {
   const r = (state.window === 'custom' ? 'mtd' : state.window || 'mtd') as 'mtd' | '7d' | '30d' | '90d'
   const rl = RANGE_LABELS[r] ?? 'MTD'
   const rd = RANGE_DELTAS[r] ?? 'vs last month'
+  const queryClient = useQueryClient()
 
   const { data: stats, isLoading: statsLoading, error: statsError } = useDashboardStats(r)
   const { data: projects } = useProjects()
@@ -124,8 +126,18 @@ export function DashboardPage() {
         </div>
         <div className="actions">
           <Button icon={editMode ? 'check' : 'layout-grid'} bracket onClick={() => setEditMode(m => !m)}>{editMode ? 'done' : 'customize'}</Button>
-          <Button icon="refresh-ccw" bracket>refresh</Button>
-          <Button icon="download" bracket>export</Button>
+          <Button icon="refresh-ccw" bracket onClick={() => queryClient.invalidateQueries()}>refresh</Button>
+          <Button icon="download" bracket onClick={() => {
+            const rows = [['kpi', 'label', 'value', 'meta']].concat(visibleKpis.map(id => [id, kpiDefs[id].label, kpiDefs[id].value, kpiDefs[id].meta ?? '']))
+            const csv = rows.map(r => r.join(',')).join('\n')
+            const blob = new Blob([csv], { type: 'text/csv' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `dashboard-${new Date().toISOString().split('T')[0]}.csv`
+            a.click()
+            URL.revokeObjectURL(url)
+          }}>export</Button>
         </div>
       </div>
 
