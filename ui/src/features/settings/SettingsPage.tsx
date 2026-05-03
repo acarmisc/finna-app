@@ -8,6 +8,9 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog'
 import { money } from '@/components/shared/money'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useToast } from '@/contexts/ToastContext'
+import { NotificationToggle } from './components/NotificationToggle'
+import { SettingsSection } from './components/SettingsSection'
+import { ApiKeyItem } from './components/ApiKeyItem'
 
 interface ApiKey {
   id: string
@@ -61,6 +64,13 @@ const SECTIONS = [
   {id:'preferences',  label: '// preferences'},
 ]
 
+// Constants
+const SAVE_TIMEOUT_MS = 2000
+const KEY_GENERATION_TIMEOUT_MS = 1000
+const API_KEY_ID_LENGTH = 4
+const RANDOM_STRING_START_INDEX = 2
+const RANDOM_STRING_LENGTH = 8
+
 export function SettingsPage() {
   const { theme, resolvedTheme, setTheme, toggleTheme } = useTheme()
   const { showToast, showSuccess, showError } = useToast()
@@ -96,6 +106,7 @@ export function SettingsPage() {
     timezone: 'Europe/Rome',
   })
 
+  // Effect to sync theme from context to preferences
   useEffect(() => {
     if (section === 'preferences') {
       setPreferences(prev => ({ ...prev, theme }))
@@ -105,7 +116,7 @@ export function SettingsPage() {
   const save = () => {
     setSaved(true)
     showSuccess('Changes saved successfully')
-    setTimeout(() => setSaved(false), 2000)
+    setTimeout(() => setSaved(false), SAVE_TIMEOUT_MS)
   }
 
   const deleteKey = (id: string) => {
@@ -117,9 +128,9 @@ export function SettingsPage() {
     setIsGeneratingKey(true)
     setTimeout(() => {
       const newKey: ApiKey = {
-        id: `k${Date.now().toString().slice(-4)}`,
+        id: `k${Date.now().toString().slice(-API_KEY_ID_LENGTH)}`,
         name: 'new-api-key',
-        key: `sk_finna_new_••••••••••••••••${Math.random().toString(36).substring(2, 10)}`,
+        key: `sk_finna_new_••••••••••••••••${Math.random().toString(36).substring(RANDOM_STRING_START_INDEX, RANDOM_STRING_START_INDEX + RANDOM_STRING_LENGTH)}`,
         created: 'Just now',
         last: 'Never',
         scopes: ['read', 'write'],
@@ -136,11 +147,26 @@ export function SettingsPage() {
           },
         },
       })
-    }, 1000)
+    }, KEY_GENERATION_TIMEOUT_MS)
   }
 
   const toggleNotif = (key: keyof NotificationChannel) => {
     setNotifs(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  // Helper function for individual profile field updates
+  const updateProfileField = (key: keyof typeof profile, value: string) => {
+    setProfile(prev => ({ ...prev, [key]: value }))
+  }
+
+  // Helper function for individual org field updates
+  const updateOrgField = (key: keyof typeof org, value: string | number) => {
+    setOrg(prev => ({ ...prev, [key]: value }))
+  }
+
+  // Helper function for individual preference field updates
+  const updatePreferenceField = <K extends keyof UserPreferences>(key: K, value: UserPreferences[K]) => {
+    setPreferences(prev => ({ ...prev, [key]: value }))
   }
 
   return (
@@ -189,22 +215,27 @@ export function SettingsPage() {
                     <Button size="sm" variant="outline" className="mt-2">upload new</Button>
                   </div>
                 </div>
-                {([
-                  {k:'name',        label:'full name'},
-                  {k:'email',       label:'email address'},
-                  {k:'timezone',    label:'timezone'},
-                  {k:'locale',      label:'locale'},
-                  {k:'currency',    label:'default currency'},
-                ] as const).map(({k,label}) => (
-                  <div key={k}>
-                    <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-1.5">{label}</label>
-                    <Input
-                      className="font-mono text-xs max-w-sm"
-                      value={(profile as any)[k]}
-                      onChange={e=>setProfile(p=>({...p, [k]: e.target.value}))}
-                    />
-                  </div>
-                ))}
+                <SettingsSection title="profile">
+                  {([
+                    {k:'name',        label:'full name'},
+                    {k:'email',       label:'email address'},
+                    {k:'timezone',    label:'timezone'},
+                    {k:'locale',      label:'locale'},
+                    {k:'currency',    label:'default currency'},
+                  ] as const).map(({k,label}) => (
+                    <div key={k}>
+                      <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-1.5">{label}</label>
+                      <Input
+                        className="font-mono text-xs max-w-sm"
+                        value={(profile as any)[k]}
+                        onChange={e=>updateProfileField(k, e.target.value)}
+                      />
+                    </div>
+                  ))}
+                </SettingsSection>
+                <SettingsSection title="" className="pt-2">
+                  <Button size="sm" variant="outline" onClick={save}>{saved ? '✓' : 'save'}</Button>
+                </SettingsSection>
               </CardContent>
             </Card>
           )}
@@ -215,35 +246,37 @@ export function SettingsPage() {
                 <CardTitle className="text-xs font-mono uppercase tracking-widest text-muted-foreground">organization</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center gap-12">
-                  <div>
-                    <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">organization name</div>
-                    <div className="font-mono text-sm">{org.name}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">billing email</div>
-                    <div className="font-mono text-sm">{org.billing_email}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-12">
-                  <div>
-                    <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">plan tier</div>
-                    <div className="font-mono text-sm">
-                      <span className="inline-block px-2 py-0.5 rounded bg-muted text-muted-foreground">{org.plan}</span>
+                <SettingsSection title="organization">
+                  <div className="flex items-center gap-12">
+                    <div>
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">organization name</div>
+                      <div className="font-mono text-sm">{org.name}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">billing email</div>
+                      <div className="font-mono text-sm">{org.billing_email}</div>
                     </div>
                   </div>
-                  <div>
-                    <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">seat usage</div>
-                    <div className="font-mono text-sm">{org.used_seats}/{org.seats} seats</div>
+                  <div className="flex items-center gap-12">
+                    <div>
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">plan tier</div>
+                      <div className="font-mono text-sm">
+                        <span className="inline-block px-2 py-0.5 rounded bg-muted text-muted-foreground">{org.plan}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1">seat usage</div>
+                      <div className="font-mono text-sm">{org.used_seats}/{org.seats} seats</div>
+                    </div>
                   </div>
-                </div>
-                <div className="border border-border p-4 mt-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-mono text-sm text-foreground">Upgrade to Enterprise</span>
-                    <Button size="sm" variant="outline">upgrade</Button>
+                  <div className="border border-border p-4 mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-mono text-sm text-foreground">Upgrade to Enterprise</span>
+                      <Button size="sm" variant="outline">upgrade</Button>
+                    </div>
+                    <div className="text-xs font-mono text-muted-foreground">Get advanced features: SSO, audit logs, and priority support</div>
                   </div>
-                  <div className="text-xs font-mono text-muted-foreground">Get advanced features: SSO, audit logs, and priority support</div>
-                </div>
+                </SettingsSection>
               </CardContent>
             </Card>
           )}
@@ -265,37 +298,15 @@ export function SettingsPage() {
                   </div>
                 )}
                 {keys.map(api => (
-                  <div key={api.id} className="border border-border p-4 relative group">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-mono text-xs text-foreground">{api.name}</span>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            navigator.clipboard.writeText(api.key)
-                            showToast('Key copied to clipboard')
-                          }}
-                        >
-                          copy
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-danger hover:text-danger"
-                          onClick={() => deleteKey(api.id)}
-                        >
-                          revoke
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="font-mono text-[10px] text-muted-foreground break-all mb-2">{api.key}</div>
-                    <div className="flex gap-4 text-[10px] font-mono text-muted-foreground">
-                      <span>created {api.created}</span>
-                      <span>last used {api.last}</span>
-                      <span>scopes · {api.scopes.join(', ')}</span>
-                    </div>
-                  </div>
+                  <ApiKeyItem
+                    apiKey={api}
+                    onRevoke={deleteKey}
+                    onCopy={(key) => {
+                      navigator.clipboard.writeText(key)
+                      showToast('Key copied to clipboard')
+                    }}
+                    isGenerating={isGeneratingKey}
+                  />
                 ))}
                 {keys.length === 0 && (
                   <div className="text-center py-8 border border-border border-dashed rounded text-muted-foreground">
@@ -312,57 +323,33 @@ export function SettingsPage() {
                 <CardTitle className="text-xs font-mono uppercase tracking-widest text-muted-foreground">notification channels</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-3">
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2">email</div>
+                <SettingsSection title="email">
                   <div className="space-y-2">
                     {(['firing', 'pending'] as const).map(status => (
-                      <div key={status} className="flex items-center justify-between">
-                        <label className="text-sm text-foreground">
-                          email · {status} alerts
-                        </label>
-                        <button
-                          onClick={() => toggleNotif(`email_${status}` as keyof NotificationChannel)}
-                          className="w-9 h-5 border border-border relative transition-colors"
-                          style={{
-                            background: notifs[`email_${status}`] ? 'var(--accent)' : 'var(--surface-2)',
-                          }}
-                        >
-                          <span className="absolute top-0.5 transition-all"
-                            style={{
-                              left: notifs[`email_${status}`] ? '18px' : '0px',
-                              color: 'var(--bg)'
-                            }}>
-                            ●
-                          </span>
-                        </button>
+                      <div key={status}>
+                        <NotificationToggle
+                          label={`email · ${status} alerts`}
+                          checked={notifs[`email_${status}`]}
+                          onChange={() => toggleNotif(`email_${status}` as keyof NotificationChannel)}
+                          status={status}
+                          service="email"
+                        />
                       </div>
                     ))}
                   </div>
-                </div>
+                </SettingsSection>
 
-                <div className="border-t border-border pt-4 space-y-3">
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2">telegram</div>
+                <SettingsSection title="telegram" className="border-t border-border pt-4">
                   <div className="space-y-2">
                     {(['firing', 'pending'] as const).map(status => (
-                      <div key={status} className="flex items-center justify-between">
-                        <label className="text-sm text-foreground">
-                          telegram · {status} alerts
-                        </label>
-                        <button
-                          onClick={() => toggleNotif(`telegram_${status}` as keyof NotificationChannel)}
-                          className="w-9 h-5 border border-border relative transition-colors"
-                          style={{
-                            background: notifs[`telegram_${status}`] ? 'var(--accent)' : 'var(--surface-2)',
-                          }}
-                        >
-                          <span className="absolute top-0.5 transition-all"
-                            style={{
-                              left: notifs[`telegram_${status}`] ? '18px' : '0px',
-                              color: 'var(--bg)'
-                            }}>
-                            ●
-                          </span>
-                        </button>
+                      <div key={status}>
+                        <NotificationToggle
+                          label={`telegram · ${status} alerts`}
+                          checked={notifs[`telegram_${status}`]}
+                          onChange={() => toggleNotif(`telegram_${status}` as keyof NotificationChannel)}
+                          status={status}
+                          service="telegram"
+                        />
                       </div>
                     ))}
                   </div>
@@ -374,31 +361,19 @@ export function SettingsPage() {
                       onChange={e=>setNotifs(n=>({...n, telegram_chat_id: e.target.value}))}
                     />
                   </div>
-                </div>
+                </SettingsSection>
 
-                <div className="border-t border-border pt-4 space-y-3">
-                  <div className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-2">slack</div>
+                <SettingsSection title="slack" className="border-t border-border pt-4">
                   <div className="space-y-2">
                     {(['firing', 'pending'] as const).map(status => (
-                      <div key={status} className="flex items-center justify-between">
-                        <label className="text-sm text-foreground">
-                          slack · {status} alerts
-                        </label>
-                        <button
-                          onClick={() => toggleNotif(`slack_${status}` as keyof NotificationChannel)}
-                          className="w-9 h-5 border border-border relative transition-colors"
-                          style={{
-                            background: notifs[`slack_${status}`] ? 'var(--accent)' : 'var(--surface-2)',
-                          }}
-                        >
-                          <span className="absolute top-0.5 transition-all"
-                            style={{
-                              left: notifs[`slack_${status}`] ? '18px' : '0px',
-                              color: 'var(--bg)'
-                            }}>
-                            ●
-                          </span>
-                        </button>
+                      <div key={status}>
+                        <NotificationToggle
+                          label={`slack · ${status} alerts`}
+                          checked={notifs[`slack_${status}`]}
+                          onChange={() => toggleNotif(`slack_${status}` as keyof NotificationChannel)}
+                          status={status}
+                          service="slack"
+                        />
                       </div>
                     ))}
                   </div>
@@ -410,7 +385,7 @@ export function SettingsPage() {
                       onChange={e=>setNotifs(n=>({...n, slack_webhook: e.target.value}))}
                     />
                   </div>
-                </div>
+                </SettingsSection>
               </CardContent>
             </Card>
           )}
@@ -421,67 +396,74 @@ export function SettingsPage() {
                 <CardTitle className="text-xs font-mono uppercase tracking-widest text-muted-foreground">preferences</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div>
-                  <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-2">theme</label>
-                  <Select defaultValue={theme} onValueChange={(v: any) => setTheme(v)}>
-                    <SelectTrigger className="font-mono text-xs max-w-xs"><SelectValue/></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="dark">dark</SelectItem>
-                      <SelectItem value="light">light</SelectItem>
-                      <SelectItem value="system">system (auto)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <SettingsSection title="theme">
+                  <div>
+                    <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-2">theme</label>
+                    <Select defaultValue={theme} onValueChange={(v: any) => setTheme(v)}>
+                      <SelectTrigger className="font-mono text-xs max-w-xs"><SelectValue/></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="dark">dark</SelectItem>
+                        <SelectItem value="light">light</SelectItem>
+                        <SelectItem value="system">system (auto)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </SettingsSection>
 
-                <div>
-                  <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-2">default date range</label>
-                  <Select defaultValue={preferences.defaultWindow} onValueChange={(v: any) => setPreferences(p => ({...p, defaultWindow: v}))}>
-                    <SelectTrigger className="font-mono text-xs max-w-xs"><SelectValue/></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="mtd">mtd · month to date</SelectItem>
-                      <SelectItem value="7d">last 7d</SelectItem>
-                      <SelectItem value="30d">last 30d</SelectItem>
-                      <SelectItem value="90d">last 90d</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <SettingsSection title="default date range">
+                  <div>
+                    <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-2">default date range</label>
+                    <Select defaultValue={preferences.defaultWindow} onValueChange={(v: any) => setPreferences(p => ({...p, defaultWindow: v}))}>
+                      <SelectTrigger className="font-mono text-xs max-w-xs"><SelectValue/></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mtd">mtd · month to date</SelectItem>
+                        <SelectItem value="7d">last 7d</SelectItem>
+                        <SelectItem value="30d">last 30d</SelectItem>
+                        <SelectItem value="90d">last 90d</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </SettingsSection>
 
-                <div>
-                  <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-2">language</label>
-                  <Select defaultValue={preferences.language} onValueChange={(v: any) => setPreferences(p => ({...p, language: v}))}>
-                    <SelectTrigger className="font-mono text-xs max-w-xs"><SelectValue/></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">English (US)</SelectItem>
-                      <SelectItem value="en-GB">English (UK)</SelectItem>
-                      <SelectItem value="de">Deutsch</SelectItem>
-                      <SelectItem value="fr">Français</SelectItem>
-                      <SelectItem value="it">Italiano</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <SettingsSection title="language">
+                  <div>
+                    <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-2">language</label>
+                    <Select defaultValue={preferences.language} onValueChange={(v: any) => setPreferences(p => ({...p, language: v}))}>
+                      <SelectTrigger className="font-mono text-xs max-w-xs"><SelectValue/></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="en">English (US)</SelectItem>
+                        <SelectItem value="en-GB">English (UK)</SelectItem>
+                        <SelectItem value="de">Deutsch</SelectItem>
+                        <SelectItem value="fr">Français</SelectItem>
+                        <SelectItem value="it">Italiano</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </SettingsSection>
 
-                <div>
-                  <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-2">timezone</label>
-                  <Select defaultValue={preferences.timezone} onValueChange={(v: any) => setPreferences(p => ({...p, timezone: v}))}>
-                    <SelectTrigger className="font-mono text-xs max-w-xs"><SelectValue/></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="UTC">UTC</SelectItem>
-                      <SelectItem value="Europe/Rome">Europe/Rome</SelectItem>
-                      <SelectItem value="America/New_York">America/New_York</SelectItem>
-                      <SelectItem value="Asia/Tokyo">Asia/Tokyo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                <SettingsSection title="timezone">
+                  <div>
+                    <label className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground block mb-2">timezone</label>
+                    <Select defaultValue={preferences.timezone} onValueChange={(v: any) => setPreferences(p => ({...p, timezone: v}))}>
+                      <SelectTrigger className="font-mono text-xs max-w-xs"><SelectValue/></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="UTC">UTC</SelectItem>
+                        <SelectItem value="Europe/Rome">Europe/Rome</SelectItem>
+                        <SelectItem value="America/New_York">America/New_York</SelectItem>
+                        <SelectItem value="Asia/Tokyo">Asia/Tokyo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </SettingsSection>
 
-                <div className="border border-border p-4 bg-background">
-                  <div className="text-sm font-semibold text-foreground mb-2">appearance</div>
+                <SettingsSection title="appearance" className="border border-border p-4 bg-background">
                   <div className="flex items-center justify-between">
                     <label className="text-sm text-foreground cursor-pointer">show scanlines overlay</label>
                     <button className="w-9 h-5 border border-border relative">
                       <span className="absolute top-0.5 left-18 transition-all" style={{ color: 'var(--bg)' }}>●</span>
                     </button>
                   </div>
-                </div>
+                </SettingsSection>
               </CardContent>
             </Card>
           )}
