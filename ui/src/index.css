@@ -3,6 +3,7 @@
 @import "@fontsource/inter";
 @import "@fontsource/jetbrains-mono";
 @import "@fontsource/doto";
+@import "@fontsource/press-start-2p";
 
 
 @custom-variant dark (&:is(.dark *));
@@ -1745,8 +1746,21 @@
 .login-brand {
   position: relative;
   background:
-    linear-gradient(var(--color-border-2) 1px, transparent 1px) 0 0 / 32px 32px,
-    linear-gradient(90deg, var(--color-border-2) 1px, transparent 1px) 0 0 / 32px 32px,
+    radial-gradient(circle at 25% 15%, color-mix(in oklab, var(--color-primary) 25%, transparent) 0%, transparent 45%),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 2px,
+      rgba(255,255,255,0.02) 2px,
+      rgba(255,255,255,0.02) 3px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 2px,
+      rgba(255,255,255,0.02) 2px,
+      rgba(255,255,255,0.02) 3px
+    ),
     var(--color-surface);
   border-right: 1px solid var(--color-border);
   padding: 56px;
@@ -1766,23 +1780,29 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: var(--font-mono);
-  font-size: 16px;
-  font-weight: 600;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  font-weight: 400;
   color: var(--color-fg);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 .login-brand-mark .caret { color: var(--color-accent); }
 .login-brand-headline { position: relative; max-width: 480px; }
 .login-brand-headline h1 {
-  font-size: 36px;
-  line-height: 1.15;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 22px;
+  line-height: 1.5;
+  font-weight: 400;
+  letter-spacing: 0;
   color: var(--color-fg);
   margin: 0 0 16px;
 }
-.login-brand-headline h1 .accent { color: var(--color-primary); }
+.login-brand-headline h1 .accent {
+  color: var(--color-primary);
+  text-shadow:
+    2px 0 0 color-mix(in oklab, var(--color-primary) 50%, #000),
+    0 2px 0 color-mix(in oklab, var(--color-primary) 50%, #000);
+}
 .login-brand-headline p {
   font-size: 15px;
   line-height: 1.55;
