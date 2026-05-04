@@ -29,6 +29,11 @@ module.exports = {
   verbose: true,
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
-    '^@/services/apiClient$': '<rootDir>/src/__mocks__/services/apiClient.ts',
+    '^@/components/shared$': '<rootDir>/src/__mocks__/components/shared/index.ts',
+    '^@/services/apiClient$': '<rootDir>/src/__mocks__/apiClient.ts',
+    '^@/contexts/ToastContext$': '<rootDir>/src/__mocks__/contexts/ToastContext.tsx',
+    '^@/contexts/DateRangeContext$': '<rootDir>/src/__mocks__/contexts/DateRangeContext.tsx',
+    '^@/api/hooks$': '<rootDir>/src/__mocks__/api/hooks/index.ts',
+    '^@tanstack/react-query$': '<rootDir>/node_modules/@tanstack/react-query/build/legacy/index.cjs',
   },
 }
