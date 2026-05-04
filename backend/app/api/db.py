@@ -170,11 +170,13 @@ def get_sync_pool() -> ConnectionPool:
     if os.environ.get("TESTING"):
         if _sync_pool is None:
             init_sync_pool()
-        assert _sync_pool is not None
+        if _sync_pool is None:
+            raise ValueError("Sync connection pool not initialized")
         return _sync_pool
     if _sync_pool is None:
         init_sync_pool()
-    assert _sync_pool is not None
+    if _sync_pool is None:
+        raise ValueError("Sync connection pool not initialized")
     return _sync_pool
 
 
@@ -185,8 +187,8 @@ async def get_async_connection() -> AsyncIterator[AsyncConnection]:
     try:
         async with pool.connection() as conn:
             yield conn
-    except psycopg.PoolTimeout:  # type: ignore[attr-defined]
-        logger.error("Connection pool exhausted - no available connections")
+    except PoolTimeout:  # type: ignore[attr-defined]
+        logger.error("Async connection pool exhausted")
         raise
     except psycopg.Error as e:
         logger.exception("Database error: %s", e)
@@ -199,17 +201,10 @@ def get_connection() -> psycopg.Connection:
     try:
         conn = pool.getconn()
         if conn is None or conn.closed:
-            logger.warning("Got invalid connection from pool, creating new one")
-            # Create a new connection but track it properly
-            # Handle both string and callable conninfo
-            conninfo = pool.conninfo
-            if callable(conninfo):
-                conninfo = conninfo()
-            conn = psycopg.connect(
-                conninfo,
-                connect_timeout=10,
-                row_factory=dict_row,  # type: ignore[arg-type]
-            )
+            logger.warning("Got invalid connection from pool, closing and getting new one")
+            if conn is not None:
+                conn.close()
+            conn = pool.getconn()
         return conn
     except PoolTimeout:
         logger.error("Connection pool exhausted - no available connections")
