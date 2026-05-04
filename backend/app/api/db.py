@@ -211,16 +211,6 @@ def get_connection() -> psycopg.Connection:
     except psycopg.Error as e:
         logger.exception("Failed to get connection from pool: %s", e)
         raise
-    except psycopg.Error as e:
-        logger.exception("Failed to get connection from pool: %s", e)
-        raise
-    return conn
-    except PoolTimeout:
-        logger.error("Connection pool exhausted - no available connections")
-        raise
-    except psycopg.Error as e:
-        logger.exception("Failed to get connection from pool: %s", e)
-        raise
 
 
 def release_connection(conn: Optional[psycopg.Connection]) -> None:
@@ -264,14 +254,6 @@ def close_pools() -> None:
             _async_pool = None
 
     # Close sync pool
-    if _sync_pool is not None:
-        logger.info("Closing sync connection pool")
-        try:
-            _sync_pool.close()
-        except Exception as e:
-            logger.exception("Error closing sync connection pool: %s", e)
-        finally:
-            _sync_pool = None
     if _sync_pool is not None:
         logger.info("Closing sync connection pool")
         try:
