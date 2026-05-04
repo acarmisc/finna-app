@@ -2,7 +2,8 @@
 @import "tw-animate-css";
 @import "@fontsource/inter";
 @import "@fontsource/jetbrains-mono";
-@import "@fontsource/doto";
+@import "@fontsource/doto/400.css";
+@import "@fontsource/doto/500.css";
 @import "@fontsource/press-start-2p";
 @import "@fontsource/vt323";
 

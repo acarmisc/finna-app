@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".."))
 from .. import auth as api_auth
-from ..db import insert_and_return, query_one
+from ..db import execute, insert_and_return, query_one
 
 require_auth = api_auth.require_auth
 logger = logging.getLogger("api.auth")
@@ -31,7 +31,7 @@ class TokenRequest(BaseModel):
 @router.post("/auth/token")
 async def login_token(req: TokenRequest) -> dict[str, Any]:
     """Authenticate user and return JWT token."""
-    from ..auth import create_access_token, pwd_context
+    from ..auth import create_access_token, verify_password
 
     row = query_one(
         "SELECT id, username, hashed_password, is_active, is_admin FROM auth_users WHERE username = %s",
@@ -39,13 +39,83 @@ async def login_token(req: TokenRequest) -> dict[str, Any]:
     )
     if not row or not row.get("hashed_password"):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    if not pwd_context.verify(req.password, row["hashed_password"]):
+    if not verify_password(req.password, row["hashed_password"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     if not row.get("is_active"):
         raise HTTPException(status_code=403, detail="Account is disabled")
 
     token = create_access_token(data={"sub": row["username"], "is_admin": bool(row.get("is_admin", False))})
     return {"token": token}
+
+
+@router.get("/auth/github")
+async def github_redirect() -> dict[str, Any]:
+    """Return GitHub OAuth redirect URL."""
+    from ..auth import get_github_redirect_url
+    url = get_github_redirect_url()
+    if not url:
+        return {"error": "GitHub OAuth not configured", "url": None}
+    return {"url": url}
+
+
+class GitHubCallbackRequest(BaseModel):
+    code: str
+
+
+@router.post("/auth/github/callback")
+async def github_callback(req: GitHubCallbackRequest) -> dict[str, Any]:
+    """Exchange GitHub code for JWT token."""
+    from ..auth import (
+        GITHUB_CLIENT_ID,
+        create_access_token,
+        exchange_github_code,
+        get_github_user,
+        get_github_user_emails,
+    )
+
+    if not GITHUB_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="GitHub OAuth not configured")
+
+    token_data = await exchange_github_code(req.code)
+    if not token_data or "access_token" not in token_data:
+        raise HTTPException(status_code=400, detail="Failed to exchange code for token")
+
+    access_token = token_data["access_token"]
+    github_user = await get_github_user(access_token)
+    if not github_user:
+        raise HTTPException(status_code=400, detail="Failed to get GitHub user")
+
+    github_id = str(github_user.get("id", ""))
+    username = github_user.get("login", "")
+    email = github_user.get("email")
+
+    if not email:
+        emails = await get_github_user_emails(access_token)
+        for e in emails:
+            if e.get("primary"):
+                email = e.get("email")
+                break
+
+    if not email:
+        raise HTTPException(status_code=400, detail="No email found in GitHub account")
+
+    row = query_one("SELECT id, username, is_active, is_admin FROM auth_users WHERE github_id = %s", (github_id,))
+
+    if not row:
+        user_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc)
+        execute(
+            "INSERT INTO auth_users (id, username, email, github_id, is_active, created_at, updated_at) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+            (user_id, username, email, github_id, True, now, now),
+        )
+        row = {"id": user_id, "username": username, "is_active": True, "is_admin": False}
+
+    if not row.get("is_active"):
+        raise HTTPException(status_code=403, detail="Account is disabled")
+
+    jwt_token = create_access_token(data={"sub": row["username"], "is_admin": bool(row.get("is_admin", False))})
+    return {"token": jwt_token}
 
 
 class GCPRegisterRequest(BaseModel):

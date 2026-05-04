@@ -9,11 +9,15 @@ from typing import Any, Optional
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 
 JWT_SECRET = os.getenv("JWT_SECRET", "default-secret-key-change-in-production")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXPIRATION_MINUTES = int(os.getenv("JWT_EXPIRATION_MINUTES", "60"))
+
+GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
+GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
+GITHUB_CALLBACK_URL = os.getenv("GITHUB_CALLBACK_URL", "http://localhost:5173/#/auth/callback")
 
 # Simple in-memory user storage (for demo purposes)
 USERS_TABLE = {
@@ -24,19 +28,16 @@ USERS_TABLE = {
     }
 }
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
-
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against a hash."""
-    return pwd_context.verify(plain_password, hashed_password)  # type: ignore[no-any-return]
+    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
 
 def get_password_hash(password: str) -> str:
     """Hash a password."""
-    return pwd_context.hash(password)  # type: ignore[no-any-return]
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def create_access_token(data: dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
@@ -121,3 +122,71 @@ async def token_verification_middleware(request: Request, call_next):
                     headers={"WWW-Authenticate": "Bearer"},
                 )
     return await call_next(request)
+
+
+def get_github_redirect_url() -> str | None:
+    """Generate GitHub OAuth redirect URL."""
+    if not GITHUB_CLIENT_ID:
+        return None
+    import urllib.parse
+    params = urllib.parse.urlencode({
+        "client_id": GITHUB_CLIENT_ID,
+        "redirect_uri": GITHUB_CALLBACK_URL,
+        "scope": "read:user email",
+        "state": "finna-oauth",
+    })
+    return f"https://github.com/login/oauth/authorize?{params}"
+
+
+async def exchange_github_code(code: str) -> dict[str, Any] | None:
+    """Exchange GitHub code for access token."""
+    import httpx
+    if not GITHUB_CLIENT_ID or not GITHUB_CLIENT_SECRET:
+        return None
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://github.com/login/oauth/access_token",
+            data={
+                "client_id": GITHUB_CLIENT_ID,
+                "client_secret": GITHUB_CLIENT_SECRET,
+                "code": code,
+                "redirect_uri": GITHUB_CALLBACK_URL,
+            },
+            headers={"Accept": "application/json"},
+        )
+        if response.status_code != 200:
+            return None
+        return response.json()
+
+
+async def get_github_user(access_token: str) -> dict[str, Any] | None:
+    """Get GitHub user info using access token."""
+    import httpx
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://api.github.com/user",
+            headers={
+                "Authorization": f"token {access_token}",
+                "Accept": "application/json",
+            },
+        )
+        if response.status_code != 200:
+            return None
+        return response.json()
+
+
+async def get_github_user_emails(access_token: str) -> list[dict[str, Any]]:
+    """Get GitHub user emails."""
+    import httpx
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            "https://api.github.com/user/emails",
+            headers={
+                "Authorization": f"token {access_token}",
+                "Accept": "application/json",
+            },
+        )
+        if response.status_code != 200:
+            return []
+        return response.json()
