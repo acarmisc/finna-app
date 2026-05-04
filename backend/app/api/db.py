@@ -130,12 +130,13 @@ def get_sync_pool() -> ConnectionPool | None:
 async def get_async_connection() -> AsyncIterator[AsyncConnection]:
     """Get an async PostgreSQL connection from the pool."""
     pool = await get_async_pool()
-    assert pool is not None
+    if pool is None:
+        raise ValueError("Async pool not initialized")
     try:
         async with pool.connection() as conn:
             yield conn
-    except psycopg.PoolTimeout:  # type: ignore[attr-defined]
-        logger.error("Connection pool exhausted - no available connections")
+    except PoolTimeout:  # type: ignore[attr-defined]
+        logger.error("Async connection pool exhausted")
         raise
     except psycopg.Error as e:
         logger.exception("Database error: %s", e)
@@ -145,11 +146,13 @@ async def get_async_connection() -> AsyncIterator[AsyncConnection]:
 def get_connection() -> psycopg.Connection:
     """Get a sync PostgreSQL connection from the pool."""
     pool = get_sync_pool()
-    assert pool is not None
+    if pool is None:
+        raise ValueError("Sync pool not initialized")
     try:
         conn = pool.getconn()
         if conn is None or conn.closed:
-            conn = psycopg.connect(pool.dsn, row_factory=dict_row)  # type: ignore[attr-defined,arg-type]
+            pool.putconn(conn)  # return the bad conn so pool can dispose it
+            raise ConnectionError("Pool returned invalid/closed connection")
         return conn
     except PoolTimeout:
         logger.error("Connection pool exhausted - no available connections")
@@ -176,8 +179,8 @@ def close_pools() -> None:
                 loop.create_task(_async_pool.close())
             else:
                 loop.run_until_complete(_async_pool.close())
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001
+            logger.exception("Failed to close async pool cleanly")
         _async_pool = None
     if _sync_pool is not None:
         logger.info("Closing sync connection pool")
