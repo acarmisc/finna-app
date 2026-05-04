@@ -1,3 +1,6 @@
+import React from 'react'
+
+export const Badge = () => <span data-testid="mock-badge">badge</span>
 export const Icon = () => <span data-testid="mock-icon">icon</span>
 export const Button = () => <button data-testid="mock-button">Button</button>
 export const ProviderBadge = () => <span data-testid="mock-provider-badge">badge</span>
