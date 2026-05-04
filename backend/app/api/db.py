@@ -201,8 +201,9 @@ def get_connection() -> psycopg.Connection:
     try:
         conn = pool.getconn()
         if conn is None or conn.closed:
-            logger.warning("Got invalid connection from pool, returning to pool for cleanup")
-            pool.putconn(conn, close=True)
+            logger.warning("Got invalid connection from pool, closing and getting new one")
+            if conn is not None:
+                conn.close()
             conn = pool.getconn()
         return conn
     except PoolTimeout:
