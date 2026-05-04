@@ -184,13 +184,24 @@ async def export_costs(
 
     results = query_all(sql, tuple(params))
 
-    import csv, io
+    import csv
+    import io
     out = io.StringIO()
     w = csv.writer(out)
     w.writerow(["id", "provider", "project", "sku", "date", "amount", "currency"])
     for r in results:
-        w.writerow([r["record_id"], r["provider"], r["project_name"], r["service_name"],
-            r["usage_start"].isoformat() if r["usage_start"] else "", r["net_cost_usd"], r.get("currency_original", "USD")])
+        date_str = r["usage_start"].isoformat() if r["usage_start"] else ""
+        w.writerow(
+            [
+                r["record_id"],
+                r["provider"],
+                r["project_name"],
+                r["service_name"],
+                date_str,
+                r["net_cost_usd"],
+                r.get("currency_original", "USD"),
+            ]
+        )
 
     return StreamingResponse(iter([out.getvalue()]), media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=costs.csv"})
