@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useState, useCallback, useMemo } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { Icon } from '@/components/shared'
 import { cn } from '@/lib/utils'
 
@@ -8,10 +8,159 @@ export interface SidebarProps {
   onToggle?: () => void
   activeBase?: string
   onLogout?: () => void
-  alertCount?: number
-  userEmail?: string
-  userOrg?: string
-  apiHealthy?: boolean
+  counts?: Record<string, number>
+}
+
+// Reusable Logo component
+const Logo: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ collapsed, onToggle }) => (
+  <div className="sb-logo" onClick={onToggle} role="button" tabIndex={0} aria-label="Toggle navigation">
+    <span className="caret">{collapsed ? '‹' : '›'}</span>
+    {!collapsed && (
+      <>
+        <span className="wordmark">finna</span>
+        <span className="cursor" aria-hidden="true" />
+      </>
+    )}
+  </div>
+)
+
+// Reusable NavItem component
+interface NavItemProps {
+  item: NonNullable<typeof NAV_ITEMS[number]>
+  active: boolean
+  collapsed: boolean
+  counts: Record<string, number>
+  onNavigate: (path: string) => void
+}
+
+const NavItem: React.FC<NavItemProps> = ({ item, active, collapsed, counts, onNavigate }) => {
+  // Only render sections as dividers, skip navigation items for sections
+  if (item.sec) return null
+
+  const handleClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault()
+    onNavigate(item.path!)
+  }, [item.path, onNavigate])
+
+  return (
+    <a
+      key={item.id}
+      className={cn('sb-item', active && 'active')}
+      href={`#${item.path}`}
+      onClick={handleClick}
+      data-label={item.label}
+      title={collapsed ? item.label : undefined}
+      aria-current={active ? 'page' : undefined}
+    >
+      <Icon name={item.icon!} size={16} aria-hidden="true" />
+      <span className="label">{item.label}</span>
+      {item.countKey && counts[item.countKey] > 0 && (
+        <span className="count" aria-label={`${item.label} count: ${counts[item.countKey]}`}>
+          {counts[item.countKey]}
+        </span>
+      )}
+    </a>
+  )
+}
+
+// Reusable UserMenu component
+interface UserMenuProps {
+  open: boolean
+  onToggle: () => void
+  onNavigateToSettings: () => void
+  onLogout: () => void
+}
+
+const UserMenu: React.FC<UserMenuProps> = ({ open, onToggle, onNavigateToSettings, onLogout }) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onToggle()
+    }
+  }, [onToggle])
+
+  return (
+    <>
+      <button
+        className="icon-btn"
+        onClick={onToggle}
+        title="Account"
+        aria-haspopup="true"
+        aria-expanded={open}
+        onKeyDown={handleKeyDown}
+      >
+        <Icon name="chevron-up" size={14} aria-hidden="true" />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          style={{
+            position: 'absolute',
+            bottom: 'calc(100% + 4px)',
+            right: 8,
+            left: 8,
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            boxShadow: '0 4px 0 rgba(0,0,0,0.3)',
+            zIndex: 20,
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              onToggle()
+            }
+          }}
+        >
+          <a
+            href="#/settings"
+            onClick={(e) => {
+              e.preventDefault()
+              onToggle()
+              onNavigateToSettings()
+            }}
+            role="menuitem"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 12px',
+              fontSize: 12,
+              color: 'var(--fg)',
+              borderBottom: '1px solid var(--border-2)',
+              cursor: 'pointer',
+            }}
+          >
+            <Icon name="settings-2" size={14} aria-hidden="true" />
+            <span>Settings</span>
+          </a>
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              onToggle()
+              onLogout()
+            }}
+            role="menuitem"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '8px 12px',
+              fontSize: 12,
+              color: 'var(--danger)',
+              cursor: 'pointer',
+              fontFamily: 'JetBrains Mono, monospace',
+              background: 'none',
+              border: 'none',
+              width: '100%',
+              textAlign: 'left',
+            }}
+          >
+            <Icon name="log-out" size={14} aria-hidden="true" />
+            <span>Log out</span>
+          </button>
+        </div>
+      )}
+    </>
+  )
 }
 
 type NavItem = {
@@ -37,250 +186,87 @@ const NAV_ITEMS: Array<SectionItem | NavItem> = [
   { id: 'settings', label: 'Settings', icon: 'settings-2', path: '/settings' },
 ]
 
-interface NavLinkProps {
-  item: NavItem
-  active: boolean
-  count?: number
-  collapsed?: boolean
-  onClick: (path: string) => void
-}
-
-const NavLink = React.memo<NavLinkProps>(({ item, active, count, collapsed, onClick }) => {
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    onClick(item.path)
-  }, [item.path, onClick])
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      onClick(item.path)
-    }
-  }, [item.path, onClick])
-
-  return (
-    <a
-      className={cn('sb-item', active && 'active')}
-      title={collapsed ? item.label : undefined}
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-      href={`#${item.path}`}
-      role="menuitem"
-      tabIndex={0}
-      aria-current={active ? 'page' : undefined}
-    >
-      <Icon name={item.icon} size={16} aria-hidden="true" />
-      <span className="label">{item.label}</span>
-      {item.countKey != null && count != null && count > 0 && (
-        <span className="count" aria-label={`${count} items`}>{count}</span>
-      )}
-    </a>
-  )
-})
-NavLink.displayName = 'NavLink'
-
-interface MenuItemProps {
-  icon: string
-  label: string
-  danger?: boolean
-  onClick: () => void
-}
-
-const menuItemStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 8,
-  padding: '8px 12px',
-  fontSize: 12,
-  cursor: 'pointer',
-}
-
-const MenuItem = React.memo<MenuItemProps>(({ icon, label, danger, onClick }) => {
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    onClick()
-  }, [onClick])
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault()
-      onClick()
-    }
-  }, [onClick])
-
-  return (
-    <a
-      style={{
-        ...menuItemStyle,
-        color: danger ? 'var(--danger)' : 'var(--fg)',
-        borderBottom: '1px solid var(--border-2)',
-        fontFamily: danger ? 'JetBrains Mono, monospace' : undefined,
-      }}
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-      href="#"
-      role="menuitem"
-      tabIndex={0}
-    >
-      <Icon name={icon} size={14} aria-hidden="true" />
-      <span>{label}</span>
-    </a>
-  )
-})
-MenuItem.displayName = 'MenuItem'
-
 const Sidebar: React.FC<SidebarProps> = ({
   collapsed,
   onToggle,
   activeBase = '/dashboard',
   onLogout,
-  alertCount = 0,
-  userEmail = 'finops@acme.co',
-  userOrg = 'API',
-  apiHealthy = true,
+  counts: incomingCounts = {},
 }) => {
-  const [menu, setMenu] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
 
+  // Memoize counts object to prevent unnecessary recalculations
+  const counts = useMemo(() => ({
+    alerts: incomingCounts.alerts ?? 0, // Default to 0 if not provided
+    ...incomingCounts,
+  }), [incomingCounts])
+
+  // Use useCallback for event handlers to prevent unnecessary re-renders
   const handleNavigate = useCallback((path: string) => {
     navigate(path)
   }, [navigate])
 
-  const handleToggleMenu = useCallback(() => {
-    setMenu((m: boolean) => !m)
-  }, [])
-
-  const handleLogout = useCallback(() => {
-    setMenu(false)
-    onLogout?.()
-  }, [onLogout])
-
-  const handleSettings = useCallback(() => {
-    setMenu(false)
+  const handleNavigateToSettings = useCallback(() => {
     navigate('/settings')
   }, [navigate])
 
-  useEffect(() => {
-    if (!menu) return
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        menuRef.current && !menuRef.current.contains(e.target as Node) &&
-        triggerRef.current && !triggerRef.current.contains(e.target as Node)
-      ) {
-        setMenu(false)
-      }
-    }
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenu(false)
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [menu])
+  const handleLogout = useCallback(() => {
+    onLogout?.()
+  }, [onLogout])
 
-  const navSections = useMemo(() => {
-    const sections: Array<{ sec?: string; items: NavItem[] }> = []
-    let current: { sec?: string; items: NavItem[] } = { items: [] }
-    for (const item of NAV_ITEMS) {
-      if ('sec' in item) {
-        if (current.items.length > 0) sections.push(current)
-        current = { sec: item.sec, items: [] }
-      } else {
-        current.items.push(item as NavItem)
-      }
+  // Handle keyboard events for logo button
+  const handleLogoKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onToggle?.()
     }
-    if (current.items.length > 0) sections.push(current)
-    return sections
-  }, [])
-
-  const counts: Record<string, number> = useMemo(() => ({ alerts: alertCount }), [alertCount])
+  }, [onToggle])
 
   return (
     <aside className={cn('sb', collapsed && 'sb-collapsed')} aria-label="Main navigation">
-      <div
-        className="sb-logo"
-        onClick={onToggle}
-        role="button"
-        tabIndex={0}
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onToggle?.() }}
-      >
-        <span className="caret" aria-hidden="true">{collapsed ? '‹' : '›'}</span>
-        {!collapsed && (
-          <>
-            <span className="wordmark">finna</span>
-            <span className="cursor" aria-hidden="true" />
-          </>
-        )}
-      </div>
-      <nav className="sb-nav" role="navigation" aria-label="Primary">
-        {navSections.map((section, si) => (
-          <React.Fragment key={section.sec ?? `section-${si}`}>
-            {section.sec && (
-              <div className="sb-section" aria-hidden="true">{section.sec}</div>
-            )}
-            {section.items.map((item) => (
-              <NavLink
-                key={item.id}
-                item={item}
-                active={activeBase === item.path}
-                count={item.countKey ? counts[item.countKey] : undefined}
-                collapsed={collapsed}
-                onClick={handleNavigate}
-              />
-            ))}
-          </React.Fragment>
-        ))}
+      <Logo collapsed={collapsed} onToggle={onToggle || (() => {})} />
+      
+      <nav className="sb-nav" aria-label="Primary navigation">
+        {NAV_ITEMS.map((item) => {
+          if ('sec' in item) {
+            return (
+              <div key={item.sec} className="sb-section" role="separator" aria-label={item.sec}>
+                {item.sec}
+              </div>
+            )
+          }
+          
+          const active = activeBase === item.path
+          
+          return (
+            <NavItem
+              key={item.id}
+              item={item}
+              active={active}
+              collapsed={collapsed}
+              counts={counts}
+              onNavigate={handleNavigate}
+            />
+          )
+        })}
       </nav>
+      
       <div className="sb-foot" style={{ position: 'relative' }}>
-        <div className="avatar" aria-hidden="true">FN</div>
+        <div className="avatar" aria-label="User avatar">FN</div>
         <div className="who">
-          <div className="name">{userEmail}</div>
-          <div className="org">{userOrg} · {apiHealthy ? 'healthy' : 'degraded'}</div>
+          <div className="name">finops@acme.co</div>
+          <div className="org">API · healthy</div>
         </div>
-        <span
-          className="health"
-          title={apiHealthy ? 'API healthy' : 'API degraded'}
-          aria-label={apiHealthy ? 'API healthy' : 'API degraded'}
+        <span className="health" title="API healthy" aria-label="API status: healthy" />
+        
+        <UserMenu
+          open={menuOpen}
+          onToggle={() => setMenuOpen((m) => !m)}
+          onNavigateToSettings={handleNavigateToSettings}
+          onLogout={handleLogout}
         />
-        <button
-          ref={triggerRef}
-          className="icon-btn"
-          onClick={handleToggleMenu}
-          title="Account"
-          aria-label="Account menu"
-          aria-expanded={menu}
-          aria-controls={menu ? 'sb-account-menu' : undefined}
-          aria-haspopup="menu"
-        >
-          <Icon name="chevron-up" size={14} aria-hidden="true" />
-        </button>
-        {menu && (
-          <div
-            id="sb-account-menu"
-            ref={menuRef}
-            role="menu"
-            aria-label="Account menu"
-            style={{
-              position: 'absolute',
-              bottom: 'calc(100% + 4px)',
-              right: 8,
-              left: 8,
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              boxShadow: '0 4px 0 rgba(0,0,0,0.3)',
-              zIndex: 20,
-            }}
-          >
-            <MenuItem icon="settings-2" label="Settings" onClick={handleSettings} />
-            <MenuItem icon="log-out" label="Log out" danger onClick={handleLogout} />
-          </div>
-        )}
       </div>
     </aside>
   )
