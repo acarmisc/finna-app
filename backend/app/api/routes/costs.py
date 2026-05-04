@@ -76,7 +76,7 @@ async def list_costs(
     if start and not start_date:
         start_date = start
     end_date = end_date or datetime.now()
-    start_date, end_date = _resolve_window(window, start_date, end_date)  # type: ignore[arg-type]
+    start_date, end_date = _resolve_window(window, start_date, end_date)  # type: ignore[arg-type,return-assign]  # type: ignore[arg-type]
 
     conditions = []
     params = []
@@ -165,7 +165,7 @@ async def export_costs(
 ) -> StreamingResponse:
     """Export cost data as CSV."""
     end_date = end_date or datetime.now()
-    start_date, end_date = _resolve_window(window, start_date, end_date)
+    start_date, end_date = _resolve_window(window, start_date, end_date)  # type: ignore[arg-type,return-assign]
 
     conditions, params = [], []
     if provider:
@@ -175,7 +175,7 @@ async def export_costs(
         conditions.append("project_name = %s")
         params.append(project)
     conditions.extend(["usage_start >= %s", "usage_start <= %s"])
-    params.extend([start_date, end_date])
+    params.extend([start_date, end_date])  # type: ignore[list-item]
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
@@ -350,7 +350,7 @@ async def get_daily_costs(
     end_date = end_date or datetime.now()
     if not isinstance(end_date, datetime):
         end_date = datetime.fromisoformat(end_date)  # type: ignore[assignment]
-    start_date, end_date = _resolve_window(window, start_date, end_date)  # type: ignore[arg-type]
+    start_date, end_date = _resolve_window(window, start_date, end_date)  # type: ignore[arg-type,return-assign]  # type: ignore[arg-type]
 
     conditions = ["DATE(usage_start) >= %s", "DATE(usage_start) <= %s"]
     _sd = start_date.date() if hasattr(start_date, "date") else start_date  # type: ignore[union-attr]
@@ -414,7 +414,7 @@ async def cost_summary(
     end_date = end_date or datetime.now()
     if not isinstance(end_date, datetime):
         end_date = datetime.fromisoformat(end_date)  # type: ignore[assignment]
-    start_date, end_date = _resolve_window(window, start_date, end_date)  # type: ignore[arg-type]
+    start_date, end_date = _resolve_window(window, start_date, end_date)  # type: ignore[arg-type,return-assign]  # type: ignore[arg-type]
 
     sql = (
         "SELECT provider, SUM(net_cost_usd) as total "
@@ -471,7 +471,7 @@ async def cost_breakdown(
         start_date = datetime.fromisoformat(start_date)  # type: ignore[assignment]
     if isinstance(end_date, str):
         end_date = datetime.fromisoformat(end_date)  # type: ignore[assignment]
-    start_date, end_date = _resolve_window(window, start_date, end_date)  # type: ignore[arg-type]
+    start_date, end_date = _resolve_window(window, start_date, end_date)  # type: ignore[arg-type,return-assign]  # type: ignore[arg-type]
 
     conditions = []
     params = []
