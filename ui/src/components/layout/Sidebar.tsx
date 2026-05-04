@@ -26,7 +26,7 @@ const Logo: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ collapse
 
 // Reusable NavItem component
 interface NavItemProps {
-  item: NonNullable<typeof NAV_ITEMS[number]>
+  item: NavItem
   active: boolean
   collapsed: boolean
   counts: Record<string, number>
@@ -34,12 +34,9 @@ interface NavItemProps {
 }
 
 const NavItem: React.FC<NavItemProps> = ({ item, active, collapsed, counts, onNavigate }) => {
-  // Only render sections as dividers, skip navigation items for sections
-  if (item.sec) return null
-
   const handleClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault()
-    onNavigate(item.path!)
+    onNavigate(item.path)
   }, [item.path, onNavigate])
 
   return (
@@ -226,7 +223,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside className={cn('sb', collapsed && 'sb-collapsed')} aria-label="Main navigation">
-      <Logo collapsed={collapsed} onToggle={onToggle || (() => {})} />
+      <Logo collapsed={!!collapsed} onToggle={onToggle || (() => {})} />
       
       <nav className="sb-nav" aria-label="Primary navigation">
         {NAV_ITEMS.map((item) => {
@@ -243,9 +240,9 @@ const Sidebar: React.FC<SidebarProps> = ({
           return (
             <NavItem
               key={item.id}
-              item={item}
+              item={item as NavItem}
               active={active}
-              collapsed={collapsed}
+              collapsed={!!collapsed}
               counts={counts}
               onNavigate={handleNavigate}
             />
