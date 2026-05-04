@@ -1,6 +1,9 @@
 -- FinOps Multi-Cloud Monitoring — Database Initialization (Docker-friendly)
 -- PostgreSQL 16
 
+-- Enable pgcrypto extension for crypt function
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- ─── Cost records ───────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS cost_records (
