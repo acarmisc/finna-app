@@ -36,9 +36,9 @@ class CostFilter(BaseModel):
 
 def _resolve_window(
     window: Optional[str],
-    start_date: Any,
+    start_date: Union[str, datetime, None],
     end_date: datetime,
-) -> tuple[Any, datetime]:
+) -> tuple[datetime, datetime]:
     """Resolve window shortcut + CLI aliases into concrete start/end dates."""
     if window and window not in ("mtd", "7d", "30d", "90d"):
         window = None
@@ -52,7 +52,10 @@ def _resolve_window(
     elif window == "90d":
         start = end_date - timedelta(days=90)
     else:
-        start = start_date or (end_date - timedelta(days=30))
+        if isinstance(start_date, str):
+            start = datetime.fromisoformat(start_date)
+        else:
+            start = start_date or (end_date - timedelta(days=30))
 
     return start, end_date
 
@@ -164,10 +167,21 @@ async def export_costs(
     window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
 ) -> StreamingResponse:
     """Export cost data as CSV."""
-    end_date = end_date or datetime.now()
-    start_date, end_date = _resolve_window(window, start_date, end_date)  # type: ignore[arg-type,return-assign]
+    end_date_val: datetime
+    if end_date is None:
+        end_date_val = datetime.now()
+    elif isinstance(end_date, str):
+        end_date_val = datetime.fromisoformat(end_date)
+    else:
+        end_date_val = end_date
+    if isinstance(start_date, str):
+        start_date_val = datetime.fromisoformat(start_date)
+    else:
+        start_date_val = start_date or datetime.now()
+    start_dt, end_dt = _resolve_window(window, start_date_val, end_date_val)
 
-    conditions, params = [], []
+    conditions: list[str] = []
+    params: list[Any] = []
     if provider:
         conditions.append("provider = %s")
         params.append(provider)
@@ -175,7 +189,7 @@ async def export_costs(
         conditions.append("project_name = %s")
         params.append(project)
     conditions.extend(["usage_start >= %s", "usage_start <= %s"])
-    params.extend([start_date, end_date])  # type: ignore[list-item]
+    params.extend([start_dt, end_dt])
 
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
@@ -190,18 +204,10 @@ async def export_costs(
     w = csv.writer(out)
     w.writerow(["id", "provider", "project", "sku", "date", "amount", "currency"])
     for r in results:
-        date_str = r["usage_start"].isoformat() if r["usage_start"] else ""
-        w.writerow(
-            [
-                r["record_id"],
-                r["provider"],
-                r["project_name"],
-                r["service_name"],
-                date_str,
-                r["net_cost_usd"],
-                r.get("currency_original", "USD"),
-            ]
-        )
+        usage_ts = r["usage_start"].isoformat() if r["usage_start"] else ""
+        currency = r.get("currency_original", "USD")
+        w.writerow([r["record_id"], r["provider"], r["project_name"], r["service_name"],
+            usage_ts, r["net_cost_usd"], currency])
 
     return StreamingResponse(iter([out.getvalue()]), media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=costs.csv"})
@@ -359,7 +365,7 @@ async def get_daily_costs(
 
     if provider:
         conditions.append("provider = %s")
-        params.append(provider)
+        params.append(provider)  # type: ignore[arg-type]
 
     sql = f"""
         SELECT

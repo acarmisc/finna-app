@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: finna-app-staging
-  labels:
-    name: finna-app-staging
-    purpose: finops-cost-tracking
-    environment: staging
