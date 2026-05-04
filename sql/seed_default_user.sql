@@ -1,4 +1,4 @@
 -- sql/seed_default_user.sql
-INSERT INTO users (username, password_hash, email, is_active, is_superuser)
-VALUES ('admin', crypt('admin_password', gen_salt('bf')), 'admin@example.com', true, true)
+INSERT INTO auth_users (username, email, hashed_password, is_active, is_admin)
+VALUES ('admin', 'admin@example.com', crypt('admin_password', '$2a$08$UYoRP.qb0Lx5AlFzlY0dnO'), true, true)
 ON CONFLICT (username) DO NOTHING;
