@@ -26,20 +26,17 @@ const Logo: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ collapse
 
 // Reusable NavItem component
 interface NavItemProps {
-  item: NonNullable<typeof NAV_ITEMS[number]>
+  item: NavItem
   active: boolean
   collapsed: boolean
   counts: Record<string, number>
   onNavigate: (path: string) => void
 }
 
-const NavItem: React.FC<NavItemProps> = ({ item, active, collapsed, counts, onNavigate }) => {
-  // Only render sections as dividers, skip navigation items for sections
-  if (item.sec) return null
-
+const NavItem: React.FC<NavItemProps> = ({ item, active, collapsed: isCollapsed, counts, onNavigate }) => {
   const handleClick = useCallback((e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault()
-    onNavigate(item.path!)
+    onNavigate(item.path)
   }, [item.path, onNavigate])
 
   return (
@@ -49,10 +46,10 @@ const NavItem: React.FC<NavItemProps> = ({ item, active, collapsed, counts, onNa
       href={`#${item.path}`}
       onClick={handleClick}
       data-label={item.label}
-      title={collapsed ? item.label : undefined}
+      title={isCollapsed ? item.label : undefined}
       aria-current={active ? 'page' : undefined}
     >
-      <Icon name={item.icon!} size={16} aria-hidden="true" />
+      <Icon name={item.icon} size={16} aria-hidden="true" />
       <span className="label">{item.label}</span>
       {item.countKey && counts[item.countKey] > 0 && (
         <span className="count" aria-label={`${item.label} count: ${counts[item.countKey]}`}>
@@ -173,6 +170,9 @@ type NavItem = {
 
 type SectionItem = { sec: string }
 
+const isSectionItem = (item: SectionItem | NavItem): item is SectionItem => 'sec' in item
+const isNavItem = (item: SectionItem | NavItem): item is NavItem => !('sec' in item)
+
 const NAV_ITEMS: Array<SectionItem | NavItem> = [
   { sec: 'Overview' },
   { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard', path: '/dashboard' },
@@ -187,12 +187,13 @@ const NAV_ITEMS: Array<SectionItem | NavItem> = [
 ]
 
 const Sidebar: React.FC<SidebarProps> = ({
-  collapsed,
+  collapsed: isCollapsedProp,
   onToggle,
   activeBase = '/dashboard',
   onLogout,
   counts: incomingCounts = {},
 }) => {
+  const collapsed = isCollapsedProp ?? false
   const [menuOpen, setMenuOpen] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
@@ -226,11 +227,11 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside className={cn('sb', collapsed && 'sb-collapsed')} aria-label="Main navigation">
-      <Logo collapsed={collapsed} onToggle={onToggle || (() => {})} />
+      <Logo collapsed={collapsed ?? false} onToggle={onToggle ?? (() => {})} />
       
       <nav className="sb-nav" aria-label="Primary navigation">
         {NAV_ITEMS.map((item) => {
-          if ('sec' in item) {
+          if (isSectionItem(item)) {
             return (
               <div key={item.sec} className="sb-section" role="separator" aria-label={item.sec}>
                 {item.sec}
