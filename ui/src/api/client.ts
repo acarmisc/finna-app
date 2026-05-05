@@ -105,9 +105,30 @@ apiClient.interceptors.response.use(
     } else if (error.response?.status === 401) {
       // Show notification for 401 errors
       if (typeof window !== "undefined") {
-        // You can use a notification library here, e.g., toast or alert
-        alert("Your session has expired. Please log in again.");
-        window.location.href = "/#/";
+        // Dispatch a custom event to handle the toast in a React component
+        const event = new CustomEvent("showToast", {
+          detail: {
+            message: "Your session has expired. Please log in again.",
+            type: "error",
+            description: "You will be redirected to the login page.",
+          },
+        });
+        window.dispatchEvent(event);
+        setTimeout(() => {
+          window.location.href = "/#/";
+        }, 3000); // Redirect after 3 seconds
+      }
+    } else if (error.response?.status === 404) {
+      // Handle 404 responses gracefully
+      if (typeof window !== "undefined") {
+        const event = new CustomEvent("showToast", {
+          detail: {
+            message: "Resource not found.",
+            type: "error",
+            description: "The requested resource could not be found.",
+          },
+        });
+        window.dispatchEvent(event);
       }
     }
 

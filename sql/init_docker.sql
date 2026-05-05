@@ -123,7 +123,10 @@ CREATE TABLE IF NOT EXISTS cloud_config (
     credential_type TEXT,
     config JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_test BOOLEAN,
+    last_test_at TIMESTAMPTZ,
+    err TEXT
 );
 
 -- ─── Auth ───────────────────────────────────────────────────────────────────
