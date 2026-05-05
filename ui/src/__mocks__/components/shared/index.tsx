@@ -1,5 +1,12 @@
+import React from 'react'
+
+export const Badge = () => <span data-testid="mock-badge">badge</span>
 export const Icon = () => <span data-testid="mock-icon">icon</span>
 export const Button = () => <button data-testid="mock-button">Button</button>
+export const ConfirmButton = () => <button data-testid="mock-confirm-button">confirm</button>
+export const CancelButton = () => <button data-testid="mock-cancel-button">cancel</button>
+export const DangerButton = () => <button data-testid="mock-danger-button">delete</button>
+export const AddButton = () => <button data-testid="mock-add-button">add</button>
 export const ProviderBadge = () => <span data-testid="mock-provider-badge">badge</span>
 export const StatusBadge = () => <span data-testid="mock-status-badge">status</span>
 export const SeverityBadge = () => <span data-testid="mock-severity-badge">severity</span>

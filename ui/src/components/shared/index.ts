@@ -1,5 +1,6 @@
 export { Icon } from './Icon'
-export { Button } from './Button'
+export { Button, ConfirmButton, CancelButton, DangerButton, AddButton } from './action-button'
+export { Badge } from './badge'
 export { ProviderBadge } from './provider-badge'
 export { StatusBadge } from './status-badge'
 export { SeverityBadge } from './severity-badge'
