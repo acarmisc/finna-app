@@ -1,0 +1,156 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+  API_IMAGE: ${{ github.repository }}/finops-api
+  EXTRACTOR_IMAGE: ${{ github.repository }}/finops-extractor
+
+jobs:
+  build-api:
+    name: Build & Push API Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.API_IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix=
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.api
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-extractor:
+    name: Build & Push Extractor Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.EXTRACTOR_IMAGE }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha,prefix=
+
+      - name: Build and push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile.extractor
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.EXTRACTOR_IMAGE }}:${{ steps.meta.outputs.version }}
+          format: sarif
+          output: trivy-results.sarif
+
+      - name: Upload Trivy results
+        uses: actions/upload-artifact@v4
+        with:
+          name: extractor-trivy-results
+          path: trivy-results.sarif
+
+      - name: Fail on critical vulnerabilities
+        run: |
+          count=$(cat trivy-results.sarif | jq -r '.results[].packages[]? | select(.severity == "CRITICAL") | .severity' | wc -l)
+          if [ "$count" -gt 0 ]; then
+            echo "Found $count CRITICAL vulnerabilities in extractor"
+            exit 1
+          fi
+          echo "No critical vulnerabilities found"
+
+  release:
+    name: Create GitHub Release
+    needs: [build-api, build-extractor]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            git log --pretty=format:"- %s (%h)" "${PREV_TAG}..HEAD" > CHANGELOG.md
+          else
+            git log --pretty=format:"- %s (%h)" > CHANGELOG.md
+          fi
+
+          cat >> CHANGELOG.md <<EOF
+
+          ## Container Images
+
+          - \`ghcr.io/${{ github.repository }}/finops-api:${{ github.ref_name }}\`
+          - \`ghcr.io/${{ github.repository }}/finops-extractor:${{ github.ref_name }}\`
+          EOF
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          bodyPath: CHANGELOG.md
+          generateReleaseNotes: true

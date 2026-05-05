@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuthStore } from '@/store/auth'
 import { Button } from '@/components/shared/Button'
 import { Icon } from '@/components/shared/Icon'
@@ -9,19 +9,6 @@ interface LoginComponentProps {
 }
 
 const SSO_PROVIDERS = [
-  {
-    id: 'google',
-    name: 'Continue with Google',
-    meta: 'OAuth',
-    svg: (
-      <svg viewBox="0 0 18 18" width="18" height="18">
-        <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.49h4.84a4.14 4.14 0 0 1-1.79 2.71v2.26h2.9c1.7-1.56 2.69-3.87 2.69-6.62z" />
-        <path fill="#34A853" d="M9 18c2.43 0 4.47-.81 5.96-2.18l-2.9-2.26c-.81.54-1.84.86-3.06.86-2.36 0-4.36-1.59-5.07-3.74H.96v2.34A8.99 8.99 0 0 0 9 18z" />
-        <path fill="#FBBC05" d="M3.93 10.68A5.4 5.4 0 0 1 3.64 9c0-.58.1-1.15.29-1.68V4.98H.96A8.99 8.99 0 0 0 0 9c0 1.45.35 2.83.96 4.02l2.97-2.34z" />
-        <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58A8.99 8.99 0 0 0 9 0 9 9 0 0 0 .96 4.98L3.93 7.32C4.64 5.17 6.64 3.58 9 3.58z" />
-      </svg>
-    ),
-  },
   {
     id: 'github',
     name: 'Continue with GitHub',
@@ -35,13 +22,23 @@ const SSO_PROVIDERS = [
 ] as const
 
 export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) {
-  const { setToken } = useAuthStore()
+  const { setToken, isAuthenticated } = useAuthStore()
   const [showEmail, setShowEmail] = useState(false)
   const [user, setUser] = useState('')
   const [pw, setPw] = useState('')
   const [err, setErr] = useState('')
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const { resolvedTheme, toggleTheme } = useTheme()
+
+  useEffect(() => {
+    const hash = window.location.hash
+    const params = new URLSearchParams(hash.slice(1))
+    const code = params.get('code')
+    if (code && !isAuthenticated) {
+      handleOAuthCallback(code)
+      window.location.hash = ''
+    }
+  }, [])
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -73,15 +70,37 @@ export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) 
   }
 
   const ssoLogin = async (id: string) => {
-    setLoadingId(id)
+    if (id === 'github') {
+      setLoadingId(id)
+      try {
+        const response = await fetch('/api/v1/auth/github')
+        const data = await response.json()
+        if (!response.ok || data.error) {
+          setErr(data.error || 'GitHub login not configured')
+          setLoadingId(null)
+          return
+        }
+        window.location.href = data.url
+      } catch {
+        setErr('Connection error')
+        setLoadingId(null)
+      }
+      return
+    }
+    setErr('This login method is not available')
+  }
+
+  const handleOAuthCallback = async (code: string) => {
+    setLoadingId('github')
     try {
-      const response = await fetch('/api/v1/auth/token', {
+      const response = await fetch('/api/v1/auth/github/callback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: 'admin', password: 'admin' }),
+        body: JSON.stringify({ code }),
       })
       if (!response.ok) {
-        setErr('Login failed')
+        const data = await response.json().catch(() => ({}))
+        setErr(data.detail || 'Login failed')
         setLoadingId(null)
         return
       }
@@ -132,11 +151,6 @@ export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) 
                 <span className="meta">{p.meta}</span>
               </button>
             ))}
-            <button className="sso-btn" onClick={() => ssoLogin('oidc')} disabled={!!loadingId}>
-              <span className="ico"><Icon name="key-round" size={16} /></span>
-              <span className="name">{loadingId === 'oidc' ? 'Redirecting…' : 'Enterprise SSO'}</span>
-              <span className="meta">OIDC</span>
-            </button>
           </div>
 
           <div className="login-divider"><span>or</span></div>

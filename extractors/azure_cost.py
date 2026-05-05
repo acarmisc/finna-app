@@ -503,6 +503,8 @@ def transform_row(
         cost_usd=cost_usd,
         currency_original=currency,
         cost_original=cost_original,
+        discount_usd=Decimal("0"),
+        net_cost_usd=cost_usd,
         usage_quantity=Decimal(str(usage_quantity)) if usage_quantity is not None else None,
         usage_unit=unit_of_measure or None,
         tags=tags,
@@ -597,10 +599,10 @@ def mark_extractor_healthy(
     with conn.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO extractor_health (extractor_name, last_run_ts, status, records_extracted, updated_at)
+            INSERT INTO extractor_health (extractor_name, last_run_start, status, records_extracted, updated_at)
             VALUES (%s, %s, 'success', %s, %s)
             ON CONFLICT (extractor_name) DO UPDATE
-            SET last_run_ts = EXCLUDED.last_run_ts,
+            SET last_run_start = EXCLUDED.last_run_start,
                 status = EXCLUDED.status,
                 records_extracted = EXCLUDED.records_extracted,
                 updated_at = EXCLUDED.updated_at
@@ -621,10 +623,10 @@ def mark_extractor_unhealthy(
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO extractor_health (extractor_name, last_run_ts, status, error_message, updated_at)
+                INSERT INTO extractor_health (extractor_name, last_run_start, status, error_message, updated_at)
                 VALUES (%s, %s, 'failed', %s, %s)
                 ON CONFLICT (extractor_name) DO UPDATE
-                SET last_run_ts = EXCLUDED.last_run_ts,
+                SET last_run_start = EXCLUDED.last_run_start,
                     status = EXCLUDED.status,
                     error_message = EXCLUDED.error_message,
                     updated_at = EXCLUDED.updated_at
