@@ -5,7 +5,6 @@
 @import "@fontsource/doto/400.css";
 @import "@fontsource/doto/500.css";
 @import "@fontsource/press-start-2p";
-@import "@fontsource/vt323";
 
 @custom-variant dark (&:is(.dark *));
 @custom-variant light (&:is(.light *));
@@ -24,7 +23,7 @@
         "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     --font-heading: "Doto", monospace;
     --font-display: "Doto", monospace;
-    --font-stat: "VT323", monospace;
+    --font-stat: "JetBrains Mono", monospace;
     --font-pixel: "Press Start 2P", monospace;
 
     /* Dark theme colors (GitHub-inspired) */
@@ -540,7 +539,6 @@
     text-transform: none;
 }
 
-/* Stat values — VT323 per spec */
 .stat-val,
 .stat .stat-val,
 .stat-card .stat-val {

@@ -717,7 +717,7 @@ Defined as CSS custom properties at `:root`. Override via `[data-theme="light"]`
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --font-pixel: 'Press Start 2P', monospace;
-  --font-display: 'VT323', monospace;
+  --font-display: 'JetBrains Mono', monospace;
 
   --radius: 0;
 }
