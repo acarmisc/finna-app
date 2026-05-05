@@ -3,7 +3,7 @@
    Sharp corners, visible borders, mono numerics, flat color blocks.
    ========================================================================= */
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=VT323&family=Press+Start+2P&family=Doto&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Press+Start+2P&family=Doto&display=swap");
 
 /* ---------- Tokens ---------- */
 :root,
@@ -521,7 +521,7 @@ a:hover {
 }
 .page-head h1 {
     font-family: "Doto", "Press Start 2P", monospace;
-    font-size: 16px;
+    font-size: 24px;
     font-weight: 400;
     margin: 0;
 }
