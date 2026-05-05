@@ -589,16 +589,19 @@ async def dashboard_stats(
     ]
 
     alert_sql = """
-        SELECT status, COUNT(*) as count
+        SELECT status, severity, COUNT(*) as count
         FROM alerts
-        GROUP BY status
+        GROUP BY status, severity
     """
     alert_rows = query_all(alert_sql)
     by_status: dict[str, int] = {"firing": 0, "ack": 0, "resolved": 0}
+    by_severity: dict[str, int] = {"err": 0, "warn": 0}
     for r in alert_rows:
         status_val = r["status"] or "firing"
         by_status[status_val] = by_status.get(status_val, 0) + int(r["count"] or 0)
-    alert_stats = by_status
+        severity_val = r["severity"] or "err"
+        by_severity[severity_val] = by_severity.get(severity_val, 0) + int(r["count"] or 0)
+    alert_stats = {"firing": by_status["firing"], "ack": by_status["ack"], "resolved": by_status["resolved"], "by_severity": by_severity}
 
     return {
         "totals": totals,
