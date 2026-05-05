@@ -1,0 +1,52 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      PG_DSN: "postgresql://finops:finops_dev@postgres:5432/finops"
+      HOST: "0.0.0.0"
+      PORT: "8000"
+      JWT_SECRET: "dev-secret-key-change-in-production"
+      ENCRYPTION_KEY: "dev-key-change-in-production"
+      AUTO_MIGRATE: "true"
+      ALLOWED_ORIGINS: "*"
+      # OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: finops
+      POSTGRES_USER: finops
+      POSTGRES_PASSWORD: finops_dev
+      SEED_SAMPLE_DATA: "false"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./sql/init_docker.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./sql/seed_default_user.sql:/docker-entrypoint-initdb.d/03-default-user.sql
+      - ./sql/set_seed_sample_data.sh:/docker-entrypoint-initdb.d/04-set-seed-sample-data.sh
+      - ./sql/seed_sample_data.sql:/docker-entrypoint-initdb.d/05-seed-sample-data.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finops"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pg_data:

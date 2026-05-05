@@ -1,0 +1,65 @@
+# Version control
+.git
+.gitignore
+
+# Node frontend (moved to finna-app-ui repo)
+node_modules/
+frontend/node_modules/
+*.log
+npm-debug.log*
+
+# Documentation
+docs/
+*.md
+LICENSE
+
+# Terraform (not in repo, but ignore if present locally)
+*.tf
+*.tfstate
+*.tfstate.backup
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Docker artifacts (prevent recursive builds)
+docker-compose*.yml
+Dockerfile*
+
+# Test artifacts
+tests/
+htmlcov/
+.coverage
+coverage.xml
+
+# Onboarding scripts (not needed in container)
+onboarding/
+
+# Local env files
+.env
+.env.*
+
+# UI subtree - but we need it for monolith build
+# (build.context will include it, Dockerfile will handle it)
+# ui/

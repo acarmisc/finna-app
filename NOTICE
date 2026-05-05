@@ -1,0 +1,37 @@
+finna-app
+Copyright 2024 Abstract CES Srl
+
+This product includes software developed at Abstract CES Srl
+(https://github.com/acarmisc/finna-app).
+
+---
+
+THIRD-PARTY LICENSE NOTICES
+
+This software depends on the following third-party packages, each available
+under its respective license:
+
+| Package                | License       | Notes                                  |
+|------------------------|---------------|----------------------------------------|
+| psycopg[binary]        | LGPL-3.0+     | Used as a library; dynamic linking     |
+| pydantic               | MIT           |                                        |
+| boto3                  | Apache-2.0    |                                        |
+| pyarrow                | Apache-2.0    |                                        |
+| google-cloud-bigquery  | Apache-2.0    |                                        |
+| azure-mgmt-costmgmt    | MIT           |                                        |
+| azure-identity         | MIT           |                                        |
+| pyyaml                 | MIT           |                                        |
+| tenacity               | Apache-2.0    |                                        |
+| python-dotenv          | BSD-3-Clause  |                                        |
+| questionary            | MIT           |                                        |
+| rich                   | MIT           |                                        |
+
+psycopg is licensed under the GNU Lesser General Public License v3.0 or later
+(LGPL-3.0+). As a dynamically-linked library dependency, this use is permitted
+under the LGPL terms. You may replace psycopg with a compatible alternative or
+modify and relink it independently of this project.
+
+Docker base images:
+- python:3.12-slim     — PSF License (Python Software Foundation)
+- postgres:16-alpine   — PostgreSQL License (BSD-like)
+- maximhq/bifrost      — Apache-2.0

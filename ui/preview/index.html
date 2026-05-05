@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinOps Console - Demo Preview</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; }
+        header { background: #1e293b; padding: 20px 40px; border-bottom: 1px solid #334155; }
+        header h1 { font-size: 24px; font-weight: 700; }
+        header p { color: #94a3b8; margin-top: 8px; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 40px 20px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(600px, 1fr)); gap: 32px; }
+        .card { background: #1e293b; border-radius: 16px; overflow: hidden; border: 1px solid #334155; }
+        .card-header { padding: 24px 24px 0; }
+        .card-header h2 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+        .card-header p { color: #94a3b8; font-size: 14px; }
+        .screenshot { 
+            width: 100%; 
+            height: 400px; 
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            border-top: 1px solid #334155;
+            border-bottom: 1px solid #334155;
+        }
+        .screenshot-content { text-align: center; color: #64748b; }
+        .screenshot-content h3 { font-family: monospace; font-size: 16px; margin-bottom: 8px; }
+        .screenshot-content p { font-size: 14px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(600px, 1fr)); gap: 32px; padding: 24px; }
+        .grid .card { margin: 0; }
+        footer { text-align: center; padding: 32px; color: #64748b; border-top: 1px solid #334155; margin-top: 48px; }
+        footer a { color: #38bdf8; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>FinOps Console 🚀</h1>
+        <p>Demo Preview - Staging Environment</p>
+    </header>
+
+    <div class="container">
+        <div class="grid">
+            <div class="card">
+                <div class="card-header">
+                    <h2>📊 Dashboard</h2>
+                    <p>Overview of costs, alerts, and extractor status</p>
+                </div>
+                <div class="screenshot">
+                    <div class="screenshot-content">
+                        <h3>[ FINNA DASHBOARD VIEW ]</h3>
+                        <p>Dashboard showing real-time cost analytics</p>
+                        <p>Provider badges: Azure / GCP / LLM</p>
+                        <p>Interactive charts with Recharts</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>⚙️ Extractors</h2>
+                    <p>Job scheduler with run history and trigger controls</p>
+                </div>
+                <div class="screenshot">
+                    <div class="screenshot-content">
+                        <h3>[ EXTRACTOR MANAGEMENT ]</h3>
+                        <p>Trigger extraction jobs</p>
+                        <p>7 pending + 1 successful run</p>
+                        <p>9,504 records extracted</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>🔐 Configurations</h2>
+                    <p>Cloud provider credentials management</p>
+                </div>
+                <div class="screenshot">
+                    <div class="screenshot-content">
+                        <h3>[ CLOUD CONFIG VIEW ]</h3>
+                        <p>Azure service principal config</p>
+                        <p>GCP service account config</p>
+                        <p>Test credentials button</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>📈 Cost Analysis</h2>
+                    <p>Detailed cost breakdown by SKU and daily trends</p>
+                </div>
+                <div class="screenshot">
+                    <div class="screenshot-content">
+                        <h3>[ COST BREAKDOWN ]</h3>
+                        <p>Tabular-nums currency display</p>
+                        <p>Daily trend chart</p>
+                        <p>Cost delta indicators</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top: 32px; padding: 24px; background: #1e293b; border-radius: 16px; border: 1px solid #334155;">
+            <h2 style="font-size: 20px; margin-bottom: 16px;">🎯 Production Access</h2>
+            <p style="margin-bottom: 8px;"><strong>Frontend (UI):</strong> <a href="https://<your-domain>" style="color: #38bdf8;">https://<your-domain></a></p>
+            <p style="margin-bottom: 8px;"><strong>Backend (API):</strong> <a href="https://<your-domain>/api/v1" style="color: #38bdf8;">https://<your-domain>/api/v1</a></p>
+            <p style="margin-bottom: 8px;"><strong>Namespace:</strong> finna-app-staging</p>
+            <p><strong>Credentials:</strong> Username: <code>admin</code> | Password: <code>admin</code></p>
+        </div>
+    </div>
+
+    <footer>
+        <p>FinOps Console - Staging Environment | MIT License | <a href="https://github.com/acarmisc/finna-app-ui">View on GitHub</a></p>
+    </footer>
+</body>
+</html>

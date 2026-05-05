@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finops-api
+  namespace: finops
+  labels:
+    app: finops-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: finops-api
+  template:
+    metadata:
+      labels:
+        app: finops-api
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: api
+        image: ghcr.io/acarmisc/finops-api:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: HOST
+          valueFrom:
+            configMapKeyRef:
+              name: finops-config
+              key: API_HOST
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: finops-config
+              key: API_PORT
+        - name: PG_DSN
+          valueFrom:
+            secretKeyRef:
+              name: finops-secret
+              key: PG_DSN
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: finops-secret
+              key: JWT_SECRET
+        - name: GCP_PROJECT_ID
+          valueFrom:
+            secretKeyRef:
+              name: finops-secret
+              key: GCP_PROJECT_ID
+        - name: AZURE_SUBSCRIPTION_ID
+          valueFrom:
+            secretKeyRef:
+              name: finops-secret
+              key: AZURE_SUBSCRIPTION_ID
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "500m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      restartPolicy: Always

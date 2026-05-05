@@ -1,0 +1,66 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: finops-extractor-azure
+  namespace: finna-app-staging
+  labels:
+    app: finops-extractor
+    extractor: azure-cost
+spec:
+  schedule: "30 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: finops-extractor
+            extractor: azure-cost
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+          - name: extractor
+            image: europe-west1-docker.pkg.dev/abs-digital-playground/finna-app-staging/api:latest
+            imagePullPolicy: Always
+            env:
+            - name: EXTRACTOR_PROVIDER
+              value: "azure"
+            - name: CONFIG_ID
+              value: "1"
+            - name: API_URL
+              value: "http://finops-api.finna-app-staging.svc.cluster.local:8000"
+            - name: AUTH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: finops-secret
+                  key: API_USERNAME
+            - name: AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: finops-secret
+                  key: API_PASSWORD
+            - name: PG_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: finops-secret
+                  key: PG_DSN
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL

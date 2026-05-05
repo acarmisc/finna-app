@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# uv
+.python-version
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+pg_data/
+superset_data/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Terraform
+*.tfstate
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+*.tfvars
+!*.tfvars.example
+
+# Secrets
+*credentials*
+*service-account*
+*.pem
+*.key
+
+# GCP service account JSON keys (contains private key material)
+*sa*.json
+gcp-sa*.json
+
+# Temporary test scripts that may contain secrets or DB connection strings
+write_sa.py
+test_gcp_sa.py
+
+# Node frontend (moved to finna-app-ui repo)
+node_modules/
+package-lock.json
+*.tsbuildinfo
+
+# Claude/GStack worktrees (embedded repos that should never be committed)
+.claude/
+
+# Tooling caches
+.playwright-mcp/
+test-results/
+graphify-out/

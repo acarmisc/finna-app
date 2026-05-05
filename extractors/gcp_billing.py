@@ -1,0 +1,525 @@
+"""GCP BigQuery Billing Extractor for FinOps multi-cloud monitoring.
+
+Queries GCP billing export in BigQuery, normalizes rows into NormalizedCostRecord,
+and batch-inserts them into PostgreSQL.
+
+Can run as a Cloud Run Job via ``python -m extractors.gcp_billing``.
+
+Multi-project configuration (takes priority over single-project vars):
+  GCP_{PREFIX}_PROJECT          – Per-project ID
+  GCP_{PREFIX}_BQ_DATASET      – Per-project BigQuery dataset
+  GCP_{PREFIX}_BQ_TABLE        – Per-project BigQuery table
+  GCP_{PREFIX}_INGESTION_MODE  – Per-project ingestion mode
+  GCP_{PREFIX}_CSV_PATH        – Per-project CSV path
+  where PREFIX is the project ID uppercased with dashes→underscores
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import re
+import sys
+from decimal import Decimal
+from typing import Any, Sequence
+
+import psycopg
+from google.cloud import bigquery
+from google.cloud.bigquery import QueryJobConfig
+from psycopg.rows import dict_row
+from psycopg.sql import SQL
+from psycopg.types.json import Json
+from tenacity import (
+    before_sleep_log,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
+
+from extractors.gcp_shared import (
+    extract_project_label,
+    generate_record_id,
+    labels_to_tags,
+    parse_datetime,
+    resolve_service_category,
+)
+from models import NormalizedCostRecord, Provider, ServiceCategory
+
+logger = logging.getLogger("extractors.gcp_billing")
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+GCP_PROJECT: str = os.getenv("GCP_PROJECT", "")
+BQ_DATASET: str = os.getenv("BQ_DATASET", "billing_export")
+BQ_TABLE: str = os.getenv("BQ_TABLE", "gcp_billing_export_v1")
+PG_DSN: str = os.getenv("PG_DSN", "")
+DATE_FROM: str = os.getenv("DATE_FROM", "")
+DATE_TO: str = os.getenv("DATE_TO", "")
+
+BATCH_SIZE: int = int(os.getenv("BATCH_SIZE", "500"))
+
+EXTRACTOR_NAME = "gcp_billing"
+
+_GCP_PREFIX_RE = re.compile(r"^GCP_(.+)_PROJECT$")
+
+
+def discover_gcp_projects_from_env() -> dict[str, dict[str, str]]:
+    """Scan env vars for GCP_{PREFIX}_PROJECT patterns.
+
+    Returns a dict mapping prefix → {project_id, ingestion_mode, bq_dataset,
+    bq_table, csv_path} for each discovered project.
+    """
+    projects: dict[str, dict[str, str]] = {}
+    for key, value in os.environ.items():
+        m = _GCP_PREFIX_RE.match(key)
+        if not m or not value:
+            continue
+        prefix = m.group(1)
+        projects[prefix] = {
+            "project_id": value,
+            "ingestion_mode": os.environ.get(
+                f"GCP_{prefix}_INGESTION_MODE", "bigquery"
+            ),
+            "bq_dataset": os.environ.get(f"GCP_{prefix}_BQ_DATASET", "billing_export"),
+            "bq_table": os.environ.get(
+                f"GCP_{prefix}_BQ_TABLE", "gcp_billing_export_v1"
+            ),
+            "csv_path": os.environ.get(f"GCP_{prefix}_CSV_PATH", ""),
+        }
+    return projects
+
+
+# ---------------------------------------------------------------------------
+# BigQuery query builder
+# ---------------------------------------------------------------------------
+
+
+def _build_query(
+    project: str,
+    dataset: str,
+    table: str,
+    date_from: str,
+    date_to: str,
+) -> tuple[str, list[Any]]:
+    """Return parameterised SQL and query params for BigQuery."""
+    query = (
+        f"SELECT\n"
+        f"    project.id              AS project_id,\n"
+        f"    project.number          AS project_number,\n"
+        f"    billing_account_id,\n"
+        f"    service.description     AS service_description,\n"
+        f"    sku.description         AS sku_description,\n"
+        f"    usage_start_time,\n"
+        f"    usage_end_time,\n"
+        f"    usage.amount            AS usage_amount,\n"
+        f"    usage.unit              AS usage_unit,\n"
+        f"    cost,\n"
+        f"    cost_type,\n"
+        f"    currency,\n"
+        f"    location.region         AS region,\n"
+        f"    resource.name           AS resource_name,\n"
+        f"    (SELECT SUM(c.amount) FROM UNNEST(credits) AS c WHERE c.amount < 0) AS discount_amount,\n"
+        f"    labels,\n"
+        f"    system_labels\n"
+        f"FROM `{project}.{dataset}.{table}`\n"
+        f"WHERE usage_start_time >= @date_from\n"
+        f"  AND usage_start_time <  @date_to\n"
+        f"ORDER BY usage_start_time\n"
+    )
+
+    query_params = [
+        bigquery.ScalarQueryParameter("date_from", "STRING", date_from),
+        bigquery.ScalarQueryParameter("date_to", "STRING", date_to),
+    ]
+    return query, query_params
+
+
+# ---------------------------------------------------------------------------
+# Row normalisation
+# ---------------------------------------------------------------------------
+
+
+def normalise_row(
+    row: dict[str, Any],
+    service_category_map: dict[str, ServiceCategory] | None = None,
+) -> NormalizedCostRecord:
+    """Map a single BigQuery billing row to a :class:`NormalizedCostRecord`.
+
+    Delegates to :mod:`extractors.gcp_shared` for shared normalisation logic.
+    """
+    project_id = row.get("project_id", "") or ""
+    label_project = extract_project_label(row)
+    service_description = row.get("service_description", "") or ""
+    sku_description = row.get("sku_description", "") or ""
+    usage_start = parse_datetime(row.get("usage_start_time"))
+    usage_end = parse_datetime(row.get("usage_end_time"))
+    cost = row.get("cost")
+    usage_amount = row.get("usage_amount")
+    usage_unit = row.get("usage_unit") or ""
+    region = row.get("region") or None
+    resource_name = row.get("resource_name") or None
+    cost_type = row.get("cost_type") or None
+    discount_amount = row.get("discount_amount")
+
+    # Cost — GCP exports cost as a float / string; coerce safely
+    try:
+        cost_decimal = Decimal(str(cost)) if cost is not None else Decimal("0")
+    except Exception:
+        cost_decimal = Decimal("0")
+
+    # Discount (credits with negative amounts)
+    try:
+        discount_decimal = abs(Decimal(str(discount_amount))) if discount_amount is not None else Decimal("0")
+    except Exception:
+        discount_decimal = Decimal("0")
+
+    # Usage quantity
+    try:
+        usage_decimal = Decimal(str(usage_amount)) if usage_amount is not None else None
+    except Exception:
+        usage_decimal = None
+
+    record_id = generate_record_id(
+        provider=Provider.GCP.value,
+        project_id=project_id,
+        usage_start=usage_start.isoformat(),
+        service_name=sku_description,
+    )
+
+    return NormalizedCostRecord(
+        record_id=record_id,
+        provider=Provider.GCP,
+        usage_start=usage_start,
+        usage_end=usage_end,
+        account_id=project_id,
+        project_id=label_project or project_id,
+        service_category=resolve_service_category(service_description, service_category_map),
+        service_name=sku_description,
+        resource_id=resource_name,
+        region=region,
+        charge_type=cost_type,
+        cost_usd=cost_decimal,
+        cost_original=cost_decimal,
+        discount_usd=discount_decimal,
+        net_cost_usd=cost_decimal - discount_decimal,
+        tags=labels_to_tags(row),
+        usage_quantity=usage_decimal,
+        usage_unit=usage_unit if usage_unit else None,
+    )
+
+
+# ---------------------------------------------------------------------------
+# PostgreSQL helpers
+# ---------------------------------------------------------------------------
+
+_INSERT_SQL = SQL(
+    "INSERT INTO cost_records "
+    "(record_id, provider, usage_start, usage_end, ingestion_ts, "
+    "account_id, project_id, service_category, service_name, "
+    "resource_id, region, charge_type, "
+    "cost_usd, currency_original, cost_original, discount_usd, net_cost_usd, "
+    "usage_quantity, usage_unit, tags) "
+    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+    "ON CONFLICT (record_id) DO NOTHING"
+)
+
+
+@retry(
+    retry=retry_if_exception_type((psycopg.OperationalError, psycopg.InterfaceError)),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=30),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
+def _get_pg_connection(dsn: str) -> psycopg.Connection:
+    """Open a PostgreSQL connection with retry on transient errors."""
+    return psycopg.connect(dsn, row_factory=dict_row, autocommit=False)  # type: ignore[arg-type]
+
+
+def _batch_insert(
+    conn: psycopg.Connection,
+    records: Sequence[NormalizedCostRecord],
+) -> int:
+    """Insert a batch of records into ``cost_records``.
+
+    Returns the number of rows actually inserted (excludes conflicts).
+    """
+    if not records:
+        return 0
+
+    rows = [
+        (
+            rec.record_id,
+            rec.provider.value,
+            rec.usage_start,
+            rec.usage_end,
+            rec.ingestion_ts,
+            rec.account_id,
+            rec.project_id,
+            rec.service_category.value,
+            rec.service_name,
+            rec.resource_id,
+            rec.region,
+            rec.charge_type,
+            rec.cost_usd,
+            rec.currency_original,
+            rec.cost_original,
+            rec.discount_usd,
+            rec.net_cost_usd,
+            rec.usage_quantity,
+            rec.usage_unit,
+            Json(rec.tags) if rec.tags else Json({}),
+        )
+        for rec in records
+    ]
+
+    with conn.cursor() as cur:
+        cur.executemany(_INSERT_SQL, rows)
+    conn.commit()
+
+    inserted = len(
+        records
+    )  # ON CONFLICT DO NOTHING doesn't give rowcount via executemany
+    logger.debug("Batch inserted up to %d records", inserted)
+    return inserted
+
+
+# ---------------------------------------------------------------------------
+# Extractor health tracking
+# ---------------------------------------------------------------------------
+
+
+def _mark_health_start(
+    conn: psycopg.Connection, extractor_name: str = EXTRACTOR_NAME
+) -> None:
+    """Mark the extractor as *running* in ``extractor_health``."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO extractor_health
+                (extractor_name, last_run_start, status, records_extracted, updated_at)
+            VALUES (%s, now(), 'running', 0, now())
+            ON CONFLICT (extractor_name) DO UPDATE
+                SET last_run_start = now(),
+                    status = 'running',
+                    records_extracted = 0,
+                    error_message = NULL,
+                    updated_at = now()
+            """,
+            (extractor_name,),
+        )
+    conn.commit()
+
+
+def _mark_health_success(
+    conn: psycopg.Connection, record_count: int, extractor_name: str = EXTRACTOR_NAME
+) -> None:
+    """Mark the extractor as *success* in ``extractor_health``."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE extractor_health
+            SET last_run_end = now(),
+                status = 'success',
+                records_extracted = %s,
+                updated_at = now()
+            WHERE extractor_name = %s
+            """,
+            (record_count, extractor_name),
+        )
+    conn.commit()
+
+
+def _mark_health_failure(
+    conn: psycopg.Connection, error_message: str, extractor_name: str = EXTRACTOR_NAME
+) -> None:
+    """Mark the extractor as *failed* in ``extractor_health``."""
+    try:
+        conn.rollback()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE extractor_health
+                SET last_run_end = now(),
+                    status = 'failed',
+                    error_message = %s,
+                    updated_at = now()
+                WHERE extractor_name = %s
+                """,
+                (error_message[:2000], extractor_name),
+            )
+        conn.commit()
+    except Exception:
+        logger.exception("Failed to mark extractor health as failed")
+
+
+# ---------------------------------------------------------------------------
+# Core extractor logic
+# ---------------------------------------------------------------------------
+
+
+@retry(
+    retry=retry_if_exception_type((Exception,)),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=2, min=4, max=60),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
+def _run_bq_query(
+    bq_client: bigquery.Client,
+    query: str,
+    query_params: list[bigquery.ScalarQueryParameter],
+    project: str,
+) -> Any:
+    """Execute a parameterised BigQuery query with retry."""
+    job_config = QueryJobConfig()
+    job_config.query_parameters = query_params
+    job_config.use_legacy_sql = False
+
+    logger.info("Running BigQuery query on project %s", project)
+    query_job = bq_client.query(query, job_config=job_config)
+    return query_job.result()
+
+
+def extract(
+    bq_client: bigquery.Client | None = None,
+    pg_dsn: str | None = None,
+    gcp_project: str | None = None,
+    bq_dataset: str | None = None,
+    bq_table: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    batch_size: int | None = None,
+    service_category_map: dict[str, ServiceCategory] | None = None,
+    health_name: str | None = None,
+) -> int:
+    """Run the full GCP billing extraction pipeline.
+
+    Returns the total number of records inserted into PostgreSQL.
+    """
+    project = gcp_project or GCP_PROJECT
+    dataset = bq_dataset or BQ_DATASET
+    table = bq_table or BQ_TABLE
+    dsn = pg_dsn or PG_DSN
+    from_date = date_from or DATE_FROM
+    to_date = date_to or DATE_TO
+    batch_sz = batch_size or BATCH_SIZE
+    extractor_name = health_name or EXTRACTOR_NAME
+
+    if not project:
+        raise ValueError("GCP_PROJECT is required (set env var or pass gcp_project)")
+    if not dsn:
+        raise ValueError("PG_DSN is required (set env var or pass pg_dsn)")
+    if not from_date or not to_date:
+        raise ValueError(
+            "DATE_FROM and DATE_TO are required (set env vars or pass date_from/date_to)"
+        )
+
+    if bq_client is not None:
+        client = bq_client
+    else:
+        try:
+            from config.auth import get_gcp_credentials
+
+            creds, _ = get_gcp_credentials()
+            client = bigquery.Client(project=project, credentials=creds)
+        except Exception:
+            client = bigquery.Client(project=project)
+
+    query, query_params = _build_query(project, dataset, table, from_date, to_date)
+    rows: Any = _run_bq_query(client, query, query_params, project)  # type: ignore[arg-type]
+
+    pg_conn = _get_pg_connection(dsn)
+    _mark_health_start(pg_conn, extractor_name=extractor_name)
+
+    total_inserted = 0
+    batch: list[NormalizedCostRecord] = []
+
+    try:
+        for row in rows:
+            record = normalise_row(dict(row.items()), service_category_map)
+            batch.append(record)
+
+            if len(batch) >= batch_sz:
+                inserted = _batch_insert(pg_conn, batch)
+                total_inserted += inserted
+                batch = []
+
+        if batch:
+            inserted = _batch_insert(pg_conn, batch)
+            total_inserted += inserted
+
+        if total_inserted == 0:
+            logger.info("No billing records found for the given date range")
+
+        _mark_health_success(pg_conn, total_inserted, extractor_name=extractor_name)
+        logger.info("Extraction complete: %d records inserted", total_inserted)
+
+    except Exception as exc:
+        logger.exception("Extraction failed: %s", exc)
+        _mark_health_failure(pg_conn, str(exc), extractor_name=extractor_name)
+        raise
+    finally:
+        pg_conn.close()
+
+    return total_inserted
+
+
+# ---------------------------------------------------------------------------
+# CLI entrypoint (Cloud Run Job)
+# ---------------------------------------------------------------------------
+
+
+def main() -> None:
+    """Entrypoint for running the extractor as a Cloud Run Job.
+
+    Supports multi-project mode: when GCP_{PREFIX}_PROJECT env vars are present,
+    iterates over all discovered projects. Falls back to single-project mode
+    (GCP_PROJECT) when no prefixed vars exist.
+    """
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+        stream=sys.stdout,
+    )
+
+    logger.info("Starting GCP billing extractor")
+
+    multi_projects = discover_gcp_projects_from_env()
+
+    if multi_projects:
+        logger.info("Multi-project mode: %d project(s) discovered", len(multi_projects))
+        for prefix, cfg in multi_projects.items():
+            health_name = f"gcp_billing_{prefix.lower()}"
+            logger.info(
+                "Processing GCP project prefix=%s id=%s", prefix, cfg["project_id"]
+            )
+            try:
+                total = extract(
+                    gcp_project=cfg["project_id"],
+                    bq_dataset=cfg.get("bq_dataset"),
+                    bq_table=cfg.get("bq_table"),
+                    health_name=health_name,
+                )
+                logger.info(
+                    "Project %s (%s): %d records", prefix, cfg["project_id"], total
+                )
+            except Exception:
+                logger.exception(
+                    "GCP project %s (%s) failed", prefix, cfg["project_id"]
+                )
+                sys.exit(1)
+    else:
+        try:
+            total = extract()
+            logger.info("GCP billing extractor finished: %d records", total)
+        except Exception:
+            logger.exception("GCP billing extractor failed")
+            sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
