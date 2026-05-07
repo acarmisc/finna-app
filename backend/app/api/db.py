@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator, Optional
 
@@ -156,11 +158,13 @@ async def get_async_pool() -> AsyncConnectionPool:
     if os.environ.get("TESTING"):
         if _async_pool is None:
             await init_async_pool()
-        assert _async_pool is not None
+        if _async_pool is None:
+            raise ValueError("Async connection pool not initialized")
         return _async_pool
     if _async_pool is None:
         await init_async_pool()
-    assert _async_pool is not None
+    if _async_pool is None:
+        raise ValueError("Async connection pool not initialized")
     return _async_pool
 
 
@@ -184,34 +188,57 @@ def get_sync_pool() -> ConnectionPool:
 async def get_async_connection() -> AsyncIterator[AsyncConnection]:
     """Get an async PostgreSQL connection from the pool."""
     pool = await get_async_pool()
-    try:
-        async with pool.connection() as conn:
-            yield conn
-    except PoolTimeout:  # type: ignore[attr-defined]
-        logger.error("Async connection pool exhausted")
-        raise
-    except psycopg.Error as e:
-        logger.exception("Database error: %s", e)
-        raise
+    max_retries = 3
+    base_delay = 0.1  # 100ms
+    
+    for attempt in range(max_retries):
+        try:
+            async with pool.connection() as conn:
+                yield conn
+                return  # Success, exit the function
+        except PoolTimeout:  # type: ignore[attr-defined]
+            if attempt == max_retries - 1:  # Last attempt
+                logger.error("Async connection pool exhausted after %d retries", max_retries)
+                raise
+            delay = base_delay * (2 ** attempt)  # Exponential backoff
+            logger.warning("Async connection pool exhausted, retrying in %.2fs (attempt %d/%d)", 
+                         delay, attempt + 1, max_retries)
+            await asyncio.sleep(delay)
+        except psycopg.Error as e:
+            logger.exception("Database error: %s", e)
+            raise
 
 
 def get_connection() -> psycopg.Connection:
     """Get a sync PostgreSQL connection from the pool."""
     pool = get_sync_pool()
-    try:
-        conn = pool.getconn()
-        if conn is None or conn.closed:
-            logger.warning("Got invalid connection from pool, closing and getting new one")
-            if conn is not None:
-                conn.close()
+    max_retries = 3
+    base_delay = 0.1  # 100ms
+    
+    for attempt in range(max_retries):
+        try:
             conn = pool.getconn()
-        return conn
-    except PoolTimeout:
-        logger.error("Connection pool exhausted - no available connections")
-        raise
-    except psycopg.Error as e:
-        logger.exception("Failed to get connection from pool: %s", e)
-        raise
+            if conn is None or conn.closed:
+                logger.warning("Got invalid connection from pool, closing and getting new one")
+                if conn is not None:
+                    conn.close()
+                # Try to get a new connection
+                conn = pool.getconn()
+                if conn is None or conn.closed:
+                    raise psycopg.OperationalError("Failed to obtain a valid connection from the pool")
+            return conn
+        except PoolTimeout:
+            if attempt == max_retries - 1:  # Last attempt
+                logger.error("Connection pool exhausted after %d retries", max_retries)
+                raise
+            delay = base_delay * (2 ** attempt)  # Exponential backoff
+            logger.warning("Connection pool exhausted, retrying in %.2fs (attempt %d/%d)", 
+                         delay, attempt + 1, max_retries)
+            time.sleep(delay)
+        except psycopg.Error as e:
+            logger.exception("Failed to get connection from pool: %s", e)
+            raise
+    raise RuntimeError("unreachable: get_connection retry loop exited without return")
 
 
 def release_connection(conn: Optional[psycopg.Connection]) -> None:
