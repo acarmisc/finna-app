@@ -125,6 +125,8 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      HAS_GCP: ${{ secrets.GCP_SA_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -162,17 +164,17 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Authenticate to Google Cloud
-        if: ${{ secrets.GCP_SA_KEY != '' }}
+        if: env.HAS_GCP == 'true'
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Configure Docker for GCR
-        if: ${{ secrets.GCP_SA_KEY != '' }}
+        if: env.HAS_GCP == 'true'
         run: gcloud auth configure-docker europe-west1-docker.pkg.dev
 
       - name: Extract metadata (GCR)
-        if: ${{ secrets.GCP_SA_KEY != '' }}
+        if: env.HAS_GCP == 'true'
         id: meta-gcr
         uses: docker/metadata-action@v6
         with:
@@ -184,7 +186,7 @@ jobs:
             type=raw,value=latest
 
       - name: Build and push to GCR
-        if: ${{ secrets.GCP_SA_KEY != '' }}
+        if: env.HAS_GCP == 'true'
         uses: docker/build-push-action@v7
         with:
           context: ./ui
