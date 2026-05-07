@@ -157,7 +157,8 @@ async def exchange_github_code(code: str) -> dict[str, Any] | None:
         )
         if response.status_code != 200:
             return None
-        return response.json()
+        data: dict[str, Any] = response.json()
+        return data
 
 
 async def get_github_user(access_token: str) -> dict[str, Any] | None:
@@ -173,7 +174,8 @@ async def get_github_user(access_token: str) -> dict[str, Any] | None:
         )
         if response.status_code != 200:
             return None
-        return response.json()
+        data: dict[str, Any] = response.json()
+        return data
 
 
 async def get_github_user_emails(access_token: str) -> list[dict[str, Any]]:
@@ -189,4 +191,5 @@ async def get_github_user_emails(access_token: str) -> list[dict[str, Any]]:
         )
         if response.status_code != 200:
             return []
-        return response.json()
+        data: list[dict[str, Any]] = response.json()
+        return data
