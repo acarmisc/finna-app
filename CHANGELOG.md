@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.1.0] - 2026-05-07
+
+### Added
+- `ci(release)`: build & push UI image (`finops-ui`) to GHCR, plus conditional GCR push to `europe-west1-docker.pkg.dev/abs-digital-playground/finna-app-staging/frontend` when `GCP_SA_KEY` is set
+- `ui/screenshots/`: QA evidence merged from archived `acarmisc/finna-app-ui` repo
+
+### Fixed
+- `db.py`: 3-attempt exponential-backoff retry on `PoolTimeout` for sync + async connections; replaced `assert` in `get_*_pool` with explicit `ValueError`; satisfy mypy `[return]` on `get_connection` retry loop (#125, fixes #110)
+- `auth.py`: annotate `response.json()` returns to satisfy mypy `no-any-return`
+- `ci(release)`: build UI `dist/` (`npm ci && npm run build`) before docker buildx context; use job-level `env.HAS_GCP` instead of `secrets.X` in `if:` (invalid)
+- `k8s/base/cronjob-azure.yaml`: switch from `europe-west1-docker.pkg.dev/.../api:latest` to `ghcr.io/acarmisc/finna-app/finops-extractor:1.1.0` (proper extractor image)
+
+### Changed
+- repo hygiene: untrack 130 `graphify-out/*` artifacts (already gitignored); drop `sql/seed_default_user.sql` and its `docker-compose.yml` mount
+- archived legacy `acarmisc/finna-app-ui` repo; all useful work merged into monorepo `ui/`
+
+### Deployment
+- Helm release `finna-app` in `finna-app-staging` namespace upgraded to chart `1.0.1` / appVersion `1.1.0`; chart `values.yaml` `image.repository` aligned to `ghcr.io/acarmisc/finna-app/finops-api`, `image.tag: 1.1.0` to remove drift from manual `kubectl set image` patches
+
 ## [Session: 2026-04-27] - Azure Cronjob API-Triggered Extraction
 
 ### Goal
