@@ -89,7 +89,7 @@ async def list_costs(
         params.append(provider)
 
     if project:
-        conditions.append("project_name = %s")
+        conditions.append("project_id = %s")
         params.append(project)
 
     conditions.append("usage_start >= %s")
@@ -108,12 +108,12 @@ async def list_costs(
             project_name,
             service_name as sku_name,
             usage_start as cost_date,
-            net_cost_usd as cost_amount,
+            COALESCE(NULLIF(net_cost_usd, 0), cost_usd) as cost_amount,
             currency_original,
             tags
         FROM cost_records
         {where_clause}
-        ORDER BY usage_start DESC, net_cost_usd DESC
+        ORDER BY usage_start DESC, cost_usd DESC
         LIMIT 1000
     """
 
@@ -186,7 +186,7 @@ async def export_costs(
         conditions.append("provider = %s")
         params.append(provider)
     if project:
-        conditions.append("project_name = %s")
+        conditions.append("project_id = %s")
         params.append(project)
     conditions.extend(["usage_start >= %s", "usage_start <= %s"])
     params.extend([start_dt, end_dt])
@@ -243,7 +243,7 @@ async def get_cost_totals(
     sql = """
         SELECT
             provider,
-            SUM(net_cost_usd) as total,
+            SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as total,
             COUNT(*) as record_count
         FROM cost_records
         WHERE usage_start >= %s AND usage_start <= %s
@@ -299,7 +299,7 @@ async def get_costs_by_sku(
         params.append(provider)
 
     if project:
-        conditions.append("project_name = %s")
+        conditions.append("project_id = %s")
         params.append(project)
 
     where_clause = ""
@@ -312,7 +312,7 @@ async def get_costs_by_sku(
             project_id,
             project_name,
             service_name as sku_name,
-            SUM(net_cost_usd) as mtd,
+            SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as mtd,
             COUNT(*) as instances
         FROM cost_records
         {where_clause}
@@ -371,7 +371,7 @@ async def get_daily_costs(
         SELECT
             DATE(usage_start) as date,
             provider,
-            SUM(net_cost_usd) as amount
+            SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as amount
         FROM cost_records
         WHERE {" AND ".join(conditions)}
         GROUP BY DATE(usage_start), provider
@@ -423,7 +423,7 @@ async def cost_summary(
     start_date, end_date = _resolve_window(window, start_date, end_date)  # type: ignore[arg-type,return-assign]  # type: ignore[arg-type]
 
     sql = (
-        "SELECT provider, SUM(net_cost_usd) as total "
+        "SELECT provider, SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as total "
         "FROM cost_records "
         "WHERE usage_start >= %s AND usage_start <= %s GROUP BY provider"
     )
@@ -489,7 +489,7 @@ async def cost_breakdown(
     if conditions:
         where_clause = "WHERE " + " AND ".join(conditions)
     sql = f"""
-        SELECT service_name as sku, SUM(net_cost_usd) as cost
+        SELECT service_name as sku, SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as cost
         FROM cost_records {where_clause}
         GROUP BY service_name
         ORDER BY cost DESC
@@ -538,7 +538,7 @@ async def dashboard_stats(
     prev_start = prev_end - (end_dt - current_start)
 
     totals_sql = """
-        SELECT provider, SUM(net_cost_usd) as total
+        SELECT provider, SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as total
         FROM cost_records
         WHERE usage_start >= %s AND usage_start <= %s
         GROUP BY provider
@@ -566,7 +566,7 @@ async def dashboard_stats(
     }
 
     daily_sql = """
-        SELECT DATE(usage_start) as date, provider, SUM(net_cost_usd) as amount
+        SELECT DATE(usage_start) as date, provider, SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as amount
         FROM cost_records
         WHERE usage_start >= %s AND usage_start <= %s
         GROUP BY DATE(usage_start), provider
