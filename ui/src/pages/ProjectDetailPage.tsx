@@ -8,6 +8,7 @@ import { Button } from '@/components/shared/Button'
 import { money } from '@/components/shared/money'
 import { useProject, useCosts } from '@/api/hooks'
 import { useToast } from '@/contexts/ToastContext'
+import { useDateRange } from '@/contexts/DateRangeContext'
 import type { Provider } from '@/types/api'
 
 function Sparkline({ seed = 1, up = true }: { seed?: number; up?: boolean }) {
@@ -42,8 +43,9 @@ export function ProjectDetailPage() {
   const navigate = useNavigate()
   const { slug = '' } = useParams<{ slug: string }>()
   const toast = useToast()
+  const { state } = useDateRange()
   const { data: p, isLoading } = useProject(slug)
-  const { data: costsResp } = useCosts({ project: slug })
+  const { data: costsResp } = useCosts({ project: slug, startDate: state.start, endDate: state.end })
 
   const [note, setNote] = useState('')
   const [showDel, setShowDel] = useState(false)
@@ -51,7 +53,7 @@ export function ProjectDetailPage() {
 
   const handleDelete = async () => {
     const token = localStorage.getItem('finna_token')
-    const res = await fetch(`/api/v1/projects/${slug}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
+    const res = await fetch(`/api/v1/config/projects/${slug}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
     if (res.ok) {
       toast.showSuccess('Project deleted')
       navigate('/projects')

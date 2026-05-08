@@ -184,6 +184,47 @@ async def create_project(data: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.get(
+    "/config/projects/{slug}",
+    dependencies=[Depends(require_auth)],
+)
+async def get_project(slug: str) -> dict[str, Any]:
+    """Get a single project by slug."""
+    r = query_one(
+        "SELECT id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note, provider "
+        "FROM fin_projects WHERE slug = %s",
+        (slug,),
+    )
+    if not r:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {
+        "id": r["id"],
+        "name": r["name"],
+        "slug": r["slug"],
+        "owner": r["owner"],
+        "cost_center": r["cost_center"],
+        "budget_cap": float(r["budget_cap"]) if r["budget_cap"] else None,
+        "mtd": float(r["mtd"]) if r["mtd"] else 0.0,
+        "tags": r["tags"] or {},
+        "created": r["created_at"].isoformat() if r["created_at"] else None,
+        "note": r.get("note", ""),
+        "provider": r.get("provider"),
+    }
+
+
+@router.delete(
+    "/config/projects/{slug}",
+    status_code=204,
+    dependencies=[Depends(require_auth)],
+)
+async def delete_project(slug: str) -> None:
+    """Delete a project by slug."""
+    r = query_one("SELECT id FROM fin_projects WHERE slug = %s", (slug,))
+    if not r:
+        raise HTTPException(status_code=404, detail="Project not found")
+    execute("DELETE FROM fin_projects WHERE slug = %s", (slug,))
+
+
+@router.get(
     "/config/provider/{provider}",
     response_model=list[CloudConfigResponse],
     dependencies=[Depends(require_auth)],
