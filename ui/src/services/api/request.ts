@@ -44,8 +44,13 @@ export async function apiRequest<T>(
 
 export function buildQueryString(params?: Record<string, unknown>): string {
   if (!params) return ''
-  const qs = new URLSearchParams(
-    Object.entries(params).filter(([, v]) => v != null) as [string, string][]
-  ).toString()
+  const entries = Object.entries(params)
+    .filter(([, v]) => v != null)
+    .map(([k, v]) => [camelToSnake(k), String(v)] as [string, string])
+  const qs = new URLSearchParams(entries).toString()
   return qs ? '?' + qs : ''
+}
+
+function camelToSnake(s: string): string {
+  return s.replace(/[A-Z]/g, m => '_' + m.toLowerCase())
 }
