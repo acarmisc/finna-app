@@ -5,10 +5,12 @@ interface Toast {
   id: string
   tone: 'ok' | 'err' | 'warn' | 'info'
   msg: string
+  onDismiss?: () => void
+  duration?: number
 }
 
 interface ToastContextType {
-  push: (tone: Toast['tone'], msg: string) => void
+  push: (tone: Toast['tone'], msg: string, onDismiss?: () => void, duration?: number) => void
 }
 
 const ToastCtx = createContext<ToastContextType>({ push: () => {} })
@@ -16,10 +18,13 @@ const ToastCtx = createContext<ToastContextType>({ push: () => {} })
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<Toast[]>([])
 
-  const push = useCallback((tone: Toast['tone'], msg: string) => {
+  const push = useCallback((tone: Toast['tone'], msg: string, onDismiss?: () => void, duration = 4200) => {
     const id = Math.random().toString(36).slice(2)
-    setItems(xs => [...xs, { id, tone, msg }])
-    setTimeout(() => setItems(xs => xs.filter(t => t.id !== id)), 4200)
+    setItems(xs => [...xs, { id, tone, msg, onDismiss }])
+    setTimeout(() => {
+      setItems(xs => xs.filter(t => t.id !== id))
+      if (onDismiss) onDismiss()
+    }, duration)
   }, [])
 
   const dismiss = useCallback((id: string) => {

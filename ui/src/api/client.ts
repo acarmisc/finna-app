@@ -4,6 +4,7 @@ import axios, {
   AxiosResponse,
   AxiosError,
 } from "axios";
+import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
@@ -89,9 +90,18 @@ apiClient.interceptors.response.use(
         // Refresh failed - clear tokens and redirect
         useAuthStore.getState().logout();
 
-        // Redirect to login with expired reason
+        // Show nice toast then redirect to login
         if (typeof window !== "undefined") {
-          window.location.href = "/#/";
+          toast.error("Session expired. Redirecting to login...", {
+            duration: 2500,
+            action: {
+              label: "Login",
+              onClick: () => { window.location.href = "/#/" },
+            },
+          })
+          setTimeout(() => {
+            window.location.href = "/#/"
+          }, 2800)
         }
 
         // Process queued requests with error
@@ -103,11 +113,18 @@ apiClient.interceptors.response.use(
         isRefreshing = false;
       }
     } else if (error.response?.status === 401) {
-      // Show notification for 401 errors
+      // Show nice toast then redirect to login
       if (typeof window !== "undefined") {
-        // You can use a notification library here, e.g., toast or alert
-        alert("Your session has expired. Please log in again.");
-        window.location.href = "/#/";
+        const toastId = toast.error("Session expired. Redirecting to login...", {
+          duration: 2500,
+          action: {
+            label: "Login",
+            onClick: () => { window.location.href = "/#/" },
+          },
+        })
+        setTimeout(() => {
+          window.location.href = "/#/"
+        }, 2800)
       }
     }
 
