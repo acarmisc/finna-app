@@ -70,7 +70,8 @@ export const DateRangeProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   useEffect(() => {
     const parsedCustom = parseCustomRange(searchParams)
-    if (parsedCustom) {
+    const win = searchParams.get('window')
+    if (parsedCustom && win === 'custom') {
       setCustomRange(parsedCustom)
       setWindow('custom')
     }

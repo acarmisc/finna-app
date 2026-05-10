@@ -1,6 +1,12 @@
 // Config/Connection API client
 import { apiRequest, buildQueryString } from './request'
 
+interface ProjectListParams {
+  window?: string
+  start?: string
+  end?: string
+}
+
 export const configsClient = {
   async getConnections() {
     return apiRequest('/config')
@@ -22,12 +28,14 @@ export const configsClient = {
     return apiRequest(`/config/${id}`, { method: 'DELETE' })
   },
 
-  async getProjects() {
-    return apiRequest('/config/projects')
+  async getProjects(params?: ProjectListParams) {
+    const qs = buildQueryString(params as Record<string, unknown>)
+    return apiRequest(`/config/projects${qs}`)
   },
 
-  async getProject(slug: string) {
-    return apiRequest(`/config/projects/${slug}`)
+  async getProject(slug: string, params?: ProjectListParams) {
+    const qs = buildQueryString(params as Record<string, unknown>)
+    return apiRequest(`/config/projects/${slug}${qs}`)
   },
 
   async createProject(data: unknown) {

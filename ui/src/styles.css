@@ -427,6 +427,15 @@ a:hover {
 .tb-crumb .sep {
     color: var(--fg-subtle);
 }
+.tb-crumb .crumb-link {
+    color: var(--fg-muted);
+    text-decoration: none;
+    cursor: pointer;
+}
+.tb-crumb .crumb-link:hover {
+    color: var(--fg);
+    text-decoration: underline;
+}
 .tb-crumb .last {
     color: var(--fg);
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 
 export interface AppShellProps {
   children: React.ReactNode | ((route: RouteState, ctx: { range: string; customRange: { start: string; end: string } | null }) => React.ReactNode)
@@ -20,25 +20,16 @@ export interface RouteState {
 }
 
 function useHashRoute(): RouteState {
-  const [route, setRoute] = useState<RouteState>(() => parseHash())
+  const location = useLocation()
 
-  React.useEffect(() => {
-    const onChange = () => setRoute(parseHash())
-    window.addEventListener('hashchange', onChange)
-    return () => window.removeEventListener('hashchange', onChange)
-  }, [])
-
-  return route
-}
-
-function parseHash(): RouteState {
-  const raw = window.location.hash.replace(/^#/, '') || '/dashboard'
-  const [path, query = ''] = raw.split('?')
-  const parts = path.split('/').filter(Boolean)
-  const base = '/' + (parts[0] || 'dashboard')
-  const sub = parts[1] || null
-  const qs = new URLSearchParams(query)
-  return { path, base, sub, parts, qs }
+  return React.useMemo(() => {
+    const path = location.pathname
+    const parts = path.split('/').filter(Boolean)
+    const base = '/' + (parts[0] || 'dashboard')
+    const sub = parts[1] || null
+    const qs = new URLSearchParams(location.search)
+    return { path, base, sub, parts, qs }
+  }, [location])
 }
 
 const AppShell: React.FC<AppShellProps> = ({

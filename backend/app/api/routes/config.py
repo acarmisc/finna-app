@@ -5,10 +5,10 @@ from __future__ import annotations
 import os
 import sys
 import uuid
-from datetime import datetime, timezone
-from typing import Any
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional, Union
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import auth as auth_module
 from ..db import execute, insert_and_return, query_all, query_one
@@ -103,6 +103,32 @@ async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
     }
 
 
+def _resolve_window(
+    window: Optional[str],
+    start_date: Optional[Union[str, datetime]],
+    end_date: datetime,
+) -> tuple[datetime, datetime]:
+    """Resolve window shortcut into concrete start/end dates."""
+    if window and window not in ("mtd", "7d", "30d", "90d"):
+        window = None
+
+    if window == "mtd":
+        start = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    elif window == "7d":
+        start = end_date - timedelta(days=7)
+    elif window == "30d":
+        start = end_date - timedelta(days=30)
+    elif window == "90d":
+        start = end_date - timedelta(days=90)
+    else:
+        if isinstance(start_date, str):
+            start = datetime.fromisoformat(start_date)
+        else:
+            start = start_date or (end_date - timedelta(days=30))
+
+    return start, end_date
+
+
 # ─── Projects endpoints ──────────────────────────────────────────────────────
 
 
@@ -110,13 +136,27 @@ async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
     "/config/projects",
     dependencies=[Depends(require_auth)],
 )
-async def list_projects() -> list[dict[str, Any]]:
-    """List all projects."""
-    sql = (
-        "SELECT id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note, provider "
-        "FROM fin_projects ORDER BY name"
-    )
-    rows = query_all(sql)
+async def list_projects(
+    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
+    start_date: Optional[str] = Query(None, description="Start date in ISO format"),
+    end_date: Optional[str] = Query(None, description="End date in ISO format"),
+) -> list[dict[str, Any]]:
+    """List all projects with MTD calculated from cost_records for the given window."""
+    end_dt = datetime.now()
+    start_dt, end_dt = _resolve_window(window, start_date, end_dt)
+
+    sql = """
+        SELECT
+            p.id, p.name, p.slug, p.owner, p.cost_center, p.budget_cap, p.tags, p.created_at, p.note, p.provider,
+            COALESCE(SUM(COALESCE(NULLIF(c.net_cost_usd, 0), c.cost_usd)), 0) as mtd
+        FROM fin_projects p
+        LEFT JOIN cost_records c ON c.project_id = p.id
+            AND c.usage_start >= %s
+            AND c.usage_start <= %s
+        GROUP BY p.id, p.name, p.slug, p.owner, p.cost_center, p.budget_cap, p.tags, p.created_at, p.note, p.provider
+        ORDER BY mtd DESC
+    """
+    rows = query_all(sql, (start_dt, end_dt))
     return [
         {
             "id": r["id"],
@@ -187,13 +227,28 @@ async def create_project(data: dict[str, Any]) -> dict[str, Any]:
     "/config/projects/{slug}",
     dependencies=[Depends(require_auth)],
 )
-async def get_project(slug: str) -> dict[str, Any]:
-    """Get a single project by slug."""
-    r = query_one(
-        "SELECT id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note, provider "
-        "FROM fin_projects WHERE slug = %s",
-        (slug,),
-    )
+async def get_project(
+    slug: str,
+    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
+    start_date: Optional[str] = Query(None, description="Start date in ISO format"),
+    end_date: Optional[str] = Query(None, description="End date in ISO format"),
+) -> dict[str, Any]:
+    """Get a single project by slug with MTD calculated from cost_records."""
+    end_dt = datetime.now()
+    start_dt, end_dt = _resolve_window(window, start_date, end_dt)
+
+    sql = """
+        SELECT
+            p.id, p.name, p.slug, p.owner, p.cost_center, p.budget_cap, p.tags, p.created_at, p.note, p.provider,
+            COALESCE(SUM(COALESCE(NULLIF(c.net_cost_usd, 0), c.cost_usd)), 0) as mtd
+        FROM fin_projects p
+        LEFT JOIN cost_records c ON c.project_id = p.id
+            AND c.usage_start >= %s
+            AND c.usage_start <= %s
+        WHERE p.slug = %s
+        GROUP BY p.id, p.name, p.slug, p.owner, p.cost_center, p.budget_cap, p.tags, p.created_at, p.note, p.provider
+    """
+    r = query_one(sql, (start_dt, end_dt, slug))
     if not r:
         raise HTTPException(status_code=404, detail="Project not found")
     return {
