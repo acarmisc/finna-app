@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ProviderBadge } from '@/components/shared/provider-badge'
 import { ProgressBar } from '@/components/shared/progress-bar'
@@ -10,6 +10,7 @@ import { useProject, useCosts } from '@/api/hooks'
 import { useToast } from '@/contexts/ToastContext'
 import { useDateRange } from '@/contexts/DateRangeContext'
 import type { Provider } from '@/types/api'
+import { Icon } from '@/components/shared/Icon'
 
 function Sparkline({ seed = 1, up = true }: { seed?: number; up?: boolean }) {
   const len = 12
@@ -49,6 +50,7 @@ export function ProjectDetailPage() {
 
   const [note, setNote] = useState('')
   const [showDel, setShowDel] = useState(false)
+  const [skuFilter, setSkuFilter] = useState('')
   useEffect(() => { setNote((p as any)?.note ?? '') }, [(p as any)?.note])
 
   const handleDelete = async () => {
@@ -91,6 +93,12 @@ export function ProjectDetailPage() {
   const totalMtd = skus.reduce((s, c) => s + c.mtd, 0)
   const totalPrev = skus.reduce((s, c) => s + c.prev, 0)
 
+  const filteredSkus = useMemo(() => {
+    if (!skuFilter.trim()) return skus
+    const q = skuFilter.toLowerCase()
+    return skus.filter(c => c.sku.toLowerCase().includes(q))
+  }, [skus, skuFilter])
+
   return (
     <div className="page">
       <div className="page-head">
@@ -110,34 +118,44 @@ export function ProjectDetailPage() {
           </div>
         </div>
         <div className="actions">
-          <Button icon="edit-3" bracket onClick={() => navigate(`/projects/${slug}/edit`)}>edit</Button>
+          <Button icon="edit-3" bracket onClick={() => navigate('/projects')}>edit</Button>
           <Button icon="trash-2" variant="danger" bracket onClick={() => setShowDel(true)}>delete</Button>
         </div>
       </div>
 
       <div className="row row-2-6040-rev" style={{ gap: 12 }}>
         <div className="card">
-          <div className="card-hd"><h3>Monthly budget</h3><span className="chip">Apr 2026</span></div>
+          <div className="card-hd">
+            <div className="hstack-3">
+              <h3>Cost summary</h3>
+              <span className="chip">custom range</span>
+            </div>
+          </div>
           <div className="card-bd">
             <div className="spread">
               <div>
-                <div className="stat-lbl">MTD</div>
-                <div className="stat-val" style={{ fontSize: 32 }}>{money(mtd)}<span className="ccy">USD</span></div>
+                <div className="stat-lbl">total</div>
+                <div className="stat-val" style={{ fontSize: 32 }}>{money(totalMtd)}<span className="ccy">USD</span></div>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                <div className="stat-lbl">cap</div>
-                <div className="stat-val" style={{ fontSize: 20, color: 'var(--fg-muted)' }}>{cap ? money(cap, 0) : '—'}</div>
-              </div>
+              {cap > 0 && (
+                <div style={{ textAlign: 'right' }}>
+                  <div className="stat-lbl">cap</div>
+                  <div className="stat-val" style={{ fontSize: 20, color: 'var(--fg-muted)' }}>{money(cap, 0)}</div>
+                  <div className="mono" style={{ fontSize: 11, color: pct >= 90 ? 'var(--danger)' : pct >= 70 ? 'var(--warning)' : 'var(--accent)', marginTop: 2 }}>
+                    {pct >= 90 ? 'OVER' : pct >= 70 ? 'NEAR CAP' : 'OK'}
+                  </div>
+                </div>
+              )}
             </div>
-            <div style={{ marginTop: 16 }}>
-              <ProgressBar value={mtd} max={Math.max(cap, 1)} stepped segments={20} />
-              <div className="hstack spread mt-2">
-                <span className="mono" style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{cap ? `${pct.toFixed(1)}% utilized` : 'no budget cap'}</span>
-                <span className="mono" style={{ fontSize: 11, color: pct >= 90 ? 'var(--danger)' : pct >= 70 ? 'var(--warning)' : 'var(--accent)' }}>
-                  {cap ? (pct >= 90 ? 'OVER THRESHOLD' : pct >= 70 ? 'NEAR CAP' : 'HEALTHY') : '—'}
-                </span>
+            {cap > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <ProgressBar value={mtd} max={Math.max(cap, 1)} stepped segments={20} />
+                <div className="hstack spread mt-2">
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--fg-muted)' }}>{pct.toFixed(1)}% of cap</span>
+                  <span className="mono" style={{ fontSize: 11 }}>{money(mtd)} / {money(cap, 0)}</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
         <div className="card">
@@ -154,15 +172,23 @@ export function ProjectDetailPage() {
       <div className="card mt-3">
         <div className="card-hd">
           <h3>Cost breakdown · SKU</h3>
-          <Link to="/costs" style={{ fontSize: 11, fontFamily: 'JetBrains Mono, monospace' }}>open in explorer →</Link>
+          <div className="inp-group" style={{ maxWidth: 220, width: '100%' }}>
+            <Icon name="search" size={13} />
+            <input
+              className="inp"
+              placeholder="filter by SKU…"
+              value={skuFilter}
+              onChange={e => setSkuFilter(e.target.value)}
+            />
+          </div>
         </div>
         <div className="card-bd p0">
           <table className="tbl">
             <thead><tr>
-              <th>SKU</th><th className="num">MTD</th><th className="num">Previous</th><th className="num">Δ</th><th>Trend</th>
+              <th>SKU</th><th className="num">total</th><th className="num">prev</th><th className="num">Δ</th><th>Trend</th>
             </tr></thead>
             <tbody>
-              {skus.map((c, i) => (
+              {filteredSkus.map((c, i) => (
                 <tr key={`${c.sku}-${i}`}>
                   <td className="mono">{c.sku}</td>
                   <td className="num mono">{money(c.mtd)}</td>
@@ -171,11 +197,13 @@ export function ProjectDetailPage() {
                   <td style={{ width: 160 }}><Sparkline seed={c.sku.length} up={c.delta > 0} /></td>
                 </tr>
               ))}
-              {skus.length === 0 && (
-                <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 24 }}>// no cost records</td></tr>
+              {filteredSkus.length === 0 && (
+                <tr><td colSpan={5} className="muted" style={{ textAlign: 'center', padding: 24 }}>
+                  {skus.length === 0 ? '// no cost records' : `// no SKU matches "${skuFilter}"`}
+                </td></tr>
               )}
             </tbody>
-            {skus.length > 0 && (
+            {filteredSkus.length > 0 && (
               <tfoot>
                 <tr>
                   <td>Total</td>
