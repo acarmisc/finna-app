@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Icon } from '@/components/shared'
+import { useDateRange } from '@/contexts/DateRangeContext'
 
 interface Notification {
   id: string
@@ -304,8 +305,7 @@ function DateRangePicker({ range, setRange, customRange, setCustomRange, label }
 
 const TopBar: React.FC<TopBarProps> = ({ route }) => {
   const navigate = useNavigate()
-  const [range, setRange] = useState('mtd')
-  const [customRange, setCustomRange] = useState<{ start: string; end: string } | null>(null)
+  const { state, setRange, setCustomRange } = useDateRange()
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const notificationsRef = useRef<HTMLDivElement>(null)
   const bellRef = useRef<HTMLButtonElement>(null)
@@ -350,10 +350,12 @@ const TopBar: React.FC<TopBarProps> = ({ route }) => {
     ? `new ${baseSegment.replace(/s$/, '')}`
     : subSegment
 
-  const crumbs: { label: string; mono?: boolean }[] = [{ label: 'finna', mono: true }]
+  const crumbs: { label: string; mono?: boolean; href?: string }[] = [
+    { label: 'finna', mono: true, href: '/' },
+  ]
   if (subLabel) {
-    crumbs.push({ label: labelFor[baseSegment] || baseSegment })
-    crumbs.push({ label: subLabel, mono: true })
+    crumbs.push({ label: labelFor[baseSegment] || baseSegment, href: `/${baseSegment}` })
+    crumbs.push({ label: subLabel })
   } else {
     crumbs.push({ label: labelFor[baseSegment] || baseSegment })
   }
@@ -379,8 +381,8 @@ const TopBar: React.FC<TopBarProps> = ({ route }) => {
     return `${months[m - 1]} ${d}`
   }
 
-  const customLabel = customRange ? `${fmt(customRange.start)} — ${fmt(customRange.end)}` : null
-  const label = range === 'custom' && customLabel ? customLabel : presetLabel[range] || presetLabel['mtd']
+  const customLabel = state.window === 'custom' ? `${fmt(state.start)} — ${fmt(state.end)}` : null
+  const label = state.window === 'custom' && customLabel ? customLabel : presetLabel[state.window] || presetLabel['mtd']
 
   return (
     <header className="tb">
@@ -388,9 +390,18 @@ const TopBar: React.FC<TopBarProps> = ({ route }) => {
         {crumbs.map((c, i) => (
           <React.Fragment key={i}>
             {i > 0 && <span className="sep">/</span>}
-            <span className={`${i === crumbs.length - 1 ? 'last' : ''} ${c.mono ? 'mono' : ''}`}>
-              {c.label}
-            </span>
+            {c.href ? (
+              <a
+                href={c.href}
+                className={`crumb-link ${i === crumbs.length - 1 ? 'last' : ''} ${c.mono ? 'mono' : ''}`}
+              >
+                {c.label}
+              </a>
+            ) : (
+              <span className={`${i === crumbs.length - 1 ? 'last' : ''} ${c.mono ? 'mono' : ''}`}>
+                {c.label}
+              </span>
+            )}
           </React.Fragment>
         ))}
       </div>
@@ -405,18 +416,15 @@ const TopBar: React.FC<TopBarProps> = ({ route }) => {
           {ranges.map(([k, l]) => (
             <button
               key={k}
-              onClick={() => {
-                setRange(k)
-                setCustomRange(null)
-              }}
+              onClick={() => setRange(k)}
               style={{
                 padding: '5px 9px',
                 fontFamily: 'JetBrains Mono, monospace',
                 fontSize: 10,
                 letterSpacing: '0.08em',
                 textTransform: 'uppercase',
-                background: range === k ? 'var(--primary)' : 'transparent',
-                color: range === k ? 'var(--primary-fg)' : 'var(--fg-muted)',
+                background: state.window === k ? 'var(--primary)' : 'transparent',
+                color: state.window === k ? 'var(--primary-fg)' : 'var(--fg-muted)',
                 border: 'none',
                 borderRight: '1px solid var(--border)',
                 cursor: 'pointer',
@@ -427,10 +435,10 @@ const TopBar: React.FC<TopBarProps> = ({ route }) => {
           ))}
         </div>
         <DateRangePicker
-          range={range}
+          range={state.window}
           setRange={setRange}
-          customRange={range === 'custom' ? customRange : null}
-          setCustomRange={(range: { start: string; end: string } | null) => {
+          customRange={state.window === 'custom' ? { start: state.start, end: state.end } : null}
+          setCustomRange={(range) => {
             if (range) {
               setCustomRange(range)
             } else {

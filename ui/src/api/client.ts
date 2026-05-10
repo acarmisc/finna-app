@@ -48,83 +48,60 @@ apiClient.interceptors.response.use(
       _retry?: boolean;
     };
 
-    // Handle 401 errors
-    if (error.response?.status === 401 && originalRequest) {
+    const isAuth = useAuthStore.getState().isAuthenticated;
+
+    if (error.response?.status === 401) {
       if (isRefreshing) {
-        // If we're already refreshing, add to queue
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
-          .then(() => apiClient(originalRequest))
+          .then(() => apiClient(originalRequest as AxiosRequestConfig))
           .catch((err) => Promise.reject(err));
+      }
+
+      if (!isAuth) {
+        return Promise.reject(error);
       }
 
       isRefreshing = true;
 
       try {
-        // Attempt token refresh
         const refreshResponse = await apiClient.post(
           "/auth/refresh",
           {},
-          {
-            withCredentials: true,
-          },
+          { withCredentials: true },
         );
 
         if (refreshResponse.data?.access_token) {
-          // Update token in store
           useAuthStore.getState().setToken(refreshResponse.data.access_token);
 
-          // Retry original request with new token
-          if (originalRequest.headers) {
+          if (originalRequest?.headers) {
             originalRequest.headers.Authorization = `Bearer ${refreshResponse.data.access_token}`;
           }
 
-          // Process queued requests
           failedQueue.forEach(({ resolve }) => resolve(null));
           failedQueue = [];
 
           return apiClient(originalRequest as AxiosRequestConfig);
         }
       } catch (refreshError) {
-        // Refresh failed - clear tokens and redirect
         useAuthStore.getState().logout();
 
-        // Show nice toast then redirect to login
+        failedQueue.forEach(({ reject }) => reject(refreshError));
+        failedQueue = [];
+
         if (typeof window !== "undefined") {
           toast.error("Session expired. Redirecting to login...", {
             duration: 2500,
-            action: {
-              label: "Login",
-              onClick: () => { window.location.href = "/#/" },
-            },
-          })
+          });
           setTimeout(() => {
-            window.location.href = "/#/"
-          }, 2800)
+            window.location.hash = "/login";
+          }, 2800);
         }
-
-        // Process queued requests with error
-        failedQueue.forEach(({ reject }) => reject(refreshError));
-        failedQueue = [];
 
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
-      }
-    } else if (error.response?.status === 401) {
-      // Show nice toast then redirect to login
-      if (typeof window !== "undefined") {
-        const toastId = toast.error("Session expired. Redirecting to login...", {
-          duration: 2500,
-          action: {
-            label: "Login",
-            onClick: () => { window.location.href = "/#/" },
-          },
-        })
-        setTimeout(() => {
-          window.location.href = "/#/"
-        }, 2800)
       }
     }
 

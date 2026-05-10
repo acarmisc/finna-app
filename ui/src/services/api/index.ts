@@ -54,8 +54,8 @@ export class APIClient {
   async testConnection(id: string) { return configsClient.testConnection(id) }
   async createConnection(data: any) { return configsClient.createConnection(data) }
   async deleteConnection(id: string) { return configsClient.deleteConnection(id) }
-  async getProjects() { return configsClient.getProjects() }
-  async getProject(slug: string) { return configsClient.getProject(slug) }
+  async getProjects(params?: { window?: string; start?: string; end?: string }) { return configsClient.getProjects(params) }
+  async getProject(slug: string, params?: { window?: string; start?: string; end?: string }) { return configsClient.getProject(slug, params) }
   async createProject(data: any) { return configsClient.createProject(data) }
 
   // --- Extractors (inline for now) ---

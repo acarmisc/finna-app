@@ -2,6 +2,7 @@
 // Uses React Query with the existing apiClient
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getApiClient, type APIClient } from '@/services/apiClient'
+import { useDateRange } from '@/contexts/DateRangeContext'
 import {
   CostListResponse,
   CostTotalsResponse,
@@ -110,10 +111,11 @@ export function useAcknowledgeAlert() {
 // ============ Project Hooks ============
 
 export function useProjects() {
+  const { state } = useDateRange()
   return useQuery<ProjectResponse[], Error>({
-    queryKey: ['projects'],
+    queryKey: ['projects', state.window, state.start, state.end],
     queryFn: async () => {
-      const res = await getApiClient().getProjects()
+      const res = await getApiClient().getProjects({ window: state.window, start: state.start, end: state.end })
       return (res.data ?? null) as ProjectResponse[]
     },
     placeholderData: (previousData) => previousData,
@@ -121,10 +123,11 @@ export function useProjects() {
 }
 
 export function useProject(slug: string) {
+  const { state } = useDateRange()
   return useQuery<ProjectResponse, Error>({
-    queryKey: ['projects', slug],
+    queryKey: ['projects', slug, state.window, state.start, state.end],
     queryFn: async () => {
-      const res = await getApiClient().getProject(slug)
+      const res = await getApiClient().getProject(slug, { window: state.window, start: state.start, end: state.end })
       return (res.data ?? null) as ProjectResponse
     },
     enabled: !!slug,
