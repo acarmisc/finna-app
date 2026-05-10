@@ -150,7 +150,7 @@ async def list_projects(
             p.id, p.name, p.slug, p.owner, p.cost_center, p.budget_cap, p.tags, p.created_at, p.note, p.provider,
             COALESCE(SUM(COALESCE(NULLIF(c.net_cost_usd, 0), c.cost_usd)), 0) as mtd
         FROM fin_projects p
-        LEFT JOIN cost_records c ON c.project_id = p.id
+        LEFT JOIN cost_records c ON c.project_id = p.slug
             AND c.usage_start >= %s
             AND c.usage_start <= %s
         GROUP BY p.id, p.name, p.slug, p.owner, p.cost_center, p.budget_cap, p.tags, p.created_at, p.note, p.provider
@@ -242,7 +242,7 @@ async def get_project(
             p.id, p.name, p.slug, p.owner, p.cost_center, p.budget_cap, p.tags, p.created_at, p.note, p.provider,
             COALESCE(SUM(COALESCE(NULLIF(c.net_cost_usd, 0), c.cost_usd)), 0) as mtd
         FROM fin_projects p
-        LEFT JOIN cost_records c ON c.project_id = p.id
+        LEFT JOIN cost_records c ON c.project_id = p.slug
             AND c.usage_start >= %s
             AND c.usage_start <= %s
         WHERE p.slug = %s
