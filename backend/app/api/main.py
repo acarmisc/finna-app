@@ -115,14 +115,10 @@ from .routes import (  # noqa: E402
     auth,
     config,
     costs,
-    create_rate_limiting_middleware,  # noqa: E402
     db_dev,
     extractors,
     extractors_registry,
 )
-
-# Add rate limiting middleware (must be before routers)
-app.middleware("http")(create_rate_limiting_middleware())
 
 app.include_router(config.router, prefix="/api/v1", tags=["config"])
 app.include_router(extractors.router, prefix="/api/v1", tags=["extractors"])

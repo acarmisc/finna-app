@@ -6,9 +6,9 @@ from . import alerts, auth, config, costs, db_dev, extractors, extractors_regist
 from .openapi_extensions import (
     ERROR_RESPONSE_404,
     ERROR_RESPONSE_422,
+    RATE_LIMIT_429_RESPONSE,
     PaginationHeadersSchema,
-    create_rate_limiting_middleware,
-    rate_limiter,
+    RateLimitingHeadersSchema,
 )
 
 __all__ = [
@@ -22,6 +22,6 @@ __all__ = [
     "ERROR_RESPONSE_404",
     "ERROR_RESPONSE_422",
     "PaginationHeadersSchema",
-    "rate_limiter",
-    "create_rate_limiting_middleware",
+    "RateLimitingHeadersSchema",
+    "RATE_LIMIT_429_RESPONSE",
 ]
