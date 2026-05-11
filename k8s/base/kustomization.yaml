@@ -21,6 +21,6 @@ commonLabels:
 
 images:
   - name: finops-api
-    newTag: v1.2.3
+    newTag: 1.2.3
   - name: finops-extractor
     newTag: latest
