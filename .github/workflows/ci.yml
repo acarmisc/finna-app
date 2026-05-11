@@ -32,6 +32,8 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: pip install -e ".[dev]"
+      - name: Run Ruff linter
+        run: ruff check backend/ extractors/ models/
       - name: Run mypy
         run: mypy backend/ extractors/ models/ --ignore-missing-imports
 
