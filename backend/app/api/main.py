@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
 
@@ -15,10 +16,24 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from . import db, routes
 from .errors import register_error_handlers
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> Any:
+    """Initialize and tear down application resources."""
+    # Startup
+    if not os.environ.get("TESTING"):
+        await db.init_async_pool()
+    yield
+    # Shutdown
+    if not os.environ.get("TESTING"):
+        db.close_pools()
+
+
 app = FastAPI(
     title="Finna API",
     description="Finna cloud cost management and extraction platform",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Register custom error handlers
@@ -35,20 +50,6 @@ app.add_middleware(
 
 # Re-export routes module to avoid circular import issues
 __all__ = ["app", "auth", "db", "routes"]
-
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    """Initialize database connection pool on startup."""
-    if not os.environ.get("TESTING"):
-        await db.init_async_pool()
-
-
-@app.on_event("shutdown")
-async def shutdown_event() -> None:
-    """Close database connection pool on shutdown."""
-    if not os.environ.get("TESTING"):
-        db.close_pools()
 
 
 @app.middleware("http")
