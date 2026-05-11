@@ -39,3 +39,6 @@ test-results/
 /login-*.png
 /live-*.png
 /projects.png
+
+*storybook.log
+storybook-static
