@@ -2,28 +2,25 @@
 
 from __future__ import annotations
 
-import os
-import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from utils.encryption import decrypt_config, encrypt_config
+
 from .. import auth as auth_module
 from ..db import execute, insert_and_return, query_all, query_one
-
-require_auth = auth_module.require_auth
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".."))  # noqa: E402
-from utils.encryption import decrypt_config, encrypt_config  # noqa: E402
-
-from ..models import (  # noqa: E402, E501
+from ..models import (
     CloudConfigCreate,
     CloudConfigResponse,
     CloudConfigUpdate,
 )
 
 router = APIRouter()
+
+require_auth = auth_module.require_auth
 
 
 def _mask_secrets(config: dict[str, Any]) -> dict[str, Any]:

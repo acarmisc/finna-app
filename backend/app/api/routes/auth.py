@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import base64
 import logging
-import os
-import sys
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -13,7 +11,6 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".."))
 from .. import auth as api_auth
 from ..db import execute, insert_and_return, query_one
 
