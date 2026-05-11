@@ -8,7 +8,6 @@ Multi-cloud FinOps platform: Python FastAPI backend + React/Vite/Tailwind fronte
 - `extractors/` — GCP/Azure/AWS/LLM cost-data extractors.
 - `models/` — shared Python data models.
 - `ui/` — frontend (React + Vite + Tailwind v4 + Zustand + TanStack Query).
-- `k8s/` — kustomize manifests for staging/prod.
 - `tests/` — pytest suite for backend.
 
 ## Common commands
@@ -35,18 +34,6 @@ Multi-cloud FinOps platform: Python FastAPI backend + React/Vite/Tailwind fronte
 2. **Build**: multi-platform Docker image (amd64 + arm64) → ghcr.io/acarmisc/finops-api
 
 **No deployment steps** — CI only builds and pushes images.
-
-`docker-build.yml` — separate workflow for extractor image (runs on tags).
-
-## CI/CD Architecture
-
-### Monolithic Container
-- `Dockerfile.api` — builds both frontend + backend into single image
-- nginx on port 80 → serves frontend + proxies `/api/` to backend
-- FastAPI on port 8000 (internal only)
-
-### Multi-Platform Builds
-Images built for `linux/amd64` and `linux/arm64` using Docker Buildx.
 
 ## Design System
 

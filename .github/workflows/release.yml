@@ -10,7 +10,6 @@ env:
   API_IMAGE: ${{ github.repository }}/finops-api
   EXTRACTOR_IMAGE: ${{ github.repository }}/finops-extractor
   UI_IMAGE: ${{ github.repository }}/finops-ui
-  GCR_UI_IMAGE: europe-west1-docker.pkg.dev/abs-digital-playground/finna-app-staging/frontend
 
 jobs:
   build-api:
@@ -125,8 +124,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-    env:
-      HAS_GCP: ${{ secrets.GCP_SA_KEY != '' }}
     steps:
       - uses: actions/checkout@v6
 
@@ -175,40 +172,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Authenticate to Google Cloud
-        if: env.HAS_GCP == 'true'
-        uses: google-github-actions/auth@v3
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Configure Docker for GCR
-        if: env.HAS_GCP == 'true'
-        run: gcloud auth configure-docker europe-west1-docker.pkg.dev
-
-      - name: Extract metadata (GCR)
-        if: env.HAS_GCP == 'true'
-        id: meta-gcr
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.GCR_UI_IMAGE }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest
-
-      - name: Build and push to GCR
-        if: env.HAS_GCP == 'true'
-        uses: docker/build-push-action@v7
-        with:
-          context: ./ui
-          file: ./ui/Dockerfile
-          push: true
-          tags: ${{ steps.meta-gcr.outputs.tags }}
-          labels: ${{ steps.meta-gcr.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

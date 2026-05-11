@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: finops
-  labels:
-    name: finops
-    purpose: finops-cost-tracking
