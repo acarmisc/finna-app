@@ -15,11 +15,9 @@ from typing import Any, Optional
 
 from psycopg.rows import dict_row
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".."))  # noqa: E501
+from utils.encryption import decrypt_config
 
-from utils.encryption import decrypt_config  # noqa: E402
-
-from .metrics import extractor_duration_seconds, extractor_run_total  # noqa: E402
+from .metrics import extractor_duration_seconds, extractor_run_total
 
 logger = logging.getLogger("api.runner")
 

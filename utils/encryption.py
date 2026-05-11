@@ -127,10 +127,10 @@ def decrypt_config(encrypted) -> dict:
     # Handle legacy string formats
     if isinstance(encrypted, str):
         try:
-            return json.loads(base64.b64decode(encrypted.encode()).decode())
+            return json.loads(base64.b64decode(encrypted.encode()).decode())  # type: ignore[no-any-return]
         except Exception:
             try:
-                return json.loads(encrypted)
+                return json.loads(encrypted)  # type: ignore[no-any-return]
             except Exception:
                 return {}
 
