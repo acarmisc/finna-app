@@ -22,7 +22,6 @@ finna-app/
 ├── extractors/      # Cloud cost extractors
 ├── models/          # Shared data models
 ├── ui/              # React/Vite frontend
-├── k8s/             # Kubernetes manifests
 ├── sql/             # Database schema + seed data
 └── docker-compose.yml
 ```
@@ -196,14 +195,6 @@ docker build -f Dockerfile.api -t finna-api .
 
 # Build extractor image
 docker build -f Dockerfile.extractor -t finna-extractor .
-```
-
-### Kubernetes
-
-Kustomize manifests are in `k8s/`:
-
-```bash
-kubectl apply -k k8s/overlays/production
 ```
 
 ## Documentation

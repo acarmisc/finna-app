@@ -48,35 +48,18 @@ npm run build    # TypeScript check + Vite build → dist/
 npm run preview  # Preview build locale
 ```
 
-## Deployment
+## Stack
 
-### Prerequisiti
-
-- Accesso GCP con `gcloud` autenticato: `gcloud auth login`
-- Docker installato
-- kubectl configurato per il cluster `<gke-cluster-name>`
-
-### Build e push
-
-```bash
-npm run build
-
-# Build e push Docker image
-docker build -t finna-frontend:latest .
-docker tag finna-frontend:latest europe-west1-docker.pkg.dev/<gcp-project-id>/finna-app-staging/frontend:latest
-docker push europe-west1-docker.pkg.dev/<gcp-project-id>/finna-app-staging/frontend:latest
-
-# Rollout su GKE
-kubectl rollout restart deployment/finna-console -n finna-app-staging
-kubectl rollout status deployment/finna-console -n finna-app-staging --timeout=120s
-```
+- **Frontend**: React 18 + TypeScript + Vite + Tailwind v4 + shadcn/ui
+- **State**: Zustand + React Query
+- **Routing**: hash-based (`#/dashboard`, `#/projects`, etc.)
+- **Auth**: JWT in localStorage (`finna_token`), login base `admin/admin`
+- **Backend proxy**: Vite dev server `/api` → `http://localhost:8000`
 
 ### Endpoints
 
 - **Frontend UI**: `https://<your-domain>`
 - **Backend API**: `https://<your-domain>/api/v1`
-- **Namespace GKE**: `finna-app-staging`
-- **Ingress**: Traefik con TLS su REDACTED-LB-IP
 
 ### Login
 
@@ -105,4 +88,3 @@ Password: admin
 ---
 
 *Build timestamp: 2026-04-30*
-*Docker image: `europe-west1-docker.pkg.dev/<gcp-project-id>/finna-app-staging/frontend:latest`*
