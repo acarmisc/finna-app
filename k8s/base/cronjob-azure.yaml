@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: finops-extractor-azure
-  namespace: finna-app-staging
+  namespace: finops
   labels:
     app: finops-extractor
     extractor: azure-cost
@@ -27,15 +27,15 @@ spec:
             fsGroup: 1000
           containers:
           - name: extractor
-            image: ghcr.io/acarmisc/finna-app/finops-extractor:1.1.0
-            imagePullPolicy: Always
+            image: finops-extractor:latest
+            imagePullPolicy: IfNotPresent
             env:
             - name: EXTRACTOR_PROVIDER
               value: "azure"
             - name: CONFIG_ID
               value: "1"
             - name: API_URL
-              value: "http://finops-api.finna-app-staging.svc.cluster.local:8000"
+              value: "http://finops-api.finops.svc.cluster.local:8000"
             - name: AUTH_USERNAME
               valueFrom:
                 secretKeyRef:

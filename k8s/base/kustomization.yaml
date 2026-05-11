@@ -21,9 +21,6 @@ commonLabels:
 
 images:
   - name: finops-api
-    newTag: latest
+    newTag: v1.2.3
   - name: finops-extractor
-    newTag: latest
-  - name: finna-app-ui
-    newName: finna-app-ui
     newTag: latest
