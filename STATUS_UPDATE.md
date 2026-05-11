@@ -23,7 +23,6 @@ I've successfully completed the backend-to-frontend integration for the FinOps C
 
 ### Documentation
 - **INTEGRATION.md** - API documentation
-- **BACKEND_INTEGRATION.md** - Integration guide
 - **MVP_COMPLETE.md** - Complete summary
 - **README_INTEGRATION.md** - Quick reference
 - **startup.sh** - Automated deployment script
@@ -110,7 +109,6 @@ cd frontend && npm install && npm run dev
 
 ### Documentation
 - `INTEGRATION.md` - API docs
-- `BACKEND_INTEGRATION.md` - Integration guide
 - `MVP_COMPLETE.md` - Summary
 - `README_INTEGRATION.md` - Quick reference
 - `startup.sh` - Deployment script

@@ -38,7 +38,6 @@ I've successfully replaced the demo UI and wired up the backend to frontend for 
 - `/root/projects/finna-app/verify_setup.sh` - Verification script
 - `/root/projects/finna-app/agent_orchestration.sh` - Budget-optimized orchestration
 - `/root/projects/finna-app/INTEGRATION.md` - API documentation
-- `/root/projects/finna-app/BACKEND_INTEGRATION.md` - Integration guide
 - `/root/projects/finna-app/MVP_COMPLETE.md` - Complete summary
 
 ---
@@ -236,7 +235,6 @@ curl -s http://localhost:8000/healthz | python3 -m json.tool
 | `verify_setup.sh` | 4KB | Verification script |
 | `agent_orchestration.sh` | 10KB | Budget optimization |
 | `INTEGRATION.md` | 7KB | API docs |
-| `BACKEND_INTEGRATION.md` | 9KB | Integration guide |
 | `MVP_COMPLETE.md` | 7KB | Complete summary |
 | `README_INTEGRATION.md` | This file | Quick reference |
 
@@ -289,7 +287,7 @@ npm run dev
 ## Support Resources
 
 - **API Documentation**: http://localhost:8000/docs
-- **Integration Guide**: `BACKEND_INTEGRATION.md`
+- **Integration Guide**: `INTEGRATION.md`
 - **Complete Summary**: `MVP_COMPLETE.md`
 - **Quick Reference**: `README_INTEGRATION.md` (this file)
 

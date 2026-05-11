@@ -239,7 +239,6 @@ curl http://localhost:8000/api/v1/alerts
 ### Documentation
 - `README_INTEGRATION.md`
 - `INTEGRATION.md`
-- `BACKEND_INTEGRATION.md`
 - `MVP_COMPLETE.md`
 - `FINAL_STATUS.md`
 - `COMPLETION_REPORT.md`
