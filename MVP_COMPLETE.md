@@ -31,7 +31,6 @@ The FinOps Console has been successfully upgraded with full backend-to-frontend 
 ### 5. Deployment Files
 - `startup.sh`: Automated startup script
 - `INTEGRATION.md`: Comprehensive API documentation
-- `BACKEND_INTEGRATION.md`: Integration guide
 - `agent_orchestration.sh`: Optimized agent script for low budget
 
 ## Architecture
@@ -146,7 +145,6 @@ Optimization strategies:
 - `/src/components/auth/LoginScreen.tsx` - Auth UI
 - `startup.sh` - Startup script
 - `INTEGRATION.md` - API documentation
-- `BACKEND_INTEGRATION.md` - Integration guide
 - `agent_orchestration.sh` - Agent optimization script
 
 ### Modified Files
@@ -253,7 +251,7 @@ Savings: ~50,000 tokens 💰
 
 - **API Docs**: http://localhost:8000/docs
 - **Issues**: Check logs at `docker-compose logs`
-- **Documentation**: See `INTEGRATION.md` and `BACKEND_INTEGRATION.md`
+- **Documentation**: See `INTEGRATION.md`
 
 ## Summary
 
