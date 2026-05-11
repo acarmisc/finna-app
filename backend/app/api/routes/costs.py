@@ -601,7 +601,12 @@ async def dashboard_stats(
         by_status[status_val] = by_status.get(status_val, 0) + int(r["count"] or 0)
         severity_val = r["severity"] or "err"
         by_severity[severity_val] = by_severity.get(severity_val, 0) + int(r["count"] or 0)
-    alert_stats = {"firing": by_status["firing"], "ack": by_status["ack"], "resolved": by_status["resolved"], "by_severity": by_severity}
+    alert_stats = {
+        "firing": by_status["firing"],
+        "ack": by_status["ack"],
+        "resolved": by_status["resolved"],
+        "by_severity": by_severity,
+    }
 
     return {
         "totals": totals,

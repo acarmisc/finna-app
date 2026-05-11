@@ -190,7 +190,7 @@ async def get_async_connection() -> AsyncIterator[AsyncConnection]:
     pool = await get_async_pool()
     max_retries = 3
     base_delay = 0.1  # 100ms
-    
+
     for attempt in range(max_retries):
         try:
             async with pool.connection() as conn:
@@ -201,7 +201,7 @@ async def get_async_connection() -> AsyncIterator[AsyncConnection]:
                 logger.error("Async connection pool exhausted after %d retries", max_retries)
                 raise
             delay = base_delay * (2 ** attempt)  # Exponential backoff
-            logger.warning("Async connection pool exhausted, retrying in %.2fs (attempt %d/%d)", 
+            logger.warning("Async connection pool exhausted, retrying in %.2fs (attempt %d/%d)",
                          delay, attempt + 1, max_retries)
             await asyncio.sleep(delay)
         except psycopg.Error as e:
@@ -214,7 +214,7 @@ def get_connection() -> psycopg.Connection:
     pool = get_sync_pool()
     max_retries = 3
     base_delay = 0.1  # 100ms
-    
+
     for attempt in range(max_retries):
         try:
             conn = pool.getconn()
@@ -232,7 +232,7 @@ def get_connection() -> psycopg.Connection:
                 logger.error("Connection pool exhausted after %d retries", max_retries)
                 raise
             delay = base_delay * (2 ** attempt)  # Exponential backoff
-            logger.warning("Connection pool exhausted, retrying in %.2fs (attempt %d/%d)", 
+            logger.warning("Connection pool exhausted, retrying in %.2fs (attempt %d/%d)",
                          delay, attempt + 1, max_retries)
             time.sleep(delay)
         except psycopg.Error as e:
