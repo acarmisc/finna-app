@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: finna-app-staging
+
+resources:
+  - ../../overlays/dev
+
+commonLabels:
+  environment: staging
+
+images:
+  - name: finops-api
+    newTag: v1.2.3
+  - name: finops-extractor
+    newTag: v1.2.3
+
+patches:
+  - path: configmap-patch.yaml
+    target:
+      kind: ConfigMap
+      name: finops-config
