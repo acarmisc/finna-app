@@ -12,3 +12,6 @@ export const Routes = () => null;
 export const Link = ({ to, children, ...props }: any) => {
   return React.createElement('a', { href: to, ...props }, children);
 };
+export const MemoryRouter = ({ children }: any) => React.createElement(React.Fragment, null, children);
+export const BrowserRouter = ({ children }: any) => React.createElement(React.Fragment, null, children);
+export const HashRouter = ({ children }: any) => React.createElement(React.Fragment, null, children);

@@ -25,7 +25,7 @@ module.exports = {
   ],
   coverageProvider: 'v8',
   rootDir: '.',
-  testPathIgnorePatterns: ['/node_modules/', '/dist/'],
+  testPathIgnorePatterns: ['/node_modules/', '/dist/', '/e2e/'],
   verbose: true,
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
