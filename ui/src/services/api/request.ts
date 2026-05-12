@@ -3,16 +3,6 @@ import { useAuthStore } from '@/store/auth'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
-let isRefreshing = false
-let failedQueue: Array<{
-  resolve: (value: unknown) => void
-  reject: (reason?: unknown) => void
-}> = []
-
-const processQueue = (error?: unknown) => {
-  failedQueue.forEach(({ reject }) => reject(error))
-  failedQueue = []
-}
 
 export const apiRequest = async <T>(
   endpoint: string,
@@ -45,47 +35,8 @@ export const apiRequest = async <T>(
     }
 
     if (resp.status === 401) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject })
-        })
-          .then(() => apiRequest(endpoint, options))
-          .catch((err) => Promise.reject(err)) as Promise<{ data?: T; error?: any; status: number }>
-      }
-
-      if (!useAuthStore.getState().isAuthenticated) {
-        let parsed: any
-        try { parsed = await resp.json() } catch { parsed = {} }
-        return { status: 401, error: parsed.error || { message: 'Unauthorized' } }
-      }
-
-      isRefreshing = true
-
-      try {
-        const refreshResp = await fetch(`${API_BASE_URL}/auth/refresh`, {
-          method: 'POST',
-          credentials: 'include',
-        })
-
-        if (refreshResp.ok) {
-          const refreshData = await refreshResp.json()
-          if (refreshData?.access_token) {
-            useAuthStore.getState().setToken(refreshData.access_token)
-            processQueue()
-            return apiRequest(endpoint, options) as Promise<{ data?: T; error?: any; status: number }>
-          }
-        }
-
-        useAuthStore.getState().logout()
-        processQueue(new Error('Session expired'))
-        return { status: 401, error: { message: 'Session expired' } }
-      } catch (refreshError: any) {
-        useAuthStore.getState().logout()
-        processQueue(refreshError)
-        return { status: 401, error: { message: refreshError.message || 'Session expired' } }
-      } finally {
-        isRefreshing = false
-      }
+      useAuthStore.getState().logout()
+      return { status: 401, error: { message: 'Session expired' } }
     }
 
     let parsed: any

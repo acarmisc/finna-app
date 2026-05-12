@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
-import { QueryClientProvider } from '@tanstack/react-query'
+import { QueryClientProvider, useQueryClient } from '@tanstack/react-query'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { DateRangeProvider } from '@/contexts/DateRangeContext'
 import { ToastProvider } from '@/contexts/ToastContext'
@@ -53,12 +53,16 @@ function Router() {
 }
 
 function AuthenticatedApp() {
-  const { checkAuth } = useAuthStore()
-  
+  const { isAuthenticated, loading, checkAuth } = useAuthStore()
+  const queryClient = useQueryClient()
+
   useEffect(() => { checkAuth() }, [])
-  
-  if (!useAuthStore.getState().isAuthenticated) return <LoginComponent onLoginSuccess={() => {}} />
-  
+
+  if (loading) return null
+  if (!isAuthenticated) return (
+    <LoginComponent onLoginSuccess={() => queryClient.invalidateQueries()} />
+  )
+
   return <Router />
 }
 

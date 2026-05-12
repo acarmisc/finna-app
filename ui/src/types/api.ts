@@ -139,7 +139,8 @@ export interface ProjectUpdate {
 export interface CostRecord {
   id: string
   prov: Provider
-  name: string
+  name: string | null
+  project_id?: string | null
   sku: string
   mtd: number
   delta?: number
