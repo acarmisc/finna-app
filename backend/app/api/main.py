@@ -115,7 +115,6 @@ from .routes import (  # noqa: E402
     auth,
     config,
     costs,
-    db_dev,
     extractors,
     extractors_registry,
 )
@@ -126,7 +125,13 @@ app.include_router(extractors_registry.router, prefix="/api/v1", tags=["extracto
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(costs.router, prefix="/api/v1", tags=["costs"])
 app.include_router(alerts.router, prefix="/api/v1", tags=["alerts"])
-app.include_router(db_dev.router, prefix="/api/v1", tags=["db"])
+
+# Dev-only raw SQL endpoints (gated)
+_env = os.environ.get("ENV", "")
+if _env.lower() == "development":
+    from .routes import db_dev
+    app.include_router(db_dev.router, prefix="/api/v1", tags=["db"])
+    print("WARNING: db_dev raw SQL endpoints are mounted (ENV=development). Do NOT deploy this to production.")
 
 # Initialize Prometheus metrics instrumentator (must be after middleware)
 instrumentator = Instrumentator()
