@@ -53,6 +53,17 @@ export function ProjectDetailPage() {
   const [skuFilter, setSkuFilter] = useState('')
   useEffect(() => { setNote((p as any)?.note ?? '') }, [(p as any)?.note])
 
+  const skus = useMemo(
+    () => costsResp?.costs?.map(c => ({ sku: c.sku, mtd: c.mtd, prev: c.prev ?? 0, delta: c.delta ?? 0 })) ?? [],
+    [costsResp]
+  )
+
+  const filteredSkus = useMemo(() => {
+    if (!skuFilter.trim()) return skus
+    const q = skuFilter.toLowerCase()
+    return skus.filter(c => c.sku.toLowerCase().includes(q))
+  }, [skus, skuFilter])
+
   const handleDelete = async () => {
     const token = localStorage.getItem('finna_token')
     const res = await fetch(`/api/v1/config/projects/${slug}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
@@ -87,17 +98,9 @@ export function ProjectDetailPage() {
   const pct = cap > 0 ? (mtd / cap) * 100 : 0
   const provider = (p.provider ?? 'azure') as Provider
 
-  const skus = costsResp?.costs?.map(c => ({ sku: c.sku, mtd: c.mtd, prev: c.prev ?? 0, delta: c.delta ?? 0 })) ?? []
-
   const tags = tagsToList(p.tags)
   const totalMtd = skus.reduce((s, c) => s + c.mtd, 0)
   const totalPrev = skus.reduce((s, c) => s + c.prev, 0)
-
-  const filteredSkus = useMemo(() => {
-    if (!skuFilter.trim()) return skus
-    const q = skuFilter.toLowerCase()
-    return skus.filter(c => c.sku.toLowerCase().includes(q))
-  }, [skus, skuFilter])
 
   return (
     <div className="page">
