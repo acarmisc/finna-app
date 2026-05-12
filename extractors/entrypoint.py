@@ -4,6 +4,7 @@ Reads the EXTRACTOR_TYPE environment variable and dispatches to the
 corresponding extractor's main() function.
 
 Supported values:
+  aws_cost       - AWS Cost Explorer extractor
   gcp_billing    - GCP BigQuery billing extractor
   gcp_csv        - GCP CSV billing file extractor
   azure_cost     - Azure Cost Management extractor
@@ -16,6 +17,7 @@ import os
 import sys
 
 EXTRACTOR_MAP = {
+    "aws_cost": "extractors.aws_cost",
     "gcp_billing": "extractors.gcp_billing",
     "gcp_csv": "extractors.gcp_csv",
     "azure_cost": "extractors.azure_cost",
