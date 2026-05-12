@@ -7,6 +7,7 @@ from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 import pytest
+from tenacity import RetryError
 
 from extractors.aws_cost import (
     _generate_record_id,
@@ -308,7 +309,8 @@ class TestGetCostAndUsage:
             {"Error": {"Code": "ThrottlingException", "Message": "Rate exceeded"}},
             "GetCostAndUsage",
         )
-        with pytest.raises(ClientError):
+        # Tenacity retries ThrottlingException 3x then wraps in RetryError
+        with pytest.raises((ClientError, RetryError)):
             get_cost_and_usage(mock_client, "2024-03-01", "2024-03-31")
 
 
@@ -434,7 +436,7 @@ class TestHealthTracking:
 
 class TestExtractCosts:
     @patch("extractors.aws_cost.psycopg.connect")
-    @patch("extractors.aws_cost.boto3.client")
+    @patch("boto3.client")
     def test_happy_path(self, mock_boto3_client, mock_pg_connect, monkeypatch):
         monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIAIOSFODNN7EXAMPLE")
         monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
@@ -462,7 +464,7 @@ class TestExtractCosts:
         mock_conn.close.assert_called_once()
 
     @patch("extractors.aws_cost.psycopg.connect")
-    @patch("extractors.aws_cost.boto3.client")
+    @patch("boto3.client")
     def test_empty_result(self, mock_boto3_client, mock_pg_connect, monkeypatch):
         monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIAIOSFODNN7EXAMPLE")
         monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
@@ -501,7 +503,7 @@ class TestExtractCosts:
             )
 
     @patch("extractors.aws_cost.psycopg.connect")
-    @patch("extractors.aws_cost.boto3.client")
+    @patch("boto3.client")
     def test_db_failure_marks_health_failed(self, mock_boto3_client, mock_pg_connect, monkeypatch):
         monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIAIOSFODNN7EXAMPLE")
         monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY")
@@ -537,7 +539,7 @@ class TestExtractCosts:
 
 class TestMain:
     @patch("extractors.aws_cost.psycopg.connect")
-    @patch("extractors.aws_cost.boto3.client")
+    @patch("boto3.client")
     def test_main_with_env_dates(self, mock_boto3_client, mock_pg_connect, monkeypatch, caplog):
         import logging
 
@@ -562,7 +564,7 @@ class TestMain:
         assert any("finished" in m for m in caplog.messages)
 
     @patch("extractors.aws_cost.psycopg.connect")
-    @patch("extractors.aws_cost.boto3.client")
+    @patch("boto3.client")
     def test_main_no_env_dates_uses_defaults(self, mock_boto3_client, mock_pg_connect, monkeypatch):
         monkeypatch.delenv("DATE_FROM", raising=False)
         monkeypatch.delenv("DATE_TO", raising=False)
@@ -580,7 +582,7 @@ class TestMain:
         main()  # Should not raise
 
     @patch("extractors.aws_cost.psycopg.connect")
-    @patch("extractors.aws_cost.boto3.client")
+    @patch("boto3.client")
     def test_main_failure_exits_nonzero(self, mock_boto3_client, mock_pg_connect, monkeypatch, capsys):
         monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AK")
         monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "SK")
