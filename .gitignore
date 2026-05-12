@@ -69,3 +69,7 @@ package-lock.json
 test-results/
 graphify-out/
 azure-sp.txt
+
+# Test artifacts
+.coverage
+htmlcov/
