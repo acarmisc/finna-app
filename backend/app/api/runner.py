@@ -57,6 +57,7 @@ def _get_extractor_type(provider: str) -> str:
     mapping = {
         "azure": "azure_cost",
         "gcp": "gcp_billing",
+        "aws": "aws_cost",
     }
     return mapping.get(provider, provider)
 
@@ -95,6 +96,11 @@ def _build_env_from_config(config: dict[str, Any], provider: str, cred_type: str
             env["BQ_DATASET"] = config["bigquery_dataset"]
         if config.get("bigquery_table"):
             env["BQ_TABLE"] = config["bigquery_table"]
+        if not env.get("DATE_FROM"):
+            from datetime import datetime, timedelta, timezone
+            today = datetime.now(timezone.utc).date()
+            env["DATE_FROM"] = str(today - timedelta(days=30))
+            env["DATE_TO"] = str(today)
 
     env["PG_DSN"] = _get_pg_dsn()
 
