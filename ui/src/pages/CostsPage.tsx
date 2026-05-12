@@ -63,7 +63,7 @@ export function CostsPage() {
   const filtered = allRows.filter(c =>
     applied.providers[c.prov as Provider] &&
     (!applied.sku || c.sku.toLowerCase().includes(applied.sku.toLowerCase())) &&
-    (applied.proj.length === 0 || applied.proj.includes(c.name))
+    (applied.proj.length === 0 || applied.proj.includes(c.project_id ?? c.name ?? ''))
   )
 
   const grouped = useMemo(() => {
@@ -192,7 +192,7 @@ export function CostsPage() {
                   {filtered.map(r => (
                     <tr key={r.id}>
                       <td><ProviderBadge provider={r.prov} /></td>
-                      <td className="mono">{r.name}</td>
+                      <td className="mono">{r.name ?? r.project_id ?? '—'}</td>
                       <td>{r.sku}</td>
                       <td className="num mono">{money(r.mtd)}</td>
                       <td className="num mono muted">{money(r.prev ?? 0)}</td>
