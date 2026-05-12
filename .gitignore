@@ -68,3 +68,4 @@ package-lock.json
 .playwright-mcp/
 test-results/
 graphify-out/
+azure-sp.txt
