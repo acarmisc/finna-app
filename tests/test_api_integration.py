@@ -394,7 +394,7 @@ class TestExtractorRun:
     @pytest.mark.integration
     def test_run_extractor_success(self, auth_client):
         """Running an extractor succeeds and returns run_id."""
-        with patch("backend.app.api.routes.extractors.start_extractor") as mock_start:
+        with patch("backend.app.api.routes.extractors_registry.start_extractor") as mock_start:
             mock_start.return_value = "run-123"
 
             response = auth_client.post(
@@ -422,7 +422,7 @@ class TestExtractorRun:
     @pytest.mark.integration
     def test_list_extractors_status_success(self, auth_client):
         """Listing extractor status succeeds and returns runs."""
-        with patch("backend.app.api.routes.extractors.list_runs") as mock_list:
+        with patch("backend.app.api.routes.extractors_registry.list_runs") as mock_list:
             mock_list.return_value = [
                 {
                     "id": "run-1",
@@ -435,7 +435,7 @@ class TestExtractorRun:
                 },
             ]
 
-            response = auth_client.get("/api/v1/extractors/status")
+            response = auth_client.get("/api/v1/extractors/runs")
 
             assert response.status_code == 200
             data = response.json()
@@ -447,10 +447,10 @@ class TestExtractorRun:
     @pytest.mark.integration
     def test_list_extractors_status_empty(self, auth_client):
         """Listing extractor status when no runs returns empty list."""
-        with patch("backend.app.api.routes.extractors.list_runs") as mock_list:
+        with patch("backend.app.api.routes.extractors_registry.list_runs") as mock_list:
             mock_list.return_value = []
 
-            response = auth_client.get("/api/v1/extractors/status")
+            response = auth_client.get("/api/v1/extractors/runs")
 
             assert response.status_code == 200
             data = response.json()
@@ -460,7 +460,7 @@ class TestExtractorRun:
     @pytest.mark.integration
     def test_get_extractor_run_success(self, auth_client):
         """Getting extractor run by ID succeeds."""
-        with patch("backend.app.api.routes.extractors.get_run_status") as mock_get:
+        with patch("backend.app.api.routes.extractors_registry.get_run_status") as mock_get:
             mock_get.return_value = {
                 "id": "run-1",
                 "provider": "gcp",
@@ -471,7 +471,7 @@ class TestExtractorRun:
                 "records_extracted": 100,
             }
 
-            response = auth_client.get("/api/v1/extractors/run/run-1")
+            response = auth_client.get("/api/v1/extractors/runs/run-1")
 
             assert response.status_code == 200
             data = response.json()
@@ -481,10 +481,10 @@ class TestExtractorRun:
     @pytest.mark.integration
     def test_get_extractor_run_not_found(self, auth_client):
         """Getting nonexistent run returns 404."""
-        with patch("backend.app.api.routes.extractors.get_run_status") as mock_get:
+        with patch("backend.app.api.routes.extractors_registry.get_run_status") as mock_get:
             mock_get.return_value = None
 
-            response = auth_client.get("/api/v1/extractors/run/nonexistent")
+            response = auth_client.get("/api/v1/extractors/runs/nonexistent")
 
             assert response.status_code == 404
             data = response.json()
@@ -493,10 +493,10 @@ class TestExtractorRun:
     @pytest.mark.integration
     def test_cancel_extractor_run_success(self, auth_client):
         """Canceling an extractor run succeeds."""
-        with patch("backend.app.api.routes.extractors.cancel_run") as mock_cancel:
+        with patch("backend.app.api.routes.extractors_registry.cancel_run") as mock_cancel:
             mock_cancel.return_value = True
 
-            response = auth_client.post("/api/v1/extractors/run/run-1/cancel")
+            response = auth_client.post("/api/v1/extractors/runs/run-1/cancel")
 
             assert response.status_code == 200
             data = response.json()
@@ -505,10 +505,10 @@ class TestExtractorRun:
     @pytest.mark.integration
     def test_cancel_extractor_run_not_found(self, auth_client):
         """Canceling nonexistent run returns 404."""
-        with patch("backend.app.api.routes.extractors.cancel_run") as mock_cancel:
+        with patch("backend.app.api.routes.extractors_registry.cancel_run") as mock_cancel:
             mock_cancel.return_value = False
 
-            response = auth_client.post("/api/v1/extractors/run/nonexistent/cancel")
+            response = auth_client.post("/api/v1/extractors/runs/nonexistent/cancel")
 
             assert response.status_code == 404
 
