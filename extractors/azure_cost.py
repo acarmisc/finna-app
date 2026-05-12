@@ -494,6 +494,7 @@ def transform_row(
         usage_end=usage_dt + timedelta(days=1),
         account_id=subscription_id,
         project_id=project_id,
+        project_name=resource_group or None,
         service_category=service_category,
         service_name=service_name,
         resource_id=resource_group or None,
