@@ -12,7 +12,7 @@ from .. import auth as auth_module
 
 require_auth = auth_module.require_auth  # noqa: E402
 from ..db import execute, insert_and_return, query_all, query_one  # noqa: E402
-from ..runner import start_extractor  # noqa: E402
+from ..runner import cancel_run, get_run_status, list_runs, start_extractor  # noqa: E402
 
 router = APIRouter()
 
@@ -98,6 +98,77 @@ async def create_extractor(data: dict[str, Any]) -> dict[str, Any]:
         "created_at": now,
         "updated_at": now,
     }
+
+
+# ─── Runs (moved from legacy extractors.py) ─────────────────────────────────────
+# MUST be placed before /extractors/{extractor_id} to avoid path shadowing.
+
+@router.get("/extractors/runs", dependencies=[Depends(require_auth)])
+async def list_extractor_runs(
+    limit: int = 50, provider: Optional[str] = None
+) -> dict[str, Any]:
+    """List extractor runs."""
+    runs = list_runs(limit=limit, provider=provider)
+    return {"runs": runs, "count": len(runs)}
+
+
+@router.get("/extractors/runs/{run_id}", dependencies=[Depends(require_auth)])
+async def get_extractor_run(run_id: str) -> dict[str, Any]:
+    """Get status of an extractor run."""
+    run = get_run_status(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return run
+
+
+@router.post("/extractors/runs/{run_id}/cancel", dependencies=[Depends(require_auth)])
+async def cancel_extractor_run(run_id: str) -> dict[str, Any]:
+    """Cancel an extractor run."""
+    success = cancel_run(run_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Run not found or already finished")
+    return {"status": "cancelled"}
+
+
+@router.get("/extractors/runs/{run_id}/logs", dependencies=[Depends(require_auth)])
+async def get_extractor_run_logs(run_id: str) -> dict[str, Any]:
+    """Get sanitized log output for an extractor run."""
+    run = get_run_status(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    log_output = run.get("log_output") or ""
+    return {"logs": log_output.splitlines() if log_output else []}
+
+
+# ─── Legacy alias for /extractors/runs (kept for backward compat) ─────────────────
+
+@router.get("/extractors/status", dependencies=[Depends(require_auth)])
+async def list_extractor_status(
+    limit: int = 50, provider: Optional[str] = None
+) -> dict[str, Any]:
+    """Legacy alias – list extractor runs."""
+    runs = list_runs(limit=limit, provider=provider)
+    return {"runs": runs, "count": len(runs)}
+
+
+# ─── Legacy trigger (CLI compat; kept for frontend) ──────────────────────────
+
+@router.post("/extractors/run", dependencies=[Depends(require_auth)])
+async def run_extractor_via_post(data: dict[str, Any]) -> dict[str, Any]:
+    """Run an extractor by config_id (legacy endpoint)."""
+    provider = data.get("provider", "gcp")
+    extractor_type = data.get("extractor_type", provider)
+    config_id = data.get("config_id")
+
+    if not config_id:
+        raise HTTPException(status_code=400, detail="config_id is required")
+
+    run_id = start_extractor(
+        config_id=config_id,
+        provider=provider,
+        extractor_type=extractor_type,
+    )
+    return {"run_id": run_id, "status": "started"}
 
 
 # ─── Registry get ─────────────────────────────────────────────────────────────
