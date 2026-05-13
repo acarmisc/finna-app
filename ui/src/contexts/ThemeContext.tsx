@@ -15,20 +15,20 @@ const SYSTEM_PREFERENCE_KEY = 'finna_theme_system'
 const STORED_THEME_KEY = 'finna_theme'
 
 const detectSystemTheme = (): 'dark' | 'light' => {
-  if (typeof window === 'undefined') return 'dark'
+  if (typeof window === 'undefined') return 'light'
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === 'undefined') return 'dark'
+    if (typeof window === 'undefined') return 'light'
     const stored = localStorage.getItem(STORED_THEME_KEY) as Theme
-    return stored || 'system'
+    return stored || 'light'
   })
 
   const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>(() => {
     if (theme === 'system') return detectSystemTheme()
-    return theme
+    return theme as 'dark' | 'light'
   })
 
   useEffect(() => {

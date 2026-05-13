@@ -23,6 +23,8 @@ const RANGE_DELTAS: Record<string, string> = {
 
 const formatLabel = (iso: string) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 
+const fmt = (iso?: string) => iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+
 const durationOf = (started?: string, finished?: string) => {
   if (!started || !finished) return '—'
   const ms = new Date(finished).getTime() - new Date(started).getTime()
@@ -252,7 +254,7 @@ export function DashboardPage() {
             {runsArr.length > 0 ? (
               <table className="tbl">
                 <thead><tr>
-                  <th>Provider</th><th>Extractor</th><th>Status</th>
+                  <th>Provider</th><th>Extractor</th><th>Status</th><th>Started</th>
                   <th className="num">Records</th><th className="num">Duration</th><th>Run ID</th>
                 </tr></thead>
                 <tbody>
@@ -263,6 +265,7 @@ export function DashboardPage() {
                         <td><ProviderBadge provider={r.provider} /></td>
                         <td className="mono">{r.extractor_type}</td>
                         <td><StatusBadge status={r.status as any} /></td>
+                        <td className="mono muted">{fmt(r.started_at)}</td>
                         <td className="num mono">{r.records_extracted ? r.records_extracted.toLocaleString() : '—'}</td>
                         <td className="num mono">{durationOf(r.started_at, r.finished_at)}</td>
                         <td><span className="id">{id}</span></td>
