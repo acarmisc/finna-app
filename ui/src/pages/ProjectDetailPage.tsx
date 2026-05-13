@@ -40,6 +40,17 @@ const tagsToList = (tags?: any): string[] => {
   return Object.entries(tags).map(([k, v]) => v && v !== 'true' ? `${k}:${v}` : k)
 }
 
+const getDateRangeLabel = (window: string, start?: string, end?: string): string => {
+  switch (window) {
+    case 'mtd': return 'MTD'
+    case '7d': return 'last 7d'
+    case '30d': return 'last 30d'
+    case '90d': return 'last 90d'
+    case 'custom': return start && end ? `${start} → ${end}` : 'custom'
+    default: return 'custom'
+  }
+}
+
 export function ProjectDetailPage() {
   const navigate = useNavigate()
   const { slug = '' } = useParams<{ slug: string }>()
@@ -101,6 +112,7 @@ export function ProjectDetailPage() {
   const tags = tagsToList(p.tags)
   const totalMtd = skus.reduce((s, c) => s + c.mtd, 0)
   const totalPrev = skus.reduce((s, c) => s + c.prev, 0)
+  const rangeLabel = getDateRangeLabel(state.window, state.start, state.end)
 
   return (
     <div className="page">
@@ -131,7 +143,7 @@ export function ProjectDetailPage() {
           <div className="card-hd">
             <div className="hstack-3">
               <h3>Cost summary</h3>
-              <span className="chip">custom range</span>
+              <span className="chip">{rangeLabel}</span>
             </div>
           </div>
           <div className="card-bd">
@@ -175,14 +187,44 @@ export function ProjectDetailPage() {
       <div className="card mt-3">
         <div className="card-hd">
           <h3>Cost breakdown · SKU</h3>
-          <div className="inp-group" style={{ maxWidth: 220, width: '100%' }}>
-            <Icon name="search" size={13} />
-            <input
-              className="inp"
-              placeholder="filter by SKU…"
-              value={skuFilter}
-              onChange={e => setSkuFilter(e.target.value)}
-            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span className="muted mono" style={{ fontSize: 11 }}>{filteredSkus.length}/{skus.length} SKUs</span>
+            <div className="inp-group" style={{ maxWidth: 220, width: '100%', position: 'relative' }}>
+              <Icon name="search" size={13} />
+              <input
+                type="search"
+                autoFocus={false}
+                className="inp"
+                placeholder="filter by SKU…"
+                value={skuFilter}
+                onChange={e => setSkuFilter(e.target.value)}
+              />
+              {skuFilter.length > 0 && (
+                <button
+                  className="btn-icon"
+                  onClick={() => setSkuFilter('')}
+                  aria-label="clear filter"
+                  style={{
+                    position: 'absolute',
+                    right: 8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    padding: 4,
+                    cursor: 'pointer',
+                    color: 'var(--fg-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--fg)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--fg-muted)')}
+                >
+                  <Icon name="x" size={14} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div className="card-bd p0">
