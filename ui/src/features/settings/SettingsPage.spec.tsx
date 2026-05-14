@@ -1,57 +1,44 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SettingsPage } from './SettingsPage'
-import { useTheme } from '@/contexts/ThemeContext'
-import { useToast } from '@/contexts/ToastContext'
-
-// Mock contexts
-jest.mock('@/contexts/ThemeContext', () => ({
-  useTheme: () => ({
-    theme: 'dark',
-    resolvedTheme: 'dark',
-    setTheme: jest.fn(),
-    toggleTheme: jest.fn()
-  })
-}))
-
-jest.mock('@/contexts/ToastContext', () => ({
-  useToast: () => ({
-    showToast: jest.fn(),
-    showSuccess: jest.fn(),
-    showError: jest.fn()
-  })
-}))
 
 describe('SettingsPage Component', () => {
-  beforeEach(() => {
-    jest.clearAllMocks()
-  })
-
   it('should render settings page header', () => {
     render(<SettingsPage />)
-    
     expect(screen.getByText('Settings')).toBeInTheDocument()
-    expect(screen.getByText('// user preferences · POST /api/v1/auth/profile')).toBeInTheDocument()
+    expect(screen.getByText('// account, orchestrator, integrations')).toBeInTheDocument()
   })
 
-  it('should render navigation sections', () => {
+  it('should render Account card with fields and save button', () => {
     render(<SettingsPage />)
-    
-    const sectionButtons = screen.getAllByRole('button')
-    console.log('Number of buttons:', sectionButtons.length)
-    sectionButtons.forEach((button, index) => {
-      console.log(`Button ${index}: "${button.textContent}"`)
-    })
-    
-    // We have 7 buttons because there's also a save button
-    expect(sectionButtons.length).toBeGreaterThanOrEqual(5) // At least the 5 section buttons
-    
-    // Check that we have the expected section buttons
-    const buttonTexts = sectionButtons.map(b => b.textContent.trim())
-    expect(buttonTexts).toContain('// profile')
-    expect(buttonTexts).toContain('// organization')
-    expect(buttonTexts).toContain('// api keys')
-    expect(buttonTexts).toContain('// notifications')
-    expect(buttonTexts).toContain('// preferences')
+    expect(screen.getByRole('heading', { name: /Account/i })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('finops@acme.co')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('acme')).toBeDisabled()
+    expect(screen.getByRole('combobox')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument()
+  })
+
+  it('should render Orchestrator card with endpoint and scheduler', () => {
+    render(<SettingsPage />)
+    expect(screen.getByRole('heading', { name: /Orchestrator/i })).toBeInTheDocument()
+    expect(screen.getByText(/api endpoint/i)).toBeInTheDocument()
+    expect(screen.getByText(/healthy/i)).toBeInTheDocument()
+    expect(screen.getByText(/scheduler/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /edit schedule/i })).toBeInTheDocument()
+  })
+
+  it('should render Danger zone card with purge button', async () => {
+    render(<SettingsPage />)
+    expect(screen.getByRole('heading', { name: /Danger zone/i })).toBeInTheDocument()
+
+    const cardBd = screen.getByRole('heading', { name: /Danger zone/i }).closest('.card')?.querySelector('.card-bd')
+    expect(cardBd).toBeTruthy()
+    expect(cardBd!.textContent).toMatch(/Purge cost records/)
+
+    const purgeBtn = screen.getByRole('button', { name: /purge/i })
+    expect(purgeBtn).toBeInTheDocument()
+
+    await userEvent.click(purgeBtn)
+    expect(screen.getByText(/permanently delete/i)).toBeInTheDocument()
   })
 })
