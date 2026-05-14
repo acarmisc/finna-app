@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [v1.3.0] - 2026-05-14
+
+### Added
+- `extractors/litellm_cost.py`: LiteLLM proxy spend extractor. Pulls `/spend/logs?summarize=false`, paginated, normalizes per-request transactions into `cost_records` with `provider='llm'`. Covers all 5 cost dimensions: model (`service_name`/`model_name`), period (`usage_start`/`usage_end`), user (`account_id` + `tags.end_user`), task (`project_id` via `LITELLM_TASK_TAG_PREFIX`), team (`team`). Idempotent via `ON CONFLICT (record_id) DO NOTHING`.
+- `extractors/entrypoint.py`: registered `litellm_cost` in `EXTRACTOR_MAP`.
+- `backend/app/api/runner.py`: provider `llm`/`litellm` → `litellm_cost`; env build from cloud_config (`LITELLM_BASE_URL`, `LITELLM_MASTER_KEY`, `LITELLM_PAGE_SIZE`, `LITELLM_TIMEOUT`, `LITELLM_TASK_TAG_PREFIX`).
+- `tests/test_litellm_cost.py`: 20 unit tests (parsers, normalization, pagination via `httpx.MockTransport`, insert path, env-guard paths).
+
+### Notes
+- Validated end-to-end on staging: 1812 spend log rows → 375 records inserted ($52.80 USD, 73.5M tokens) across opus-4-7 / sonnet-4-6 / haiku-4-5.
+- `_mark_health_*` is schema-aware: tolerates both `last_run_start`/`last_run_end` (init.sql) and `last_run_ts` (init_docker.sql) shapes; failures are best-effort.
+- LiteLLM stores spend in USD only — `cost_original = cost_usd`, `currency_original = "USD"`. No exchange-rate join.
+
 ## [v1.1.0] - 2026-05-07
 
 ### Added

@@ -8,6 +8,7 @@ Supported values:
   gcp_billing    - GCP BigQuery billing extractor
   gcp_csv        - GCP CSV billing file extractor
   azure_cost     - Azure Cost Management extractor
+  litellm_cost   - LiteLLM proxy spend logs extractor
   exchange_rates - ECB exchange rate extractor
 """
 
@@ -21,6 +22,7 @@ EXTRACTOR_MAP = {
     "gcp_billing": "extractors.gcp_billing",
     "gcp_csv": "extractors.gcp_csv",
     "azure_cost": "extractors.azure_cost",
+    "litellm_cost": "extractors.litellm_cost",
     "exchange_rates": "extractors.exchange_rates",
 }
 

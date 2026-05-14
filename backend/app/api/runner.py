@@ -58,6 +58,8 @@ def _get_extractor_type(provider: str) -> str:
         "azure": "azure_cost",
         "gcp": "gcp_billing",
         "aws": "aws_cost",
+        "llm": "litellm_cost",
+        "litellm": "litellm_cost",
     }
     return mapping.get(provider, provider)
 
@@ -96,6 +98,20 @@ def _build_env_from_config(config: dict[str, Any], provider: str, cred_type: str
             env["BQ_DATASET"] = config["bigquery_dataset"]
         if config.get("bigquery_table"):
             env["BQ_TABLE"] = config["bigquery_table"]
+        if not env.get("DATE_FROM"):
+            from datetime import datetime, timedelta, timezone
+            today = datetime.now(timezone.utc).date()
+            env["DATE_FROM"] = str(today - timedelta(days=30))
+            env["DATE_TO"] = str(today)
+    elif provider in ("llm", "litellm"):
+        env["LITELLM_BASE_URL"] = config.get("base_url", "")
+        env["LITELLM_MASTER_KEY"] = config.get("master_key", "")
+        if config.get("page_size"):
+            env["LITELLM_PAGE_SIZE"] = str(config["page_size"])
+        if config.get("timeout"):
+            env["LITELLM_TIMEOUT"] = str(config["timeout"])
+        if config.get("task_tag_prefix"):
+            env["LITELLM_TASK_TAG_PREFIX"] = str(config["task_tag_prefix"])
         if not env.get("DATE_FROM"):
             from datetime import datetime, timedelta, timezone
             today = datetime.now(timezone.utc).date()
