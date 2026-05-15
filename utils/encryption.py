@@ -22,17 +22,23 @@ def get_encryption_key() -> bytes:
 
     Returns:
         bytes: Valid Fernet key (base64-urlsafe encoded).
+
+    Raises:
+        ValueError: If ENCRYPTION_KEY is not set or is the demo value.
     """
-    env_key = os.getenv("ENCRYPTION_KEY", "demo-key-change-in-production")
+    env_key = os.getenv("ENCRYPTION_KEY")
+    if not env_key:
+        raise ValueError("ENCRYPTION_KEY environment variable is required")
+    if env_key == "demo-key-change-in-production":
+        raise ValueError("ENCRYPTION_KEY must be changed from demo value")
 
     # Try to use the env key as-is (assume it's already base64-urlsafe)
-    if env_key != "demo-key-change-in-production":
-        try:
-            # Validate it's a valid Fernet key
-            Fernet(env_key.encode() if isinstance(env_key, str) else env_key)
-            return env_key.encode() if isinstance(env_key, str) else env_key
-        except Exception:
-            pass
+    try:
+        # Validate it's a valid Fernet key
+        Fernet(env_key.encode() if isinstance(env_key, str) else env_key)
+        return env_key.encode() if isinstance(env_key, str) else env_key
+    except Exception:
+        pass
 
     # Fallback: derive a valid key from the string using SHA-256
     hash_obj = hashlib.sha256(env_key.encode())
