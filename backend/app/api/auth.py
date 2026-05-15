@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -135,7 +136,7 @@ def get_github_redirect_url() -> str | None:
         "client_id": GITHUB_CLIENT_ID,
         "redirect_uri": GITHUB_CALLBACK_URL,
         "scope": "read:user email",
-        "state": "finna-oauth",
+        "state": secrets.token_urlsafe(32),
     })
     return f"https://github.com/login/oauth/authorize?{params}"
 
