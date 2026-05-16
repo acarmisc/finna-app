@@ -218,10 +218,15 @@ def normalize_aws_cost_records(
 # ---------------------------------------------------------------------------#
 
 
+ALLOWED_EXCHANGE_TABLES = {"exchange_rates"}
+
+
 def _load_exchange_rates(
     conn: psycopg.Connection, table: str = "exchange_rates"
 ) -> dict[str, Decimal]:
     rates: dict[str, Decimal] = {"USD": Decimal("1")}
+    if table not in ALLOWED_EXCHANGE_TABLES:
+        raise ValueError(f"Invalid exchange rate table: {table}")
     try:
         with conn.cursor() as cur:
             cur.execute(f"SELECT currency, rate_to_usd FROM {table}")  # noqa: S608
