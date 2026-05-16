@@ -103,6 +103,17 @@ def require_auth(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, 
     return user
 
 
+async def require_admin(user: dict[str, Any] = Depends(get_current_user)) -> dict[str, Any]:
+    """Require admin role dependency."""
+    is_admin = user.get("is_admin", False)
+    if not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin role required"
+        )
+    return user
+
+
 async def token_verification_middleware(request: Request, call_next):
     """Middleware to verify JWT token on all protected routes."""
     if request.url.path.startswith("/api/v1/") and request.url.path != "/api/v1/auth/token":
