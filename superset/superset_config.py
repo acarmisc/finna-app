@@ -55,9 +55,12 @@ SECRET_KEY = SUPERSET_SECRET_KEY
 # Metadata database (Superset's own state)
 # ---------------------------------------------------------------------------
 # Points to a dedicated PostgreSQL database on the same Postgres instance.
+_SUPERSET_DB_PASSWORD = os.getenv(
+    "SUPERSET_DB_PASSWORD", os.getenv("PGPASSWORD", "")
+)
 DATABASE_URI = os.getenv(
     "SUPERSET_DATABASE_URI",
-    "postgresql://finops:finops_dev@postgres:5432/superset_meta",
+    f"postgresql://finops:{_SUPERSET_DB_PASSWORD}@postgres:5432/superset_meta",
 )
 SQLALCHEMY_DATABASE_URI = DATABASE_URI
 

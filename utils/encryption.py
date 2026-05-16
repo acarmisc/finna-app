@@ -123,7 +123,11 @@ def decrypt_config(encrypted) -> dict:
                 result.update(decrypted_fields)
                 return result
             except (InvalidToken, json.JSONDecodeError, Exception):
-                # Decryption failed; return with sensitive fields redacted
+                # Decryption failed — log warning and return with sensitive fields redacted
+                import logging
+                logging.getLogger("encryption").warning(
+                    "Failed to decrypt config data; returning with sensitive fields redacted"
+                )
                 return {k: v for k, v in encrypted.items()
                        if k not in ["__enc__", "__data__", "__fields__"]}
         else:

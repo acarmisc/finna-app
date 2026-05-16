@@ -251,14 +251,19 @@ def _parse_tags(tags_value: Any) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 
+ALLOWED_EXCHANGE_TABLES = {"exchange_rates"}
+
+
 def _load_exchange_rates(
     conn: psycopg.Connection, table: str = "exchange_rates"
 ) -> dict[str, Decimal]:
     """Load exchange rates from the database. Returns {currency_code: rate_to_usd}."""
     rates: dict[str, Decimal] = {"USD": Decimal("1")}
+    if table not in ALLOWED_EXCHANGE_TABLES:
+        raise ValueError(f"Invalid exchange rate table: {table}")
     try:
         with conn.cursor() as cur:
-            cur.execute(f"SELECT currency as currency_code, rate_to_usd FROM {table}")  # noqa: S608 — table name is config, not user input
+            cur.execute(f"SELECT currency as currency_code, rate_to_usd FROM {table}")  # noqa: S608 — validated via allowlist
             for row in cur.fetchall():
                 rates[row[0]] = Decimal(str(row[1]))
     except psycopg.Error:
