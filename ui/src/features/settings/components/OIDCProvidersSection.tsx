@@ -111,7 +111,7 @@ export function OIDCProvidersSection() {
     if (provider) {
       setEditingId(provider.id)
       setProviderName(provider.name)
-      setFormData(provider.config)
+      setFormData(provider.config as ProviderConfig)
     } else {
       setEditingId(null)
       setProviderName('')
@@ -382,14 +382,14 @@ export function OIDCProvidersSection() {
         </div>
       )}
 
-      {deleteId && (
-        <ConfirmDialog
-          title="Delete Provider"
-          message="Are you sure? Users linked to this provider will need reassignment."
-          onConfirm={deleteProvider}
-          onCancel={() => setDeleteId(null)}
-        />
-      )}
+      <ConfirmDialog
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        title="Delete Provider"
+        message="Are you sure? Users linked to this provider will need reassignment."
+        onConfirm={deleteProvider}
+        variant="danger"
+      />
     </div>
   )
 }
