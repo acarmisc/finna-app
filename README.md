@@ -160,6 +160,26 @@ curl -X POST http://localhost:8000/api/v1/config \
   }'
 ```
 
+## Authentication
+
+### Local Development
+
+Default credentials (set via `docker-compose.yml`):
+- Username: `admin`
+- Password: `admin`
+
+### OIDC / Single Sign-On
+
+Finna supports OpenID Connect (OIDC) for enterprise single sign-on with:
+- Keycloak, Okta, Auth0, Azure AD, Google, or any spec-compliant identity provider
+- Claim-based role mapping for automatic admin access from IdP groups
+- Email domain filtering to restrict access to organization domains
+- Auto-provisioning of users on first login
+
+**Setup:** See [docs/oidc-setup.md](docs/oidc-setup.md) for step-by-step provider configuration.
+
+**Managing Providers:** Settings → Authentication → Add Provider (requires admin role)
+
 ## Configuration
 
 ### Environment Variables
