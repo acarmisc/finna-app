@@ -63,7 +63,11 @@ async def db_session_middleware(request: Request, call_next: Any) -> Any:
             request.state.db = conn
             response = await call_next(request)
         return response
-    except Exception:
+    except Exception as exc:
+        # Log the error but still process the request — avoids breaking responses
+        # when DB connection issues occur. In production, consider a circuit breaker.
+        import logging
+        logging.getLogger("api.main").warning("DB middleware error: %s", exc)
         response = await call_next(request)
         return response
 
