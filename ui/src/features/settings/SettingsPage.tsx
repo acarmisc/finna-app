@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Button } from '@/components/shared/Button'
 import { ConfirmDialog } from '@/components/shared/confirm-dialog'
+import { OIDCProvidersSection } from './components/OIDCProvidersSection'
 
 export function SettingsPage() {
   const [saved, setSaved] = useState(false)
@@ -66,6 +67,8 @@ export function SettingsPage() {
           </div>
         </div>
       </div>
+
+      <OIDCProvidersSection />
 
       <div className="card mt-3">
         <div className="card-hd"><h3>Danger zone</h3></div>
