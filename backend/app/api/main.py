@@ -114,14 +114,18 @@ async def db_stats() -> JSONResponse:
 from .routes import (  # noqa: E402
     alerts,
     auth,
+    auth_providers,
     config,
     costs,
     extractors_registry,
+    oidc_auth,
 )
 
 app.include_router(config.router, prefix="/api/v1", tags=["config"])
 app.include_router(extractors_registry.router, prefix="/api/v1", tags=["extractors"])
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
+app.include_router(auth_providers.router, prefix="/api/v1", tags=["auth"])
+app.include_router(oidc_auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(costs.router, prefix="/api/v1", tags=["costs"])
 app.include_router(alerts.router, prefix="/api/v1", tags=["alerts"])
 
