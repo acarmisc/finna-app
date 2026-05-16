@@ -29,8 +29,10 @@ export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) 
   const [err, setErr] = useState('')
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const { resolvedTheme, toggleTheme } = useTheme()
+  const [oidcProviders, setOidcProviders] = useState<any[]>([])
 
   useEffect(() => {
+    fetchOidcProviders()
     const hash = window.location.hash
     const params = new URLSearchParams(hash.slice(1))
     const code = params.get('code')
@@ -39,6 +41,17 @@ export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) 
       window.location.hash = ''
     }
   }, [])
+
+  const fetchOidcProviders = async () => {
+    try {
+      const response = await fetch('/api/v1/auth/oidc/providers')
+      if (response.ok) {
+        setOidcProviders(await response.json())
+      }
+    } catch (e) {
+      console.error('Failed to fetch OIDC providers', e)
+    }
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -88,6 +101,28 @@ export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) 
       return
     }
     setErr('This login method is not available')
+  }
+
+  const oidcLogin = async (providerId: string) => {
+    setLoadingId(providerId)
+    try {
+      const response = await fetch('/api/v1/auth/oidc/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider_id: providerId }),
+      })
+      if (!response.ok) {
+        setErr('Failed to initiate login')
+        setLoadingId(null)
+        return
+      }
+      const data = await response.json()
+      sessionStorage.setItem('oidc_provider_id', providerId)
+      window.location.href = data.authorization_url
+    } catch (e) {
+      setErr('Connection error')
+      setLoadingId(null)
+    }
   }
 
   const handleOAuthCallback = async (code: string) => {
@@ -149,6 +184,13 @@ export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) 
                 <span className="ico">{p.svg}</span>
                 <span className="name">{loadingId === p.id ? 'Redirecting…' : p.name}</span>
                 <span className="meta">{p.meta}</span>
+              </button>
+            ))}
+            {oidcProviders.map(p => (
+              <button key={p.id} className="sso-btn" onClick={() => oidcLogin(p.id)} disabled={!!loadingId}>
+                <span className="ico">🔐</span>
+                <span className="name">{loadingId === p.id ? 'Redirecting…' : `Sign in with ${p.name}`}</span>
+                <span className="meta">OIDC</span>
               </button>
             ))}
           </div>
