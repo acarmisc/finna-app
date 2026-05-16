@@ -17,6 +17,12 @@ if not JWT_SECRET:
     raise ValueError("JWT_SECRET environment variable is required")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_EXPIRATION_MINUTES = int(os.getenv("JWT_EXPIRATION_MINUTES", "60"))
+JWT_ISSUER = os.getenv("JWT_ISSUER", "finna-app")
+JWT_AUDIENCE = os.getenv("JWT_AUDIENCE", "finna-api")
+
+# Validate algorithm is one of the secure options
+if JWT_ALGORITHM not in {"HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "ES256", "ES384", "ES512"}:
+    raise ValueError(f"Unsupported JWT_ALGORITHM: {JWT_ALGORITHM}")
 
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
@@ -49,12 +55,19 @@ def create_access_token(data: dict[str, Any], expires_delta: Optional[timedelta]
         raise ValueError("JWT_SECRET environment variable is not set")
 
     to_encode = data.copy()
+    now = datetime.now(timezone.utc)
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = now + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRATION_MINUTES)
+        expire = now + timedelta(minutes=JWT_EXPIRATION_MINUTES)
 
-    to_encode.update({"exp": expire})
+    to_encode.update({
+        "exp": expire,
+        "iat": now,
+        "nbf": now,
+        "iss": JWT_ISSUER,
+        "aud": JWT_AUDIENCE,
+    })
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
     return encoded_jwt  # type: ignore[no-any-return]
 
@@ -65,8 +78,26 @@ def decode_token(token: str) -> dict[str, Any]:
         raise ValueError("JWT_SECRET environment variable is not set")
 
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(
+            token,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],
+            issuer=JWT_ISSUER,
+            audience=JWT_AUDIENCE,
+        )
         return payload  # type: ignore[no-any-return]
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except jwt.JWTClaimsError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token claims",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

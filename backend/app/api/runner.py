@@ -156,8 +156,9 @@ def _update_run_status(
                 ),
             )
         conn.commit()
-    except Exception:
+    except Exception as exc:
         conn.rollback()
+        logger.exception("Failed to update run status for %s: %s", run_id, exc)
         raise
 
 

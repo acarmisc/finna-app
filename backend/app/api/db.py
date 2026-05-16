@@ -327,7 +327,7 @@ def init_db() -> None:
                 cur.execute(sql)
         conn.commit()
         logger.info("Database initialized successfully")
-    except Exception:
+    except (psycopg.Error, OSError, ValueError):
         conn.rollback()
         logger.exception("Failed to initialize database")
         raise
@@ -366,6 +366,9 @@ def query_one(sql: str, params: tuple | None = None) -> dict[str, Any] | None:
                     result[k] = v
             return result
         return None
+    except psycopg.Error:
+        conn.rollback()
+        raise
     finally:
         release_connection(conn)
 
@@ -402,6 +405,9 @@ def query_all(sql: str, params: tuple | None = None) -> list[dict[str, Any]]:
                     converted_row[k] = v
             result.append(converted_row)
         return result
+    except psycopg.Error:
+        conn.rollback()
+        raise
     finally:
         release_connection(conn)
 

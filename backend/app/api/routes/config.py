@@ -494,9 +494,12 @@ async def update_config(config_id: str, data: CloudConfigUpdate) -> dict[str, An
     params.append(datetime.now(timezone.utc))
     params.append(config_id)
 
+    # Build parameterized SET clause — each column = %s
+    set_clause = ", ".join(updates)
+
     sql = f"""
         UPDATE cloud_config
-        SET {", ".join(updates)}
+        SET {set_clause}
         WHERE id = %s
         RETURNING id, provider, name, credential_type, config, created_at, updated_at,
                   last_test, last_test_at, err
