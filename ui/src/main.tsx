@@ -8,6 +8,7 @@ import { DateRangeProvider } from '@/contexts/DateRangeContext'
 import { ToastProvider } from '@/contexts/ToastContext'
 import { queryClient } from '@/query/queryClient'
 import LoginComponent from '@/components/auth/LoginComponent'
+import { OIDCCallbackHandler } from '@/components/auth/OIDCCallbackHandler'
 import { AppShell } from '@/components/layout'
 import CONFIG from '@/config/env'
 import './index.css'
@@ -68,7 +69,7 @@ function AuthenticatedApp() {
 
 function Root() {
   const { checkAuth } = useAuthStore()
-  
+
   useEffect(() => {
     checkAuth()
     if (!window.location.hash) window.location.hash = '#/dashboard'
@@ -76,15 +77,20 @@ function Root() {
 
   return (
     <BrowserRouter>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider>
-          <DateRangeProvider>
-            <ToastProvider>
-              <AuthenticatedApp />
-            </ToastProvider>
-          </DateRangeProvider>
-        </ThemeProvider>
-      </QueryClientProvider>
+      <Routes>
+        <Route path="/auth/oidc/callback" element={<OIDCCallbackHandler />} />
+        <Route path="*" element={
+          <QueryClientProvider client={queryClient}>
+            <ThemeProvider>
+              <DateRangeProvider>
+                <ToastProvider>
+                  <AuthenticatedApp />
+                </ToastProvider>
+              </DateRangeProvider>
+            </ThemeProvider>
+          </QueryClientProvider>
+        } />
+      </Routes>
     </BrowserRouter>
   )
 }
