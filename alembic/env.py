@@ -25,6 +25,9 @@ def get_url() -> str:
     # SQLAlchemy 2.x dropped the legacy "postgres://" scheme; normalize it.
     if dsn.startswith("postgres://"):
         dsn = "postgresql://" + dsn[len("postgres://") :]
+    # Force psycopg (v3) driver — psycopg2 isn't in the runtime image.
+    if dsn.startswith("postgresql://"):
+        dsn = "postgresql+psycopg://" + dsn[len("postgresql://") :]
     return dsn
 
 
