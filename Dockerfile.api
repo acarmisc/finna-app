@@ -52,6 +52,8 @@ COPY models/ ./models/
 COPY extractors/ ./extractors/
 COPY sql/ ./sql/
 COPY utils/ ./utils/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./alembic.ini
 
 # Copy frontend build output
 COPY --from=frontend-builder /build-ui/ui/dist/ /app/ui/
