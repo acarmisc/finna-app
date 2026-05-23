@@ -172,52 +172,70 @@ async def exchange_github_code(code: str) -> dict[str, Any] | None:
     if not GITHUB_CLIENT_ID or not GITHUB_CLIENT_SECRET:
         return None
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            "https://github.com/login/oauth/access_token",
-            data={
-                "client_id": GITHUB_CLIENT_ID,
-                "client_secret": GITHUB_CLIENT_SECRET,
-                "code": code,
-                "redirect_uri": GITHUB_CALLBACK_URL,
-            },
-            headers={"Accept": "application/json"},
-        )
-        if response.status_code != 200:
-            return None
-        data: dict[str, Any] = response.json()
-        return data
+    timeout = httpx.Timeout(10.0)
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(
+                "https://github.com/login/oauth/access_token",
+                data={
+                    "client_id": GITHUB_CLIENT_ID,
+                    "client_secret": GITHUB_CLIENT_SECRET,
+                    "code": code,
+                    "redirect_uri": GITHUB_CALLBACK_URL,
+                },
+                headers={"Accept": "application/json"},
+            )
+            if response.status_code != 200:
+                return None
+            data: dict[str, Any] = response.json()
+            return data
+    except httpx.TimeoutException:
+        return None
+    except httpx.RequestError:
+        return None
 
 
 async def get_github_user(access_token: str) -> dict[str, Any] | None:
     """Get GitHub user info using access token."""
     import httpx
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            "https://api.github.com/user",
-            headers={
-                "Authorization": f"token {access_token}",
-                "Accept": "application/json",
-            },
-        )
-        if response.status_code != 200:
-            return None
-        data: dict[str, Any] = response.json()
-        return data
+    timeout = httpx.Timeout(10.0)
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.get(
+                "https://api.github.com/user",
+                headers={
+                    "Authorization": f"token {access_token}",
+                    "Accept": "application/json",
+                },
+            )
+            if response.status_code != 200:
+                return None
+            data: dict[str, Any] = response.json()
+            return data
+    except httpx.TimeoutException:
+        return None
+    except httpx.RequestError:
+        return None
 
 
 async def get_github_user_emails(access_token: str) -> list[dict[str, Any]]:
     """Get GitHub user emails."""
     import httpx
-    async with httpx.AsyncClient() as client:
-        response = await client.get(
-            "https://api.github.com/user/emails",
-            headers={
-                "Authorization": f"token {access_token}",
-                "Accept": "application/json",
-            },
-        )
-        if response.status_code != 200:
-            return []
-        data: list[dict[str, Any]] = response.json()
-        return data
+    timeout = httpx.Timeout(10.0)
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.get(
+                "https://api.github.com/user/emails",
+                headers={
+                    "Authorization": f"token {access_token}",
+                    "Accept": "application/json",
+                },
+            )
+            if response.status_code != 200:
+                return []
+            data: list[dict[str, Any]] = response.json()
+            return data
+    except httpx.TimeoutException:
+        return []
+    except httpx.RequestError:
+        return []
