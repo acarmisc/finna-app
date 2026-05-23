@@ -93,7 +93,7 @@ export function OIDCProvidersSection() {
 
   const fetchProviders = async () => {
     try {
-      const token = localStorage.getItem('token')
+      const token = useAuthStore.getState().token || localStorage.getItem('finna_token')
       const response = await fetch('/api/v1/auth/providers', {
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -141,7 +141,7 @@ export function OIDCProvidersSection() {
     }
 
     try {
-      const token = localStorage.getItem('token')
+      const token = useAuthStore.getState().token || localStorage.getItem('finna_token')
       const method = editingId ? 'PUT' : 'POST'
       const url = editingId ? `/api/v1/auth/providers/${editingId}` : '/api/v1/auth/providers'
 
@@ -175,7 +175,7 @@ export function OIDCProvidersSection() {
   const testProvider = async (providerId: string) => {
     setTestStatus({ loading: true })
     try {
-      const token = localStorage.getItem('token')
+      const token = useAuthStore.getState().token || localStorage.getItem('finna_token')
       const response = await fetch(`/api/v1/auth/oidc/test`, {
         method: 'POST',
         headers: {
@@ -200,7 +200,7 @@ export function OIDCProvidersSection() {
   const deleteProvider = async () => {
     if (!deleteId) return
     try {
-      const token = localStorage.getItem('token')
+      const token = useAuthStore.getState().token || localStorage.getItem('finna_token')
       const response = await fetch(`/api/v1/auth/providers/${deleteId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
