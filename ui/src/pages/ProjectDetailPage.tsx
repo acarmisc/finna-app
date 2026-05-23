@@ -11,6 +11,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useDateRange } from '@/contexts/DateRangeContext'
 import type { Provider } from '@/types/api'
 import { Icon } from '@/components/shared/Icon'
+import { getAuthToken } from '@/store/auth'
 
 function Sparkline({ seed = 1, up = true }: { seed?: number; up?: boolean }) {
   const len = 12
@@ -76,7 +77,7 @@ export function ProjectDetailPage() {
   }, [skus, skuFilter])
 
   const handleDelete = async () => {
-    const token = localStorage.getItem('finna_token')
+    const token = getAuthToken()
     const res = await fetch(`/api/v1/config/projects/${slug}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
     if (res.ok) {
       toast.showSuccess('Project deleted')

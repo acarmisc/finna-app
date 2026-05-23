@@ -13,6 +13,11 @@ interface AuthActions {
   checkAuth: () => void
 }
 
+const getStoredToken = (): string | null => {
+  if (typeof window === 'undefined') return null
+  return sessionStorage.getItem('finna_token') || localStorage.getItem('finna_token')
+}
+
 export const useAuthStore = create<AuthState & AuthActions>()((set, get) => ({
   token: null,
   isAuthenticated: false,
@@ -32,7 +37,7 @@ export const useAuthStore = create<AuthState & AuthActions>()((set, get) => ({
 
   checkAuth: () => {
     // Prefer sessionStorage, fall back to localStorage for session restoration
-    const storedToken = sessionStorage.getItem('finna_token') || localStorage.getItem('finna_token')
+    const storedToken = getStoredToken()
     set({ 
       token: storedToken, 
       isAuthenticated: !!storedToken, 
@@ -54,3 +59,18 @@ export const useAuthStore = create<AuthState & AuthActions>()((set, get) => ({
     set({ token: null, isAuthenticated: false, loading: false })
   },
 }))
+
+/**
+ * Get the current auth token.
+ * This is the centralized helper for accessing auth tokens.
+ * Uses sessionStorage (primary) with localStorage fallback for session restoration.
+ * Falls back to direct storage lookup if useAuthStore is not yet initialized.
+ */
+export function getAuthToken(): string | null {
+  // Try Zustand store first (most current)
+  const storeToken = useAuthStore.getState().token
+  if (storeToken) return storeToken
+  
+  // Fallback to direct storage lookup
+  return getStoredToken()
+}

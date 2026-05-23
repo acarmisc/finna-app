@@ -1,5 +1,6 @@
 // Base request handler shared by all API clients
 import { useAuthStore } from '@/store/auth'
+import { getAuthToken } from '@/store/auth'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
@@ -9,7 +10,7 @@ export const apiRequest = async <T>(
   options: RequestInit = {}
 ): Promise<{ data?: T; error?: any; status: number }> => {
   const doRequest = async (): Promise<{ data?: T; error?: any; status: number }> => {
-    const token = useAuthStore.getState().token
+    const token = getAuthToken()
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...Object.fromEntries(new Headers(options.headers).entries()),
