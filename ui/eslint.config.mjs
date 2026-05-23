@@ -1,5 +1,6 @@
 // For more info, see https://github.com/storybookjs/eslint-plugin-storybook#configuration-flat-config-format
 import storybook from "eslint-plugin-storybook";
+import reactHooks from 'eslint-plugin-react-hooks';
 
 import js from '@eslint/js'
 import ts from 'typescript-eslint'
@@ -20,6 +21,7 @@ export default [js.configs.recommended, ...ts.configs.recommended, {
   },
   plugins: {
     import: importPlugin,
+    'react-hooks': reactHooks,
   },
   settings: {
     'import/resolver': {
@@ -30,6 +32,8 @@ export default [js.configs.recommended, ...ts.configs.recommended, {
   },
   rules: {
     'import/no-useless-path-segments': 'error',
+    'react-hooks/rules-of-hooks': 'error',
+    'react-hooks/exhaustive-deps': 'error',
     'no-restricted-imports': ['error', {
       patterns: [
         {

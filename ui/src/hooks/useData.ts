@@ -5,7 +5,7 @@ import { getApiClient } from '@/services/apiClient'
 export function useAuth() {
   const { checkAuth, isAuthenticated, logout } = useAuthStore()
   
-  useEffect(() => { checkAuth() }, [])
+  useEffect(() => { checkAuth() }, [checkAuth])
   
   return { 
     authenticated: isAuthenticated,
