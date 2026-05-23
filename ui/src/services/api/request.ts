@@ -4,6 +4,9 @@ import { useAuthStore } from '@/store/auth'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
 
+// Note: useAuthStore.getState().token is safe here because this is a plain
+// function (not a React hook) called at request time, so it always reads
+// the current state from the store. No dependency array needed.
 export const apiRequest = async <T>(
   endpoint: string,
   options: RequestInit = {}

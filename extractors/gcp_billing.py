@@ -26,6 +26,7 @@ from typing import Any, Sequence
 import psycopg
 from google.cloud import bigquery
 from google.cloud.bigquery import QueryJobConfig
+from psycopg.extras import execute_values
 from psycopg.rows import dict_row
 from psycopg.sql import SQL
 from psycopg.types.json import Json
@@ -223,7 +224,7 @@ _INSERT_SQL = SQL(
     "cost_usd, currency_original, cost_original, discount_usd, net_cost_usd, "
     "usage_quantity, usage_unit, tags) "
     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
-    "ON CONFLICT (record_id) DO NOTHING"
+    "ON CONFLICT (record_id) DO NOTHING RETURNING record_id"
 )
 
 
@@ -277,13 +278,11 @@ def _batch_insert(
     ]
 
     with conn.cursor() as cur:
-        cur.executemany(_INSERT_SQL, rows)
+        inserted_ids = execute_values(cur, _INSERT_SQL, rows, fetch=True)
     conn.commit()
 
-    inserted = len(
-        records
-    )  # ON CONFLICT DO NOTHING doesn't give rowcount via executemany
-    logger.debug("Batch inserted up to %d records", inserted)
+    inserted = len(inserted_ids) if inserted_ids else 0
+    logger.debug("Batch inserted %d records (%d skipped due to conflicts)", inserted, len(records) - inserted)
     return inserted
 
 

@@ -3,9 +3,10 @@ import { useAuthStore } from '@/store/auth'
 import { getApiClient } from '@/services/apiClient'
 
 export function useAuth() {
-  const { checkAuth, isAuthenticated, logout } = useAuthStore()
+  const checkAuth = useAuthStore((s) => s.checkAuth)
+  const { isAuthenticated, logout } = useAuthStore()
   
-  useEffect(() => { checkAuth() }, [])
+  useEffect(() => { checkAuth() }, [checkAuth])
   
   return { 
     authenticated: isAuthenticated,

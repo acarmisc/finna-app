@@ -9,6 +9,7 @@ import { money } from '@/components/shared/money'
 import { useProject, useCosts } from '@/api/hooks'
 import { useToast } from '@/contexts/ToastContext'
 import { useDateRange } from '@/contexts/DateRangeContext'
+import { getAuthToken } from '@/store/auth'
 import type { Provider } from '@/types/api'
 import { Icon } from '@/components/shared/Icon'
 
@@ -76,7 +77,7 @@ export function ProjectDetailPage() {
   }, [skus, skuFilter])
 
   const handleDelete = async () => {
-    const token = localStorage.getItem('finna_token')
+    const token = getAuthToken()
     const res = await fetch(`/api/v1/config/projects/${slug}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } })
     if (res.ok) {
       toast.showSuccess('Project deleted')
@@ -233,8 +234,8 @@ export function ProjectDetailPage() {
               <th>SKU</th><th className="num">total</th><th className="num">prev</th><th className="num">Δ</th><th>Trend</th>
             </tr></thead>
             <tbody>
-              {filteredSkus.map((c, i) => (
-                <tr key={`${c.sku}-${i}`}>
+              {filteredSkus.map((c) => (
+                <tr key={c.id}>
                   <td className="mono">{c.sku}</td>
                   <td className="num mono">{money(c.mtd)}</td>
                   <td className="num mono muted">{money(c.prev)}</td>

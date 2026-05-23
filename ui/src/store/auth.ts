@@ -54,3 +54,17 @@ export const useAuthStore = create<AuthState & AuthActions>()((set, get) => ({
     set({ token: null, isAuthenticated: false, loading: false })
   },
 }))
+
+// Centralized token access helper
+export const getAuthToken = (): string | null => {
+  const { token } = useAuthStore.getState()
+  return token
+}
+
+export const removeAuthToken = (): void => {
+  useAuthStore.getState().logout()
+}
+
+export const setAuthToken = (token: string): void => {
+  useAuthStore.getState().setToken(token)
+}

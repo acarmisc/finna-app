@@ -54,10 +54,11 @@ function Router() {
 }
 
 function AuthenticatedApp() {
-  const { isAuthenticated, loading, checkAuth } = useAuthStore()
+  const { isAuthenticated, loading } = useAuthStore()
+  const checkAuth = useAuthStore((s) => s.checkAuth)
   const queryClient = useQueryClient()
 
-  useEffect(() => { checkAuth() }, [])
+  useEffect(() => { checkAuth() }, [checkAuth])
 
   if (loading) return null
   if (!isAuthenticated) return (
@@ -68,12 +69,12 @@ function AuthenticatedApp() {
 }
 
 function Root() {
-  const { checkAuth } = useAuthStore()
+  const checkAuth = useAuthStore((s) => s.checkAuth)
 
   useEffect(() => {
     checkAuth()
     if (!window.location.hash) window.location.hash = '#/dashboard'
-  }, [])
+  }, [checkAuth])
 
   return (
     <BrowserRouter>

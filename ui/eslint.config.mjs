@@ -52,12 +52,26 @@ export default [js.configs.recommended, ...ts.configs.recommended, {
         {
           group: [
             '/index$',
-            '/index\\.ts$',
-            '/index\\.tsx$',
+            '/index\\\\.ts$',
+            '/index\\\\.tsx$',
           ],
           message: 'Avoid importing index barrel files directly.',
         },
       ],
+    }],
+    'no-restricted-globals': ['error', {
+      name: 'localStorage',
+      message: 'Use getAuthToken() from @/store/auth instead of direct localStorage access for finna_token',
+    }],
+    'no-restricted-properties': ['error', {
+      object: 'localStorage',
+      property: 'getItem',
+      message: 'Use getAuthToken() from @/store/auth instead of localStorage.getItem("finna_token")',
+    }],
+    'no-restricted-properties': ['error', {
+      object: 'localStorage',
+      property: 'setItem',
+      message: 'Use setAuthToken() from @/store/auth instead of localStorage.setItem("finna_token")',
     }],
   },
 }, ...storybook.configs["flat/recommended"]];

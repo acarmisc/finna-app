@@ -40,11 +40,49 @@ app = FastAPI(
 register_error_handlers(app)
 
 # Add CORS middleware
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+_env = os.environ.get("ENV", "development")
+allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "")
+
+# In non-dev environments, ALLOWED_ORIGINS must be explicitly set
+if _env.lower() != "development" and not allowed_origins_str:
+    raise ValueError(
+        "ALLOWED_ORIGINS must be explicitly set in non-development environments. "
+        "Set ENV=development for local development with default localhost origins, or "
+        "set ALLOWED_ORIGINS to a comma-separated list of allowed origins (e.g., https://example.com)."
+    )
+
+# Parse and validate origins
+if allowed_origins_str:
+    allowed_origins = [o.strip() for o in allowed_origins_str.split(",") if o.strip()]
+else:
+    # Default to localhost for development only
+    allowed_origins = ["http://localhost:5173", "http://localhost:3000"]
+
+# Validate each origin is an absolute URL with scheme
+for origin in allowed_origins:
+    if not origin.startswith("http://") and not origin.startswith("https://"):
+        raise ValueError(
+            f"Invalid origin '{origin}': must be an absolute URL with http:// or https:// scheme"
+        )
+
+# Determine allow_credentials setting
+# Per CORS spec, credentials cannot be used with wildcard origin
+allow_credentials = len(allowed_origins) == 1 and allowed_origins[0] != "*"
+
+# Log the effective configuration at startup
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("api.main")
+if "*" in allowed_origins:
+    logger.warning("CORS: Wildcard origin '*' is allowed; allow_credentials automatically disabled per CORS spec")
+else:
+    logger.info(f"CORS: Allowing origins: {allowed_origins}")
+logger.info(f"CORS: allow_credentials={allow_credentials}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_credentials=allow_credentials,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
