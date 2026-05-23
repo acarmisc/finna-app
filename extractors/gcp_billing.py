@@ -453,10 +453,12 @@ def extract(
             total_inserted += inserted
 
         if total_inserted == 0:
-            logger.info("No billing records found for the given date range")
-
-        _mark_health_success(pg_conn, total_inserted, extractor_name=extractor_name)
-        logger.info("Extraction complete: %d records inserted", total_inserted)
+            logger.warning("No billing records inserted - this may indicate extraction failure or empty data")
+            _mark_health_failure(pg_conn, "No billing records inserted", extractor_name=extractor_name)
+            raise RuntimeError("Extraction completed but no records were inserted")
+        else:
+            _mark_health_success(pg_conn, total_inserted, extractor_name=extractor_name)
+            logger.info("Extraction complete: %d records inserted", total_inserted)
 
     except Exception as exc:
         logger.exception("Extraction failed: %s", exc)

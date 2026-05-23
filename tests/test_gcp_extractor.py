@@ -254,6 +254,7 @@ class TestExtract:
     @patch("extractors.gcp_billing._get_pg_connection")
     @patch("extractors.gcp_billing.bigquery.Client")
     def test_extract_empty_result_set(self, mock_bq_cls, mock_pg_conn_factory) -> None:
+        """Test that empty result set raises RuntimeError and marks health as failed."""
         mock_bq_client = MagicMock()
         mock_bq_cls.return_value = mock_bq_client
 
@@ -267,17 +268,67 @@ class TestExtract:
         mock_pg_conn = MagicMock()
         mock_pg_conn_factory.return_value = mock_pg_conn
 
-        total = extract(
-            gcp_project="test-project",
-            bq_dataset="billing",
-            bq_table="export",
-            pg_dsn="postgresql://user:pass@localhost/db",
-            date_from="2025-03-01",
-            date_to="2025-04-01",
-        )
+        with pytest.raises(RuntimeError, match="Extraction completed but no records were inserted"):
+            extract(
+                gcp_project="test-project",
+                bq_dataset="billing",
+                bq_table="export",
+                pg_dsn="postgresql://user:***@localhost/db",
+                date_from="2025-03-01",
+                date_to="2025-04-01",
+            )
 
-        assert total == 0
         mock_pg_conn.close.assert_called_once()
+        # Verify health was marked as failed, not success
+        mock_pg_conn.commit.assert_called()
+        # Check that the health failure was recorded (not success)
+        call_args = mock_pg_conn.cursor.return_value.__enter__.return_value.execute.call_args_list
+        failure_calls = [c for c in call_args if "success" not in str(c).lower()]
+        assert len(failure_calls) >= 1  # At least one failure call
+
+    @patch("extractors.gcp_billing._get_pg_connection")
+    @patch("extractors.gcp_billing.bigquery.Client")
+    def test_extract_empty_result_set_marks_health_failure(self, mock_bq_cls, mock_pg_conn_factory) -> None:
+        """Test that empty result set calls _mark_health_failure."""
+        mock_bq_client = MagicMock()
+        mock_bq_cls.return_value = mock_bq_client
+
+        mock_query_job = MagicMock()
+        mock_bq_client.query.return_value = mock_query_job
+
+        mock_row_iter = MagicMock()
+        mock_row_iter.__iter__ = lambda self: iter([])
+        mock_query_job.result.return_value = mock_row_iter
+
+        mock_pg_conn = MagicMock()
+        mock_pg_conn_factory.return_value = mock_pg_conn
+
+        # Track the execute calls
+        execute_calls = []
+        def track_execute(*args, **kwargs):
+            execute_calls.append((args, kwargs))
+            sql = args[0] if args else ""
+            if "UPDATE extractor_health" in sql:
+                if "status = 'failed'" in sql or "status = 'success'" in sql:
+                    mock_pg_conn.commit()
+        mock_pg_conn.cursor.return_value.__enter__.return_value.execute.side_effect = track_execute
+
+        with pytest.raises(RuntimeError, match="Extraction completed but no records were inserted"):
+            extract(
+                gcp_project="test-project",
+                bq_dataset="billing",
+                bq_table="export",
+                pg_dsn="postgresql://user:***@localhost/db",
+                date_from="2025-03-01",
+                date_to="2025-04-01",
+            )
+
+        # Verify health failure was called, not success
+        sql_calls = [c[0][0] if c[0] else "" for c in execute_calls]
+        failure_sql = [s for s in sql_calls if "status = 'failed'" in s.lower()]
+        success_sql = [s for s in sql_calls if "status = 'success'" in s.lower()]
+        assert len(failure_sql) >= 1, f"Expected failure marking, got: {sql_calls}"
+        assert len(success_sql) == 0, f"Should not mark success when no records inserted, got: {sql_calls}"
 
     @patch("extractors.gcp_billing._get_pg_connection")
     @patch("extractors.gcp_billing.bigquery.Client")

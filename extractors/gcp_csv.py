@@ -262,12 +262,14 @@ def extract(
             total_inserted += inserted
 
         if total_inserted == 0:
-            logger.info("No billing records found in CSV file")
-
-        _mark_health_success(pg_conn, total_inserted)
-        logger.info(
-            "CSV extraction complete: %d/%d rows inserted", total_inserted, total_rows
-        )
+            logger.warning("No billing records inserted - this may indicate extraction failure or empty data")
+            _mark_health_failure(pg_conn, "No billing records inserted")
+            raise RuntimeError("CSV extraction completed but no records were inserted")
+        else:
+            _mark_health_success(pg_conn, total_inserted)
+            logger.info(
+                "CSV extraction complete: %d/%d rows inserted", total_inserted, total_rows
+            )
 
     except Exception as exc:
         logger.exception("CSV extraction failed: %s", exc)
