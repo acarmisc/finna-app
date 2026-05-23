@@ -57,7 +57,7 @@ function AuthenticatedApp() {
   const { isAuthenticated, loading, checkAuth } = useAuthStore()
   const queryClient = useQueryClient()
 
-  useEffect(() => { checkAuth() }, [])
+  useEffect(() => { checkAuth() }, [checkAuth])
 
   if (loading) return null
   if (!isAuthenticated) return (
@@ -73,7 +73,7 @@ function Root() {
   useEffect(() => {
     checkAuth()
     if (!window.location.hash) window.location.hash = '#/dashboard'
-  }, [])
+  }, [checkAuth])
 
   return (
     <BrowserRouter>
