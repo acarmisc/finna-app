@@ -65,7 +65,7 @@ export function ProjectDetailPage() {
   useEffect(() => { setNote((p as any)?.note ?? '') }, [(p as any)?.note])
 
   const skus = useMemo(
-    () => costsResp?.costs?.map(c => ({ sku: c.sku, mtd: c.mtd, prev: c.prev ?? 0, delta: c.delta ?? 0 })) ?? [],
+    () => costsResp?.costs?.map(c => ({ id: c.id, sku: c.sku, mtd: c.mtd, prev: c.prev ?? 0, delta: c.delta ?? 0 })) ?? [],
     [costsResp]
   )
 
@@ -234,7 +234,7 @@ export function ProjectDetailPage() {
             </tr></thead>
             <tbody>
               {filteredSkus.map((c, i) => (
-                <tr key={`${c.sku}-${i}`}>
+                <tr key={c.id}>
                   <td className="mono">{c.sku}</td>
                   <td className="num mono">{money(c.mtd)}</td>
                   <td className="num mono muted">{money(c.prev)}</td>
