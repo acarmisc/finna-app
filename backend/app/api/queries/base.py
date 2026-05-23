@@ -5,7 +5,6 @@ This module contains the core query functions used by domain-specific query modu
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from psycopg.rows import dict_row
@@ -20,7 +19,9 @@ def query_one(sql: str, params: tuple | None = None) -> dict[str, Any] | None:
     if params:
         for p in params:
             if isinstance(p, dict):
-                converted.append(json.dumps(p))
+                # Use psycopg's Jsonb type for proper JSON handling
+                from psycopg.types.json import Jsonb
+                converted.append(Jsonb(p))
             else:
                 converted.append(p)
         params = tuple(converted)
@@ -31,16 +32,7 @@ def query_one(sql: str, params: tuple | None = None) -> dict[str, Any] | None:
             row = cur.fetchone()
 
         if row:
-            result = {}
-            for k, v in row.items():
-                if isinstance(v, str) and v.startswith("{") and ":" in v:
-                    try:
-                        result[k] = json.loads(v)
-                    except Exception:
-                        result[k] = v
-                else:
-                    result[k] = v
-            return result
+            return dict(row)
         return None
     finally:
         release_connection(conn)
@@ -53,7 +45,9 @@ def query_all(sql: str, params: tuple | None = None) -> list[dict[str, Any]]:
     if params:
         for p in params:
             if isinstance(p, dict):
-                converted.append(json.dumps(p))
+                # Use psycopg's Jsonb type for proper JSON handling
+                from psycopg.types.json import Jsonb
+                converted.append(Jsonb(p))
             else:
                 converted.append(p)
         params = tuple(converted)
@@ -63,19 +57,7 @@ def query_all(sql: str, params: tuple | None = None) -> list[dict[str, Any]]:
             cur.execute(sql, params)
             rows = cur.fetchall()
 
-        result = []
-        for row in rows:
-            converted_row = {}
-            for k, v in row.items():
-                if isinstance(v, str) and v.startswith("{") and ":" in v:
-                    try:
-                        converted_row[k] = json.loads(v)
-                    except Exception:
-                        converted_row[k] = v
-                else:
-                    converted_row[k] = v
-            result.append(converted_row)
-        return result
+        return [dict(row) for row in rows]
     finally:
         release_connection(conn)
 
@@ -87,7 +69,9 @@ def execute(sql: str, params: tuple | None = None) -> None:
     if params:
         for p in params:
             if isinstance(p, dict):
-                converted.append(json.dumps(p))
+                # Use psycopg's Jsonb type for proper JSON handling
+                from psycopg.types.json import Jsonb
+                converted.append(Jsonb(p))
             else:
                 converted.append(p)
         params = tuple(converted)
