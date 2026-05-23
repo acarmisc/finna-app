@@ -228,7 +228,7 @@ class TestGcpMultiProjectExtract:
     @patch("extractors.gcp_billing._get_pg_connection")
     @patch("extractors.gcp_billing.bigquery.Client")
     def test_extract_with_custom_health_name(self, mock_bq_cls, mock_pg_conn_factory):
-        """extract() should accept health_name for per-project health tracking."""
+        """extract() should raise RuntimeError when 0 records are inserted and mark health as failed."""
         mock_bq_client = MagicMock()
         mock_bq_cls.return_value = mock_bq_client
 
@@ -242,15 +242,15 @@ class TestGcpMultiProjectExtract:
         mock_pg_conn = MagicMock()
         mock_pg_conn_factory.return_value = mock_pg_conn
 
-        total = extract(
-            gcp_project="my-proj",
-            bq_dataset="billing",
-            bq_table="export",
-            pg_dsn="postgresql://user:pass@localhost/db",
-            date_from="2025-03-01",
-            date_to="2025-04-01",
-            health_name="gcp_billing_prod",
-        )
+        with pytest.raises(RuntimeError, match="Extraction completed but no records were inserted"):
+            extract(
+                gcp_project="my-proj",
+                bq_dataset="billing",
+                bq_table="export",
+                pg_dsn="postgresql://user:***@localhost/db",
+                date_from="2025-03-01",
+                date_to="2025-04-01",
+                health_name="gcp_billing_prod",
+            )
 
-        assert total == 0
         mock_pg_conn.close.assert_called_once()

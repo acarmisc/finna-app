@@ -17,6 +17,8 @@ from uuid import UUID
 import httpx
 from jose import JWTError, jwt
 
+from .db import execute, query_one
+
 logger = logging.getLogger("api.oidc")
 
 # Cache for discovered metadata and JWKS
@@ -26,8 +28,8 @@ _jwks_cache: dict[str, tuple[dict[str, Any], float]] = {}
 DISCOVERY_CACHE_TTL = 3600  # 1 hour
 JWKS_CACHE_TTL = 300  # 5 minutes
 
-# In-memory state/nonce storage (single-replica only; see OIDC-PLAN.md for multi-replica path)
-_state_store: dict[str, dict[str, Any]] = {}
+# State storage: database-backed for multi-replica support
+# Legacy in-memory storage removed (was: _state_store: dict[str, dict[str, Any]] = {})
 STATE_EXPIRY = 600  # 10 minutes
 
 
@@ -367,55 +369,85 @@ def generate_state_and_nonce() -> tuple[str, str]:
 def store_state(state: str, provider_id: UUID, nonce: str, code_verifier: str) -> None:
     """
     Store state and related values for validation during callback.
-
+    
+    Uses database storage for multi-replica support.
+    
     Args:
         state: Random CSRF state
         provider_id: OIDC provider UUID
         nonce: Random nonce for ID token binding
         code_verifier: PKCE verifier (plaintext)
     """
-    _state_store[state] = {
-        "provider_id": str(provider_id),
-        "nonce": nonce,
-        "code_verifier": code_verifier,
-        "expires_at": time.time() + STATE_EXPIRY,
-    }
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(seconds=STATE_EXPIRY)
+    
+    # Use database for multi-replica support
+    execute(
+        """
+        INSERT INTO oidc_state (state, provider_id, nonce, code_verifier, expires_at)
+        VALUES (%s, %s, %s, %s, %s)
+        """,
+        (state, str(provider_id), nonce, code_verifier, expires_at),
+    )
 
 
 def validate_and_consume_state(state: str) -> tuple[str, str, str]:
     """
     Validate state (CSRF check) and consume it (one-time use).
-
+    
+    Database-backed for multi-replica support.
+    
     Args:
         state: State value from callback query string
-
+    
     Returns:
         (provider_id, nonce, code_verifier)
-
+    
     Raises:
         OIDCError: If state invalid, expired, or already consumed.
     """
-    if not state or state not in _state_store:
+    # Query for the state record
+    row = query_one(
+        """
+        SELECT provider_id, nonce, code_verifier, expires_at
+        FROM oidc_state
+        WHERE state = %s
+        """,
+        (state,),
+    )
+    
+    if not row:
         raise OIDCError("Invalid or missing state")
-
-    stored = _state_store[state]
-
+    
     # Check expiry
-    if time.time() > stored["expires_at"]:
-        _state_store.pop(state, None)
+    expires_at = row["expires_at"]
+    if datetime.now(timezone.utc) > expires_at:
+        # Record expired, delete it
+        execute(
+            "DELETE FROM oidc_state WHERE state = %s",
+            (state,),
+        )
         raise OIDCError("State expired")
-
-    # Consume (one-time use)
-    _state_store.pop(state)
-
-    return stored["provider_id"], stored["nonce"], stored["code_verifier"]
+    
+    # Consume (one-time use) - delete the record
+    execute(
+        "DELETE FROM oidc_state WHERE state = %s",
+        (state,),
+    )
+    
+    return row["provider_id"], row["nonce"], row["code_verifier"]
 
 
 def clear_expired_states() -> None:
-    """Remove expired state entries (can be called periodically by cleanup job)."""
-    now = time.time()
-    expired = [s for s, v in _state_store.items() if v["expires_at"] < now]
-    for s in expired:
-        _state_store.pop(s, None)
-    if expired:
-        logger.info(f"Cleared {len(expired)} expired OIDC states")
+    """Remove expired state entries from database."""
+    now = datetime.now(timezone.utc)
+    # Use execute for database cleanup
+    execute(
+        "DELETE FROM oidc_state WHERE expires_at < %s",
+        (now,),
+    )
+
+
+def clear_all_states() -> None:
+    """Remove all state entries - useful for testing."""
+    execute("DELETE FROM oidc_state")

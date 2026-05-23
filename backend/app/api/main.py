@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime
-from typing import Any
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,18 +16,54 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from . import db, routes
+from .db import get_pool_stats
 from .errors import register_error_handlers
+
+
+logger = logging.getLogger("api.main")
+
+
+# Import clear_expired_states at module level
+from .oidc import clear_expired_states
+
+
+async def periodic_state_cleanup():
+    """Background task to clear expired OIDC states every 5 minutes."""
+    # Wait a bit on startup for the app to be ready
+    await asyncio.sleep(30)
+    while True:
+        try:
+            clear_expired_states()
+            logger.debug("Cleaned up expired OIDC states")
+        except Exception as e:
+            logger.exception("Error cleaning up OIDC states: %s", e)
+        # Run every 5 minutes
+        await asyncio.sleep(300)
+
+
+# Global reference to cleanup task for shutdown
+_cleanup_task: Optional[asyncio.Task] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> Any:
     """Initialize and tear down application resources."""
+    global _cleanup_task
     # Startup
     if not os.environ.get("TESTING"):
         await db.init_async_pool()
+        # Start the periodic cleanup task
+        _cleanup_task = asyncio.create_task(periodic_state_cleanup())
     yield
     # Shutdown
     if not os.environ.get("TESTING"):
+        # Cancel the cleanup task
+        if _cleanup_task:
+            _cleanup_task.cancel()
+            try:
+                await _cleanup_task
+            except asyncio.CancelledError:
+                pass
         db.close_pools()
 
 
@@ -35,9 +73,6 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
-
-# Register custom error handlers
-register_error_handlers(app)
 
 # Add CORS middleware
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
@@ -66,7 +101,6 @@ async def db_session_middleware(request: Request, call_next: Any) -> Any:
     except Exception as exc:
         # Log the error but still process the request — avoids breaking responses
         # when DB connection issues occur. In production, consider a circuit breaker.
-        import logging
         logging.getLogger("api.main").warning("DB middleware error: %s", exc)
         response = await call_next(request)
         return response
