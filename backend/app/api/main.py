@@ -75,7 +75,31 @@ app = FastAPI(
 )
 
 # Add CORS middleware
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+# Determine allowed origins with validation
+allowed_origins_raw = os.getenv("ALLOWED_ORIGINS", "").strip()
+if not allowed_origins_raw:
+    # Default to localhost in dev mode
+    is_dev = "DEV" in os.getenv("APP_ENV", "").upper()
+    if not is_dev:
+        raise RuntimeError(
+            "ALLOWED_ORIGINS must be set in production. "
+            "Set APP_ENV=DEV for development with localhost defaults."
+        )
+    allowed_origins = ["http://localhost:5173", "http://localhost:3000"]
+else:
+    allowed_origins = [origin.strip() for origin in allowed_origins_raw.split(",")]
+
+# Validate no wildcard with credentials - prevents CSRF
+if "*" in allowed_origins and app is not None:
+    raise RuntimeError(
+        "CORS wildcard origin (*) is not allowed when credentials are enabled. "
+        "Set ALLOWED_ORIGINS to specific domains."
+    )
+
+# Log effective allowlist at startup
+import logging
+logging.getLogger("api.main").info(f"CORS allowed origins: {allowed_origins}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
