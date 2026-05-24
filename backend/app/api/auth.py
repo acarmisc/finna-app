@@ -145,28 +145,10 @@ async def require_admin(user: dict[str, Any] = Depends(get_current_user)) -> dic
     return user
 
 
-async def token_verification_middleware(request: Request, call_next):
-    """Middleware to verify JWT token on all protected routes."""
-    if request.url.path.startswith("/api/v1/") and request.url.path != "/api/v1/auth/token":
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header.split(" ")[1]
-            try:
-                decode_token(token)
-            except HTTPException:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid or expired token",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-        else:
-            if request.url.path != "/api/v1/healthz":
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Not authenticated",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-    return await call_next(request)
+# JWT verification is enforced per-route via FastAPI dependencies
+# (Depends(require_auth), Depends(require_admin)). Public routes
+# (/auth/oidc/providers, /auth/github, /healthz) intentionally have
+# no auth dependency. See routes/*.py for usage.
 
 
 def get_github_redirect_url() -> str | None:
