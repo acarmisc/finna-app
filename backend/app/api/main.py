@@ -52,6 +52,13 @@ app.add_middleware(
 # Re-export routes module to avoid circular import issues
 __all__ = ["app", "auth", "db", "routes"]
 
+# DB middleware imports
+import logging
+import psycopg
+from psycopg_pool import PoolTimeout
+
+_logger = logging.getLogger("api.main")
+
 
 @app.middleware("http")
 async def db_session_middleware(request: Request, call_next: Any) -> Any:
@@ -61,15 +68,13 @@ async def db_session_middleware(request: Request, call_next: Any) -> Any:
     try:
         async with db.get_async_connection() as conn:
             request.state.db = conn
-            response = await call_next(request)
-        return response
-    except Exception as exc:
-        # Log the error but still process the request — avoids breaking responses
-        # when DB connection issues occur. In production, consider a circuit breaker.
-        import logging
-        logging.getLogger("api.main").warning("DB middleware error: %s", exc)
-        response = await call_next(request)
-        return response
+            return await call_next(request)
+    except (psycopg.OperationalError, PoolTimeout) as exc:
+        # DB unavailable (pool exhausted or DB down) — return 503 immediately
+        _logger.error("DB unavailable: %s", exc)
+        return JSONResponse(
+            status_code=503, content={"detail": "database_unavailable"}
+        )
 
 
 # Health check endpoints
