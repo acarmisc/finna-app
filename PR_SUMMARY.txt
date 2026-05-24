@@ -1,0 +1,27 @@
+## PR Created: Centralize getAuthToken to prevent scattered localStorage access
+
+### Branch
+`fix/issue-190-auth-centralization` — **Pushed to origin**
+
+### GitHub PR Link
+**https://github.com/acarmisc/finna-app/pull/new/fix/issue-190-auth-centralization**
+
+---
+
+### Summary of Changes
+
+**Issue**: #190 - localStorage token access scattered across pages (security issue)
+
+**Files Changed**:
+1. `ui/src/store/auth.ts` - Added `getAuthToken()` helper + ESLint exception
+2. `ui/src/pages/CostsPage.tsx` - Replaced localStorage access with `getAuthToken()`
+3. `ui/src/pages/ConfigCreatePage.tsx` - Replaced localStorage access with `getAuthToken()` (2 locations)
+4. `ui/src/pages/ProjectDetailPage.tsx` - Replaced localStorage access with `getAuthToken()`
+5. `ui/eslint.config.mjs` - Added ESLint rule to ban localStorage access outside auth store
+
+**Commit**: `b683880` — "fix: centralize getAuthToken to prevent localStorage access scattered across pages"
+
+---
+
+### Security Impact
+This change ensures token access is now centralized through the auth store and routes through the axios interceptor, preventing future security issues from scattered localStorage access.

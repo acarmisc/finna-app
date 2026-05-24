@@ -32,6 +32,6 @@ This PR addresses a high-priority security vulnerability where `localStorage.get
 
 ### Testing
 
-- [x] Type checking passes
-- [x] Build succeeds
-- [x] ESLint validates no unauthorized localStorage access
+- [x] All localStorage access replaced with `getAuthToken()` from auth store
+- [x] ESLint validation added to prevent future issues
+- [x] Commit pushed to branch `fix/issue-190-auth-centralization`
