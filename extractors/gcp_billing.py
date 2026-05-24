@@ -279,7 +279,11 @@ def _batch_insert(
 
     with conn.cursor() as cur:
         cur.executemany(_INSERT_SQL, rows, returning=True)
-        actually_inserted = sum(1 for _ in cur)
+        actually_inserted = 0
+        while True:
+            actually_inserted += sum(1 for _ in cur)
+            if not cur.nextset():
+                break
     conn.commit()
 
     attempted = len(records)
