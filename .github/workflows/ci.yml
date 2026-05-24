@@ -81,7 +81,10 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
       - name: Initialize database
-        run: PGPASSWORD=finna psql -h localhost -U finna -d finna -f sql/init.sql
+        # init_docker.sql is the stock-postgres-compatible schema (no pg_partman/pg_cron).
+        # sql/init.sql is the prod variant that requires the partman extension and is
+        # not available in the stock postgres:16 service image.
+        run: PGPASSWORD=finna psql -v ON_ERROR_STOP=1 -h localhost -U finna -d finna -f sql/init_docker.sql
       - name: Run pytest
         run: pytest
         env:
@@ -89,6 +92,7 @@ jobs:
           PGUSER: finna
           PGPASSWORD: finna
           PGDATABASE: finna
+          PG_DSN: postgresql://finna:finna@localhost:5432/finna
           PYTHONPATH: .
 
   ui-build:
