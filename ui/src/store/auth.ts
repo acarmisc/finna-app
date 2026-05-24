@@ -54,3 +54,12 @@ export const useAuthStore = create<AuthState & AuthActions>()((set, get) => ({
     set({ token: null, isAuthenticated: false, loading: false })
   },
 }))
+
+// Centralized helper to get auth token - use this instead of localStorage.getItem('finna_token')
+export const getAuthToken = (): string | null => {
+  return useAuthStore.getState().token
+}
+
+// Allow localStorage access in this file only
+// eslint-disable-next-line no-restricted-globals
+const _localStorage = localStorage

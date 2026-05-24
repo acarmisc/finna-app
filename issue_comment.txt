@@ -1,0 +1,9 @@
+PR #205 fixes this issue and is ready for review.
+
+**Summary:**
+- Fixed all 4 occurrences of `localStorage.getItem('token')` to use `localStorage.getItem('finna_token')` in `OIDCProvidersSection.tsx`
+- Added TODO comments to refactor later to use the centralized `getAuthToken()` helper from the auth store
+
+This resolves the critical security bug where OIDC admin API calls were failing with 401 due to reading the wrong localStorage key.
+
+[🔗 View PR #205](https://github.com/acarmisc/finna-app/pull/205)

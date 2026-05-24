@@ -59,5 +59,9 @@ export default [js.configs.recommended, ...ts.configs.recommended, {
         },
       ],
     }],
+    'no-restricted-globals': ['error', {
+      name: 'localStorage',
+      message: 'Do not access localStorage directly. Use getAuthToken() from @/store/auth instead.',
+    }],
   },
 }, ...storybook.configs["flat/recommended"]];
