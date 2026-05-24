@@ -223,7 +223,8 @@ _INSERT_SQL = SQL(
     "cost_usd, currency_original, cost_original, discount_usd, net_cost_usd, "
     "usage_quantity, usage_unit, tags) "
     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
-    "ON CONFLICT (record_id) DO NOTHING"
+    "ON CONFLICT (record_id) DO NOTHING "
+    "RETURNING record_id"
 )
 
 
@@ -277,14 +278,19 @@ def _batch_insert(
     ]
 
     with conn.cursor() as cur:
-        cur.executemany(_INSERT_SQL, rows)
+        cur.executemany(_INSERT_SQL, rows, returning=True)
+        actually_inserted = sum(1 for _ in cur)
     conn.commit()
 
-    inserted = len(
-        records
-    )  # ON CONFLICT DO NOTHING doesn't give rowcount via executemany
-    logger.debug("Batch inserted up to %d records", inserted)
-    return inserted
+    attempted = len(records)
+    skipped = attempted - actually_inserted
+    logger.info(
+        "Batch inserted: attempted=%d inserted=%d skipped=%d",
+        attempted,
+        actually_inserted,
+        skipped,
+    )
+    return actually_inserted
 
 
 # ---------------------------------------------------------------------------
