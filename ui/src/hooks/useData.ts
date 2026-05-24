@@ -2,6 +2,20 @@ import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/auth'
 import { getApiClient } from '@/services/apiClient'
 
+/**
+ * Creates a stable dependency key from params object.
+ * Handles undefined values and ensures consistent ordering across runtimes.
+ * Returns a string that uniquely represents the logical state of params.
+ */
+function createParamsKey<T extends Record<string, any>>(params?: T) {
+  if (!params) return 'null'
+  // Convert to sorted entries, filtering out undefined values for consistency
+  const entries = Object.entries(params)
+    .filter(([_, v]) => v !== undefined)
+    .sort(([a], [b]) => a.localeCompare(b))
+  return JSON.stringify(entries)
+}
+
 export function useAuth() {
   const { checkAuth, isAuthenticated, logout } = useAuthStore()
   
@@ -32,7 +46,7 @@ export function useCostTotals(params?: { startDate?: string, endDate?: string })
       })
       .catch((e: Error) => setError(e.message || 'Network error'))
       .finally(() => setLoading(false))
-  }, [JSON.stringify(params)])
+  }, [createParamsKey(params)])
 
   useEffect(() => { refresh() }, [refresh])
 
@@ -57,7 +71,7 @@ export function useDailyCosts(params?: { startDate?: string, endDate?: string, p
       })
       .catch((e: Error) => setError(e.message || 'Network error'))
       .finally(() => setLoading(false))
-  }, [JSON.stringify(params)])
+  }, [createParamsKey(params)])
 
   useEffect(() => { refresh() }, [refresh])
 
@@ -82,7 +96,7 @@ export function useCosts(params?: { provider?: string; project?: string; startDa
       })
       .catch((e: Error) => setError(e.message || 'Network error'))
       .finally(() => setLoading(false))
-  }, [JSON.stringify(params)])
+  }, [createParamsKey(params)])
 
   useEffect(() => { refresh() }, [refresh])
 
@@ -108,7 +122,7 @@ export function useAlerts(params?: { status?: string; severity?: string; limit?:
       })
       .catch((e: Error) => setError(e.message || 'Network error'))
       .finally(() => { setLoading(false); setRefreshing(false) })
-  }, [JSON.stringify(params)])
+  }, [createParamsKey(params)])
 
   useEffect(() => { refresh() }, [refresh])
 
