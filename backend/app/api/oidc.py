@@ -10,8 +10,8 @@ import hashlib
 import logging
 import secrets
 import time
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID
 
 import httpx
@@ -118,7 +118,7 @@ async def get_jwks(issuer: str) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.get(jwks_uri)
             response.raise_for_status()
-            jwks = response.json()
+            jwks = dict(response.json())
     except httpx.RequestError as e:
         raise OIDCError(f"JWKS request failed: {e}")
     except httpx.HTTPStatusError as e:
@@ -215,7 +215,7 @@ async def exchange_code(
         async with httpx.AsyncClient(timeout=10) as client:
             response = await client.post(token_url, data=payload)
             response.raise_for_status()
-            tokens = response.json()
+            tokens: dict[str, Any] = response.json()
     except httpx.RequestError as e:
         raise OIDCError(f"Token exchange request failed: {e}")
     except httpx.HTTPStatusError as e:
@@ -304,7 +304,7 @@ async def verify_id_token(
 
     # Verify signature
     try:
-        claims = jwt.decode(id_token, key, algorithms=[alg], options={"verify_signature": True})
+        claims: dict[str, Any] = jwt.decode(id_token, key, algorithms=[alg], options={"verify_signature": True})
     except JWTError as e:
         raise OIDCError(f"Signature verification failed: {e}")
 

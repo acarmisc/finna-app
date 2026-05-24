@@ -70,7 +70,7 @@ def _fetch_page(
 ) -> dict[str, Any]:
     """Fetch one page of /spend/logs."""
     url = f"{base_url.rstrip('/')}/spend/logs"
-    params = {
+    params: dict[str, str | int] = {
         "start_date": start_date,
         "end_date": end_date,
         "summarize": "false",
@@ -82,7 +82,7 @@ def _fetch_page(
     data = resp.json()
     if isinstance(data, list):
         return {"data": data, "total_pages": 1}
-    return data
+    return dict(data)
 
 
 def fetch_spend_logs(

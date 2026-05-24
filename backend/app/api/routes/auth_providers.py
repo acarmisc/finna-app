@@ -7,12 +7,13 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+from utils.encryption import decrypt_config, encrypt_config
 
 from .. import auth as api_auth
 from ..db import execute, insert_and_return, query_all, query_one
-from utils.encryption import decrypt_config, encrypt_config
 
 require_admin = api_auth.require_admin
 logger = logging.getLogger("api.auth_providers")
@@ -47,8 +48,8 @@ class AuthProviderResponse(BaseModel):
     kind: str
     enabled: bool
     config: dict[str, Any]
-    created_at: str
-    updated_at: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
     created_by: Optional[str] = None
     last_test_at: Optional[str] = None
     last_test_ok: Optional[bool] = None
@@ -91,7 +92,11 @@ async def list_providers() -> list[AuthProviderResponse]:
                 created_at=row["created_at"].isoformat() if row["created_at"] else None,
                 updated_at=row["updated_at"].isoformat() if row["updated_at"] else None,
                 created_by=row.get("created_by"),
-                last_test_at=row.get("last_test_at").isoformat() if row.get("last_test_at") else None,
+                last_test_at=(
+                    last_test_at_val.isoformat()
+                    if (last_test_at_val := row.get("last_test_at")) is not None
+                    else None
+                ),
                 last_test_ok=row.get("last_test_ok"),
             )
         )
@@ -124,13 +129,20 @@ async def get_provider(provider_id: str) -> AuthProviderResponse:
         created_at=row["created_at"].isoformat() if row["created_at"] else None,
         updated_at=row["updated_at"].isoformat() if row["updated_at"] else None,
         created_by=row.get("created_by"),
-        last_test_at=row.get("last_test_at").isoformat() if row.get("last_test_at") else None,
+        last_test_at=(
+            last_test_at_val.isoformat()
+            if (last_test_at_val := row.get("last_test_at")) is not None
+            else None
+        ),
         last_test_ok=row.get("last_test_ok"),
     )
 
 
 @router.post("/auth/providers", dependencies=[Depends(require_admin)])
-async def create_provider(request: AuthProviderInput, user: dict[str, Any] = Depends(require_admin)) -> AuthProviderResponse:
+async def create_provider(
+    request: AuthProviderInput,
+    user: dict[str, Any] = Depends(require_admin),
+) -> AuthProviderResponse:
     """Create new OIDC provider."""
     provider_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
@@ -174,7 +186,10 @@ async def update_provider(provider_id: str, request: AuthProviderInput) -> AuthP
 
     # Check for duplicate name (excluding self)
     if request.name != row["name"]:
-        existing = query_one("SELECT id FROM auth_providers WHERE lower(name) = lower(%s) AND id != %s", (request.name, provider_id))
+        existing = query_one(
+            "SELECT id FROM auth_providers WHERE lower(name) = lower(%s) AND id != %s",
+            (request.name, provider_id),
+        )
         if existing:
             raise HTTPException(status_code=409, detail="Provider name already exists")
 

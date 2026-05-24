@@ -652,6 +652,7 @@ dependencies = [
     { name = "cryptography" },
     { name = "fastapi" },
     { name = "google-cloud-bigquery" },
+    { name = "httpx" },
     { name = "keyring" },
     { name = "msal" },
     { name = "msal-extensions" },
@@ -675,7 +676,6 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -694,7 +694,7 @@ requires-dist = [
     { name = "cryptography", specifier = ">=42.0" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "google-cloud-bigquery", specifier = ">=3.11" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "keyring", specifier = ">=25.0" },
     { name = "msal", specifier = ">=1.30" },
     { name = "msal-extensions", specifier = ">=1.3" },
