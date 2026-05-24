@@ -15,6 +15,10 @@ from typing import Any, Optional
 from uuid import UUID
 
 import httpx
+import psycopg
+from psycopg import AsyncConnection
+from psycopg.rows import dict_row
+from psycopg_pool import AsyncConnectionPool
 from jose import JWTError, jwt
 
 logger = logging.getLogger("api.oidc")
@@ -26,7 +30,8 @@ _jwks_cache: dict[str, tuple[dict[str, Any], float]] = {}
 DISCOVERY_CACHE_TTL = 3600  # 1 hour
 JWKS_CACHE_TTL = 300  # 5 minutes
 
-# In-memory state/nonce storage (single-replica only; see OIDC-PLAN.md for multi-replica path)
+# In-memory state/nonce storage (for single-replica deployments, deprecated)
+# Kept for backward compatibility during migration, but not used when DB pool is available
 _state_store: dict[str, dict[str, Any]] = {}
 STATE_EXPIRY = 600  # 10 minutes
 
@@ -418,4 +423,112 @@ def clear_expired_states() -> None:
     for s in expired:
         _state_store.pop(s, None)
     if expired:
-        logger.info(f"Cleared {len(expired)} expired OIDC states")
+        logger.info(f"Cleared {len(expired)} expired OIDC states (in-memory fallback)")
+
+# ============================================================================
+# Database-backed state storage (for multi-replica deployments)
+# ============================================================================
+
+
+async def store_state_async(state: str, provider_id: UUID, nonce: str, code_verifier: str, pool: AsyncConnectionPool | None = None) -> None:
+    """
+    Store state and related values in PostgreSQL for multi-replica support.
+    
+    Args:
+        state: Random CSRF state
+        provider_id: OIDC provider UUID
+        nonce: Random nonce for ID token binding
+        code_verifier: PKCE verifier (plaintext)
+        pool: AsyncConnectionPool (optional, uses default if not provided)
+    """
+    if pool is None:
+        from ..db import get_async_pool
+        pool = await get_async_pool()
+    
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=STATE_EXPIRY)
+    
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                INSERT INTO oidc_states (state, provider_id, nonce, code_verifier, expires_at)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (state) DO UPDATE SET
+                    provider_id = EXCLUDED.provider_id,
+                    nonce = EXCLUDED.nonce,
+                    code_verifier = EXCLUDED.code_verifier,
+                    expires_at = EXCLUDED.expires_at,
+                    created_at = now()
+                """,
+                (state, str(provider_id), nonce, code_verifier, expires_at)
+            )
+        await conn.commit()
+
+
+async def validate_and_consume_state_async(state: str, pool: AsyncConnectionPool | None = None) -> tuple[str, str, str]:
+    """
+    Validate state (CSRF check) and consume it (one-time use) from PostgreSQL.
+    
+    Args:
+        state: State value from callback query string
+        pool: AsyncConnectionPool (optional, uses default if not provided)
+    
+    Returns:
+        (provider_id, nonce, code_verifier)
+    
+    Raises:
+        OIDCError: If state invalid, expired, or already consumed.
+    """
+    if pool is None:
+        from ..db import get_async_pool
+        pool = await get_async_pool()
+    
+    async with pool.connection() as conn:
+        async with conn.cursor(row_factory=dict_row) as cur:
+            # Delete and return the row in one operation (atomic consume)
+            await cur.execute(
+                """
+                DELETE FROM oidc_states
+                WHERE state = %s AND expires_at > now()
+                RETURNING state, provider_id, nonce, code_verifier, expires_at
+                """,
+                (state,)
+            )
+            row = await cur.fetchone()
+    
+    if not row:
+        raise OIDCError("Invalid or missing state")
+    
+    return row["provider_id"], row["nonce"], row["code_verifier"]
+
+
+async def clear_expired_states_async(pool: AsyncConnectionPool | None = None) -> int:
+    """
+    Remove expired state entries from PostgreSQL.
+    
+    Args:
+        pool: AsyncConnectionPool (optional, uses default if not provided)
+    
+    Returns:
+        Number of expired states cleared
+    """
+    if pool is None:
+        from ..db import get_async_pool
+        pool = await get_async_pool()
+    
+    async with pool.connection() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """
+                DELETE FROM oidc_states
+                WHERE expires_at < now()
+                RETURNING state
+                """
+            )
+            rows = await cur.fetchall()
+    
+    if rows:
+        deleted_count = len(rows)
+        logger.info(f"Cleared {deleted_count} expired OIDC states (database)")
+        return deleted_count
+    return 0

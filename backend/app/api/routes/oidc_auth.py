@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from .. import auth as api_auth
 from .. import oidc
-from ..db import execute, query_one, query_all, insert_and_return
+from ..db import execute, query_one, query_all, insert_and_return, get_async_pool
 from utils.encryption import decrypt_config
 from datetime import datetime, timezone
 
@@ -176,8 +176,11 @@ async def oidc_login(request_data: OIDCLoginRequest, request: Request) -> OIDCLo
         # Generate state and nonce
         state, nonce = oidc.generate_state_and_nonce()
 
-        # Store state (for callback validation)
-        oidc.store_state(state, UUID(provider["id"]), nonce, code_verifier)
+        # Get async pool for database storage
+        pool = get_async_pool()
+
+        # Store state in PostgreSQL (multi-replica safe)
+        await oidc.store_state_async(state, UUID(provider["id"]), nonce, code_verifier, pool)
 
         # Build authorization URL
         auth_url = oidc.build_authorization_url(
