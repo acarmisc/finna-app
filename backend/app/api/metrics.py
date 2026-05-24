@@ -37,3 +37,46 @@ extractor_duration_seconds = Histogram(
     buckets=[30, 60, 120, 300, 600, 1200, 3600],
 )
 """Histogram metric tracking extractor run durations by provider and status."""
+
+# OIDC circuit breaker metrics
+oidc_discovery_fallback_total = Counter(
+    "finna_oidc_discovery_fallback_total",
+    "Total number of OIDC discovery fallbacks from stale cache",
+)
+"""Counter metric tracking OIDC discovery fallbacks from stale cache."""
+
+oidc_jwks_fallback_total = Counter(
+    "finna_oidc_jwks_fallback_total",
+    "Total number of OIDC JWKS fallbacks from stale cache",
+)
+"""Counter metric tracking OIDC JWKS fallbacks from stale cache."""
+
+oidc_jwks_fetch_duration_seconds = Histogram(
+    "finna_oidc_jwks_fetch_duration_seconds",
+    "OIDC JWKS fetch duration in seconds",
+    ["status"],
+    buckets=[0.5, 1, 2, 5, 10, 30, 60],
+)
+"""Histogram metric tracking JWKS fetch durations by status."""
+
+oidc_discovery_fetch_duration_seconds = Histogram(
+    "finna_oidc_discovery_fetch_duration_seconds",
+    "OIDC discovery fetch duration in seconds",
+    ["status"],
+    buckets=[0.5, 1, 2, 5, 10, 30, 60],
+)
+"""Histogram metric tracking discovery fetch durations by status."""
+
+oidc_circuit_breaker_state = Gauge(
+    "finna_oidc_circuit_breaker_state",
+    "Circuit breaker state (0=closed, 1=open, 0.5=half_open)",
+    ["service"],
+)
+"""Gauge metric tracking circuit breaker state (0=closed, 1=open, 0.5=half_open)."""
+
+oidc_circuit_breaker_failures = Counter(
+    "finna_oidc_circuit_breaker_failures_total",
+    "Total circuit breaker failures",
+    ["service"],
+)
+"""Counter metric tracking circuit breaker failures by service."""
