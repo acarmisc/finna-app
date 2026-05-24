@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -15,6 +16,8 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from . import db, routes
 from .errors import register_error_handlers
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -39,8 +42,24 @@ app = FastAPI(
 # Register custom error handlers
 register_error_handlers(app)
 
-# Add CORS middleware
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000").split(",")
+# Add CORS middleware with hardened validation
+raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000")
+allowed_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+
+# Validate CORS configuration
+if "*" in allowed_origins:
+    raise RuntimeError(
+        "CORS misconfig: '*' incompatible with allow_credentials=True"
+    )
+
+for origin in allowed_origins:
+    if not origin.startswith(("http://", "https://")):
+        raise RuntimeError(
+            f"CORS misconfig: origin '{origin}' missing http(s):// scheme"
+        )
+
+logger.info("CORS allowlist: %s", allowed_origins)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
