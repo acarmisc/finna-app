@@ -68,7 +68,13 @@ package-lock.json
 .playwright-mcp/
 test-results/
 graphify-out/
-azure-sp.txt
+
+# Cloud credential dumps (never commit)
+azure-sp*.txt
+gcp-sa*.json
+*-sa.json
+*.sp.txt
+credentials/
 
 # Test artifacts
 .coverage

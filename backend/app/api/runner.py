@@ -52,8 +52,20 @@ def _sanitize_log(output: str) -> str:
     return output
 
 
+# Hard allowlist of importable extractor modules. Anything reaching
+# subprocess(`python -m extractors.<X>`) MUST be in this set, otherwise an
+# attacker-controlled provider value could load arbitrary `extractors.*`
+# modules (see SECURITY_AUDIT.md §2.8).
+ALLOWED_EXTRACTORS: set[str] = {
+    "azure_cost",
+    "gcp_billing",
+    "aws_cost",
+    "litellm_cost",
+}
+
+
 def _get_extractor_type(provider: str) -> str:
-    """Map provider to default extractor type."""
+    """Map provider to default extractor type, enforcing the allowlist."""
     mapping = {
         "azure": "azure_cost",
         "gcp": "gcp_billing",
@@ -61,7 +73,10 @@ def _get_extractor_type(provider: str) -> str:
         "llm": "litellm_cost",
         "litellm": "litellm_cost",
     }
-    return mapping.get(provider, provider)
+    resolved = mapping.get(provider, provider)
+    if resolved not in ALLOWED_EXTRACTORS:
+        raise ValueError(f"Unknown extractor type: {provider!r}")
+    return resolved
 
 
 def _build_env_from_config(config: dict[str, Any], provider: str, cred_type: str | None = None) -> dict[str, str]:

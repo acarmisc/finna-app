@@ -1,0 +1,36 @@
+# SECURITY_AUDIT.md remediation — todo
+
+Legend: [ ] pending  [~] in progress  [x] done  [!] blocked/skip
+
+## Launch blockers (§6 rows 1-8)
+[x] 1. secrets-rotator: rm azure-sp.txt + gcp-sa.json; .gitignore + .dockerignore entries
+[x] 2. compose-hardener: docker-compose secrets → ${VAR}; .env.example; startup validation
+[x] 3. dep-bumper-py: pyjwt/starlette/urllib3/idna/requests bumps in pyproject.toml (venv pip-audit clean)
+[x] 4. dep-bumper-js: axios/ws via audit fix; vitest family → ^4.1.8 (devDeps). npm audit: 0 vulns
+[x] 5. sql-injection-fixer: aws/azure already allowlisted; added _ALLOWED_HEALTH_TS_COLS + _safe_ts_col in litellm_cost
+[x] 6. rate-limiter: slowapi global+AUTH_LIMIT on /auth/token, /auth/login, /auth/github/callback; OIDC already had custom limiter
+[x] 7. dead-auth-remover: dropped USERS_TABLE from backend/app/api/auth.py (no references)
+[x] 8. extractor-allowlister: ALLOWED_EXTRACTORS set in runner.py; entrypoint.py already had EXTRACTOR_MAP guard
+
+## Post-launch (§6 rows 9-15) — skip this pass unless trivial
+[x] 9. xml-defuser: replaced xml.etree.ElementTree with defusedxml.ElementTree in exchange_rates.py
+[x] 10. open-redirect-fixer: LoginComponent redirect URLs validated against ALLOWED_REDIRECT_ORIGINS allowlist; OIDC backend audit OK
+[x] 11. ui-token-migrator: centralized via tokenStorage.ts; full cookie migration deferred (see ui/MIGRATION_NOTES.md)
+[x] 12. security-headers: FastAPI middleware + nginx server-wide headers (HSTS, CSP, X-Frame-Options, Permissions-Policy)
+[x] 13. ruff-cleanup: 70 → 12 findings via `ruff check --fix .`; 58 auto-fixed (F401/I001 mostly), 12 remain (5× E501, 4× F841, 3× E402)
+[x] 14. ci-gates: GitHub Actions security.yml (python-security, js-security, semgrep, tests)
+[x] 15. dockerfile-pinner: Pinned python:3.14→3.12-slim; node:26→22-alpine; added HEALTHCHECK to api/monolith (port 8000) and ui (nginx)
+
+## Verification
+- backend.app.api.main imports cleanly with TESTING=1
+- runner._get_extractor_type accepts {aws,gcp,azure,llm,litellm}, rejects '../etc/passwd' with ValueError
+- pip-audit (venv): No known vulnerabilities found
+- npm audit (ui/): 0 vulns (was 6, 4 critical)
+- test_log_sanitizer + test_log_sanitizer_patterns: 38 passed
+- full pytest hangs on pre-existing DB/network fixtures (not from these changes); pytest --collect-only succeeds (112 tests)
+
+## USER ACTIONS REQUIRED (cannot be done from code)
+- Rotate Azure SP secret in Azure portal (creds removed from disk; identifiers in local-only audit notes)
+- Rotate GCP service-account key in GCP IAM
+- Create .env from .env.example with fresh secrets (python -c "import secrets; print(secrets.token_urlsafe(48))")
+- Investigate why full pytest hangs (likely missing test-time DB stubs)

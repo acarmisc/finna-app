@@ -11,7 +11,7 @@
 # ---------------------------------------------------------------------------#
 
 # ---- Stage 1: Builder (Python dependencies) ----
-FROM python:3.14-slim AS builder
+FROM python:3.12-slim AS builder
 
 WORKDIR /build
 
@@ -21,7 +21,7 @@ COPY pyproject.toml .
 RUN uv pip install --system --no-cache -r pyproject.toml
 
 # ---- Stage 2: Frontend builder ----
-FROM node:26-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 
 WORKDIR /build-ui
 
@@ -32,7 +32,7 @@ COPY ui/ ./ui/
 RUN cd ui && npm run build
 
 # ---- Stage 3: Runtime ----
-FROM python:3.14-slim
+FROM python:3.12-slim
 
 RUN groupadd --gid 1000 appuser && \
     useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser && \
@@ -137,6 +137,9 @@ USER appuser
 
 ENV HOST=0.0.0.0
 ENV PORT=8000
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD curl --fail http://localhost:8000/healthz || exit 1
 
 # Entrypoint starts nginx, then FastAPI in background, then nginx foreground
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

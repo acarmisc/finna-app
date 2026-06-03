@@ -32,8 +32,9 @@ def test_main_app_instance():
 
 
 def test_health_endpoint():
-    from backend.app.api.main import app
     from fastapi.testclient import TestClient
+
+    from backend.app.api.main import app
     client = TestClient(app)
     response = client.get("/health")
     assert response.status_code == 200
@@ -43,8 +44,9 @@ def test_health_endpoint():
 
 
 def test_api_health_endpoint_without_db():
-    from backend.app.api import main as main_module
     from fastapi.testclient import TestClient
+
+    from backend.app.api import main as main_module
 
     mock_conn = MagicMock()
     mock_conn.execute = AsyncMock(return_value=None)
@@ -69,8 +71,9 @@ def test_api_health_endpoint_without_db():
 
 
 def test_api_health_endpoint_db_error():
-    from backend.app.api.main import app
     from fastapi.testclient import TestClient
+
+    from backend.app.api.main import app
 
     with patch("backend.app.api.main.db.get_async_connection") as mock_ctx:
         mock_ctx.side_effect = Exception("connection refused")
@@ -81,8 +84,9 @@ def test_api_health_endpoint_db_error():
 
 
 def test_db_stats_endpoint():
-    from backend.app.api import main as main_module
     from fastapi.testclient import TestClient
+
+    from backend.app.api import main as main_module
 
     with patch.object(main_module.db, "get_pool_stats", return_value={"async": {"size": 2}, "sync": None}):
         client = TestClient(main_module.app)
@@ -125,8 +129,9 @@ def test_get_connection_invalid_then_valid():
 
 
 def test_get_connection_all_invalid():
-    from backend.app.api.db import get_connection
     import psycopg
+
+    from backend.app.api.db import get_connection
 
     mock_pool = MagicMock()
     bad_conn = MagicMock()
@@ -140,8 +145,9 @@ def test_get_connection_all_invalid():
 
 
 def test_get_connection_pool_timeout_retries():
-    from backend.app.api.db import get_connection
     from psycopg_pool import PoolTimeout
+
+    from backend.app.api.db import get_connection
 
     mock_pool = MagicMock()
     mock_pool.getconn.side_effect = PoolTimeout("timeout")
@@ -154,7 +160,7 @@ def test_get_connection_pool_timeout_retries():
 
 
 def test_init_sync_pool_returns_existing():
-    from backend.app.api.db import init_sync_pool, _sync_pool
+    from backend.app.api.db import init_sync_pool
 
     fake_pool = MagicMock()
     with patch("backend.app.api.db._sync_pool", fake_pool):
@@ -221,8 +227,9 @@ async def test_get_async_connection_success():
 
 @pytest.mark.anyio
 async def test_get_async_connection_pool_timeout_retries():
-    from backend.app.api.db import get_async_connection
     from psycopg_pool import PoolTimeout
+
+    from backend.app.api.db import get_async_connection
 
     fake_pool = MagicMock()
     fake_pool.connection.side_effect = PoolTimeout("timeout")
@@ -237,8 +244,9 @@ async def test_get_async_connection_pool_timeout_retries():
 
 @pytest.mark.anyio
 async def test_get_async_connection_psycopg_error():
-    from backend.app.api.db import get_async_connection
     import psycopg
+
+    from backend.app.api.db import get_async_connection
 
     fake_pool = MagicMock()
     fake_pool.connection.side_effect = psycopg.OperationalError("boom")

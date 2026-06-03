@@ -8,6 +8,34 @@ interface LoginComponentProps {
   onLoginSuccess?: () => void
 }
 
+/**
+ * Allowlist of trusted redirect origins.
+ * Prevents open redirect vulnerabilities by validating redirect_uri against this list.
+ * Defaults to the current origin; can be overridden via environment variable.
+ */
+const ALLOWED_REDIRECT_ORIGINS = (
+  import.meta.env.VITE_ALLOWED_REDIRECT_ORIGINS?.split(',') || [window.location.origin]
+).map(origin => origin.trim()).filter(Boolean)
+
+/**
+ * Safely validate and redirect to a URL.
+ * Ensures the target origin is in the allowlist before redirecting.
+ * Falls back to '/' if the URL origin is not trusted.
+ */
+function safeRedirect(targetUrl: string): void {
+  try {
+    const parsed = new URL(targetUrl, window.location.origin)
+    if (ALLOWED_REDIRECT_ORIGINS.includes(parsed.origin)) {
+      window.location.href = targetUrl
+      return
+    }
+  } catch {
+    // Invalid URL; fall back to safe redirect
+  }
+  // Fallback: redirect to home
+  window.location.href = '/'
+}
+
 const SSO_PROVIDERS = [
   {
     id: 'github',
@@ -93,7 +121,8 @@ export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) 
           setLoadingId(null)
           return
         }
-        window.location.href = data.url
+        // Validate redirect URL against allowlist to prevent open redirect
+        safeRedirect(data.url)
       } catch {
         setErr('Connection error')
         setLoadingId(null)
@@ -118,7 +147,8 @@ export default function LoginComponent({ onLoginSuccess }: LoginComponentProps) 
       }
       const data = await response.json()
       sessionStorage.setItem('oidc_provider_id', providerId)
-      window.location.href = data.authorization_url
+      // Validate redirect URL against allowlist to prevent open redirect
+      safeRedirect(data.authorization_url)
     } catch (e) {
       setErr('Connection error')
       setLoadingId(null)
