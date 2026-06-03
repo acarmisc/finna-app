@@ -13,9 +13,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_fastapi_instrumentator import Instrumentator
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from . import db, routes
 from .errors import register_error_handlers
+from .rate_limit import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +42,27 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# Fail fast on unsafe secrets — reject dev placeholders and weak lengths.
+# Skip under TESTING=1 so the test suite can use deterministic short fixtures.
+if not os.environ.get("TESTING"):
+    _UNSAFE_SECRETS = {
+        "dev-secret-key-change-in-production",
+        "dev-key-change-in-production",
+        "change-me",
+        "",
+    }
+    for _var in ("JWT_SECRET", "ENCRYPTION_KEY"):
+        _val = os.environ.get(_var, "")
+        if _val in _UNSAFE_SECRETS or _val.startswith("change-me"):
+            raise RuntimeError(f"{_var} is a known-unsafe placeholder; set a strong value in .env")
+        if len(_val) < 32:
+            raise RuntimeError(f"{_var} must be at least 32 characters; got {len(_val)}")
+
+# Wire rate limiter (slowapi) — global default + per-route overrides
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # Register custom error handlers
 register_error_handlers(app)
@@ -73,10 +98,29 @@ __all__ = ["app", "auth", "db", "routes"]
 
 # DB middleware imports
 import logging
+
 import psycopg
 from psycopg_pool import PoolTimeout
 
 _logger = logging.getLogger("api.main")
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next: Any) -> Any:
+    """Add security response headers (production only, skip under TESTING=1)."""
+    response = await call_next(request)
+    if not os.environ.get("TESTING"):
+        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; img-src 'self' data:; script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; connect-src 'self'"
+        )
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        logger.debug("Security headers applied to response")
+    return response
 
 
 @app.middleware("http")

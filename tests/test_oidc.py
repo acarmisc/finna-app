@@ -2,12 +2,11 @@
 
 import base64
 import hashlib
-import json
 import time
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from jose import jwt
 
@@ -34,7 +33,6 @@ def rsa_keypair():
     )
 
     # JWK format
-    from jose import utils
     e = public_key.public_numbers().e
     n = public_key.public_numbers().n
 

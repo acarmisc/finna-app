@@ -8,11 +8,12 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from .. import auth as api_auth
 from ..db import execute, insert_and_return, query_one
+from ..rate_limit import AUTH_LIMIT, limiter
 
 require_auth = api_auth.require_auth
 logger = logging.getLogger("api.auth")
@@ -26,7 +27,8 @@ class TokenRequest(BaseModel):
 
 
 @router.post("/auth/token")
-async def login_token(req: TokenRequest) -> dict[str, Any]:
+@limiter.limit(AUTH_LIMIT)
+async def login_token(request: Request, req: TokenRequest) -> dict[str, Any]:
     """Authenticate user and return JWT token."""
     from ..auth import create_access_token, verify_password
 
@@ -60,7 +62,8 @@ class GitHubCallbackRequest(BaseModel):
 
 
 @router.post("/auth/github/callback")
-async def github_callback(req: GitHubCallbackRequest) -> dict[str, Any]:
+@limiter.limit(AUTH_LIMIT)
+async def github_callback(request: Request, req: GitHubCallbackRequest) -> dict[str, Any]:
     """Exchange GitHub code for JWT token."""
     from ..auth import (
         GITHUB_CLIENT_ID,
@@ -169,7 +172,8 @@ async def register_azure_service_account(request: AzureServiceAccountRegisterReq
 
 
 @router.post("/auth/login")
-async def login_alias(req: TokenRequest) -> dict[str, Any]:
+@limiter.limit(AUTH_LIMIT)
+async def login_alias(request: Request, req: TokenRequest) -> dict[str, Any]:
     """CLI-compatible login endpoint alias."""
-    result = await login_token(req)
+    result = await login_token(request, req)
     return {"access_token": result["token"], "token_type": "bearer"}

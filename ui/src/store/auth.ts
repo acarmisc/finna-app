@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { getToken, setToken as setStoredToken, clearToken } from '@/lib/tokenStorage'
 
 interface AuthState {
   token: string | null
@@ -19,38 +20,26 @@ export const useAuthStore = create<AuthState & AuthActions>()((set, get) => ({
   loading: true,
 
   setToken: (token) => {
-    if (token) {
-      sessionStorage.setItem('finna_token', token)
-      // Keep localStorage for session restoration fallback
-      localStorage.setItem('finna_token', token)
-    } else {
-      sessionStorage.removeItem('finna_token')
-      localStorage.removeItem('finna_token')
-    }
+    setStoredToken(token)
     set({ token, isAuthenticated: !!token, loading: false })
   },
 
   checkAuth: () => {
-    // Prefer sessionStorage, fall back to localStorage for session restoration
-    const storedToken = sessionStorage.getItem('finna_token') || localStorage.getItem('finna_token')
-    set({ 
-      token: storedToken, 
-      isAuthenticated: !!storedToken, 
-      loading: false 
+    const storedToken = getToken()
+    set({
+      token: storedToken,
+      isAuthenticated: !!storedToken,
+      loading: false
     })
   },
 
   login: (token) => {
-    // Store in both sessionStorage (primary) and localStorage (fallback)
-    sessionStorage.setItem('finna_token', token)
-    localStorage.setItem('finna_token', token)
+    setStoredToken(token)
     set({ token, isAuthenticated: true, loading: false })
   },
 
   logout: () => {
-    // Clear both storage types
-    sessionStorage.removeItem('finna_token')
-    localStorage.removeItem('finna_token')
+    clearToken()
     set({ token: null, isAuthenticated: false, loading: false })
   },
 }))

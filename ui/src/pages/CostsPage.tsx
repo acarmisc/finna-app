@@ -8,6 +8,7 @@ import { Icon } from '@/components/shared/Icon'
 import { money } from '@/components/shared/money'
 import { useCosts, useDailyCosts, useProjects } from '@/api/hooks'
 import { useDateRange } from '@/contexts/DateRangeContext'
+import { getToken } from '@/lib/tokenStorage'
 import type { Provider, CostRecord } from '@/types/api'
 
 function formatLabel(iso: string) {
@@ -40,7 +41,7 @@ export function CostsPage() {
     if (applied.providers.aws) params.append('provider', 'aws')
     params.append('start_date', state.start)
     params.append('end_date', state.end)
-    const token = localStorage.getItem('finna_token')
+    const token = getToken()
     const res = await fetch(`/api/v1/costs/export?${params}`, { headers: { Authorization: `Bearer ${token}` } })
     if (res.ok) {
       const blob = await res.blob()

@@ -1,20 +1,15 @@
 """Integration and E2E tests for OIDC login/callback flow."""
 
 import base64
-import hashlib
-import json
 import time
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
-from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from jose import jwt
 
-from backend.app.api.main import app
 from backend.app.api import oidc
-from utils.encryption import encrypt_config
+from backend.app.api.main import app
 
 
 @pytest.fixture
@@ -33,7 +28,7 @@ def admin_token():
 @pytest.fixture
 def rsa_keypair():
     """Ephemeral RSA keypair for signing test ID tokens."""
-    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
 
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -257,7 +252,7 @@ async def test_oidc_callback_happy_path_new_user(client, setup_oidc_provider, rs
 @pytest.mark.asyncio
 async def test_oidc_callback_happy_path_existing_user_is_admin(client, setup_oidc_provider, rsa_keypair):
     """Callback with existing user — update is_admin from group membership."""
-    from backend.app.api.db import execute, get_connection
+    from backend.app.api.db import get_connection
 
     oidc._discovery_cache.clear()
     oidc._state_store.clear()
@@ -652,7 +647,7 @@ async def test_provider_test_endpoint(client, setup_oidc_provider, admin_token):
         mock_client.get.side_effect = [disc_resp, jwks_resp]
 
         response = client.post(
-            f"/api/v1/auth/oidc/test",
+            "/api/v1/auth/oidc/test",
             json={"provider_id": setup_oidc_provider["id"]},
             headers={"Authorization": f"Bearer {admin_token}"},
         )

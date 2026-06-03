@@ -60,6 +60,16 @@ onboarding/
 .env
 .env.*
 
+# Cloud credential dumps (must never enter image)
+azure-sp*.txt
+gcp-sa*.json
+*-sa.json
+*.sp.txt
+credentials/
+*.pem
+*.key
+*.p12
+
 # UI subtree - but we need it for monolith build
 # (build.context will include it, Dockerfile will handle it)
 # ui/

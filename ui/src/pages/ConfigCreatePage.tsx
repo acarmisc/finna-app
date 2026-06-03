@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ProviderBadge } from '@/components/shared/provider-badge'
 import { ArrowLeft } from 'lucide-react'
+import { getToken } from '@/lib/tokenStorage'
 
 export function ConfigCreatePage() {
   const { id } = useParams<{ id: string }>()
@@ -20,7 +21,7 @@ export function ConfigCreatePage() {
 
   useEffect(() => {
     if (isEdit && id) {
-      const token = localStorage.getItem('finna_token')
+      const token = getToken()
       fetch(`/api/v1/configs/${id}`, { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.json())
         .then(data => {
@@ -34,7 +35,7 @@ export function ConfigCreatePage() {
   const set = (k: string, v: string) => setFields(f => ({...f, [k]:v}))
 
   const handleSubmit = async () => {
-    const token = localStorage.getItem('finna_token')
+    const token = getToken()
     const method = isEdit ? 'PUT' : 'POST'
     const url = isEdit ? `/api/v1/configs/${id}` : '/api/v1/configs'
     const body = {

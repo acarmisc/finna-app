@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-import ipaddress
 import logging
 import time
-from typing import Any, Optional
+from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+
+from utils.encryption import decrypt_config
 
 from .. import auth as api_auth
 from .. import oidc
-from ..db import execute, query_one, query_all, insert_and_return
-from utils.encryption import decrypt_config
-from datetime import datetime, timezone
+from ..db import execute, insert_and_return, query_all, query_one
 
 require_auth = api_auth.require_auth
 require_admin = api_auth.require_admin

@@ -35,6 +35,13 @@ dependencies = [
     "opentelemetry-sdk>=1.20",
     "opentelemetry-instrumentation-fastapi>=0.41b0",
     "opentelemetry-exporter-otlp-proto-grpc>=1.20",
+    # Security floors (CVE remediation, see SECURITY_AUDIT.md §2.3)
+    "pyjwt>=2.13.0",
+    "starlette>=0.47.2",
+    "urllib3>=2.7.0",
+    "idna>=3.15",
+    "requests>=2.33.0",
+    "defusedxml>=0.7.1",
 ]
 
 [build-system]

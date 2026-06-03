@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from http import HTTPStatus
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException, Request, Response
-from starlette.datastructures import Headers
 
 os.environ["JWT_SECRET"] = "test-jwt-secret-key"
 os.environ["JWT_ALGORITHM"] = "HS256"
@@ -414,7 +413,7 @@ def test_get_pool_stats_empty():
 
 
 def test_close_pools():
-    from backend.app.api.db import close_pools, _async_pool, _sync_pool
+    from backend.app.api.db import close_pools
 
     # Ensure pools are None before test
     with patch("backend.app.api.db._async_pool", None), \
@@ -454,7 +453,7 @@ def test_release_connection_putconn_error():
 
 
 def test_verify_password():
-    from backend.app.api.auth import verify_password, get_password_hash
+    from backend.app.api.auth import get_password_hash, verify_password
 
     hashed = get_password_hash("secret123")
     assert verify_password("secret123", hashed) is True
@@ -493,8 +492,9 @@ def test_decode_token_invalid():
 
 
 def test_get_current_user_success():
-    from backend.app.api.auth import get_current_user, create_access_token
     import asyncio
+
+    from backend.app.api.auth import create_access_token, get_current_user
 
     token = create_access_token({"sub": "alice"})
 
@@ -506,8 +506,9 @@ def test_get_current_user_success():
 
 
 def test_get_current_user_missing_sub():
-    from backend.app.api.auth import get_current_user, create_access_token
     import asyncio
+
+    from backend.app.api.auth import create_access_token, get_current_user
 
     token = create_access_token({"no_sub": "alice"})
 
@@ -648,7 +649,14 @@ async def test_get_github_user_emails_failure():
 
 
 def test_api_error_attributes():
-    from backend.app.api.errors import APIError, NotFoundError, ForbiddenError, UnauthorizedError, ValidationError, RateLimitError
+    from backend.app.api.errors import (
+        APIError,
+        ForbiddenError,
+        NotFoundError,
+        RateLimitError,
+        UnauthorizedError,
+        ValidationError,
+    )
 
     exc = APIError(500, "internal", "boom")
     assert exc.status_code == 500
@@ -676,8 +684,9 @@ def test_api_error_attributes():
 
 @pytest.mark.anyio
 async def test_error_handler():
-    from backend.app.api.errors import error_handler, APIError
     from fastapi import Request
+
+    from backend.app.api.errors import APIError, error_handler
 
     request = MagicMock(spec=Request)
     request.url.path = "/api/test"
@@ -692,8 +701,9 @@ async def test_error_handler():
 
 @pytest.mark.anyio
 async def test_validation_exception_handler():
-    from backend.app.api.errors import validation_exception_handler
     from fastapi import Request
+
+    from backend.app.api.errors import validation_exception_handler
 
     request = MagicMock(spec=Request)
     request.url.path = "/api/test"
@@ -706,9 +716,10 @@ async def test_validation_exception_handler():
 
 @pytest.mark.anyio
 async def test_http_exception_handler():
-    from backend.app.api.errors import http_exception_handler
-    from starlette.exceptions import HTTPException as StarletteHTTPException
     from fastapi import Request
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+
+    from backend.app.api.errors import http_exception_handler
 
     request = MagicMock(spec=Request)
     request.url.path = "/api/test"
@@ -721,8 +732,9 @@ async def test_http_exception_handler():
 
 @pytest.mark.anyio
 async def test_generic_exception_handler():
-    from backend.app.api.errors import generic_exception_handler
     from fastapi import Request
+
+    from backend.app.api.errors import generic_exception_handler
 
     request = MagicMock(spec=Request)
     request.url.path = "/api/test"
@@ -734,8 +746,9 @@ async def test_generic_exception_handler():
 
 
 def test_register_error_handlers():
-    from backend.app.api.errors import register_error_handlers
     from fastapi import FastAPI
+
+    from backend.app.api.errors import register_error_handlers
 
     app = FastAPI()
     register_error_handlers(app)
@@ -751,24 +764,24 @@ def test_register_error_handlers():
 
 def test_queries_init_imports():
     from backend.app.api.queries import (
-        query_all,
-        query_one,
         execute,
-        insert_and_return,
-        query_all_costs,
-        query_one_cost,
-        query_all_configs,
-        query_one_config,
         execute_config,
-        insert_config_and_return,
-        query_all_alerts,
-        query_one_alert,
-        query_one_user,
-        insert_user_and_return,
-        query_all_extractors,
-        query_one_extractor,
         execute_extractor,
+        insert_and_return,
+        insert_config_and_return,
         insert_extractor_and_return,
+        insert_user_and_return,
+        query_all,
+        query_all_alerts,
+        query_all_configs,
+        query_all_costs,
+        query_all_extractors,
+        query_one,
+        query_one_alert,
+        query_one_config,
+        query_one_cost,
+        query_one_extractor,
+        query_one_user,
     )
     assert callable(query_all)
     assert callable(query_one)

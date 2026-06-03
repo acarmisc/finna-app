@@ -335,6 +335,19 @@ def insert_records(
 # ---------------------------------------------------------------------------#
 
 
+# Allowlist of timestamp column names that may be substituted into the
+# extractor_health DML below. The values come from schema introspection, not
+# user input, but we keep an explicit set so the SQL builder is statically
+# auditable (see SECURITY_AUDIT.md §2.5).
+_ALLOWED_HEALTH_TS_COLS = {"last_run_start", "last_run_end", "last_run_ts"}
+
+
+def _safe_ts_col(name: str) -> str:
+    if name not in _ALLOWED_HEALTH_TS_COLS:
+        raise ValueError(f"Refusing to use unvetted ts column: {name!r}")
+    return name
+
+
 def _health_columns(conn: psycopg.Connection) -> set[str]:
     with conn.cursor() as cur:
         cur.execute(
@@ -351,7 +364,7 @@ def _mark_health_start(conn: psycopg.Connection) -> None:
         cols = _health_columns(conn)
         if not cols:
             return
-        ts_col = "last_run_start" if "last_run_start" in cols else "last_run_ts"
+        ts_col = _safe_ts_col("last_run_start" if "last_run_start" in cols else "last_run_ts")
         sql = f"""
             INSERT INTO extractor_health
                 (extractor_name, {ts_col}, status, records_extracted, updated_at)
@@ -376,7 +389,7 @@ def _mark_health_success(conn: psycopg.Connection, record_count: int) -> None:
         cols = _health_columns(conn)
         if not cols:
             return
-        ts_col = "last_run_end" if "last_run_end" in cols else "last_run_ts"
+        ts_col = _safe_ts_col("last_run_end" if "last_run_end" in cols else "last_run_ts")
         sql = f"""
             UPDATE extractor_health
             SET {ts_col} = now(),
@@ -399,7 +412,7 @@ def _mark_health_failure(conn: psycopg.Connection, error_message: str) -> None:
         cols = _health_columns(conn)
         if not cols:
             return
-        ts_col = "last_run_end" if "last_run_end" in cols else "last_run_ts"
+        ts_col = _safe_ts_col("last_run_end" if "last_run_end" in cols else "last_run_ts")
         sql = f"""
             UPDATE extractor_health
             SET {ts_col} = now(),

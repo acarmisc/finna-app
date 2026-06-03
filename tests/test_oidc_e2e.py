@@ -2,17 +2,15 @@
 
 import base64
 import hashlib
-import json
 import time
 from unittest.mock import AsyncMock, patch
-from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.app.api.main import app
 from backend.app.api import oidc
 from backend.app.api.auth import create_access_token, decode_token
+from backend.app.api.main import app
 
 
 @pytest.fixture
@@ -30,7 +28,6 @@ def rsa_keypair():
     """Generate RSA keypair for ID token signing."""
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
-    from jose import jwt as jose_jwt
 
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     public_key = private_key.public_key()
@@ -62,7 +59,6 @@ def rsa_keypair():
 
 def sign_id_token(rsa_keypair, claims: dict) -> str:
     """Sign ID token with test key."""
-    from cryptography.hazmat.primitives import serialization
     from jose import jwt
 
     pem = rsa_keypair["private_pem"]

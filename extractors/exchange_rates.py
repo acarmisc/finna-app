@@ -14,12 +14,12 @@ import os
 import sys
 import urllib.error
 import urllib.request
-import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 import psycopg
+from defusedxml import ElementTree as ET
 from psycopg.rows import dict_row
 from tenacity import (
     before_sleep_log,

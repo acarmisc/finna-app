@@ -7,12 +7,13 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+from utils.encryption import decrypt_config, encrypt_config
 
 from .. import auth as api_auth
 from ..db import execute, insert_and_return, query_all, query_one
-from utils.encryption import decrypt_config, encrypt_config
 
 require_admin = api_auth.require_admin
 logger = logging.getLogger("api.auth_providers")

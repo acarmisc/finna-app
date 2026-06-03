@@ -1,13 +1,11 @@
 """Tests for OIDC auth providers CRUD."""
 
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 from backend.app.api.main import app
-from utils.encryption import encrypt_config
 
 
 @pytest.fixture
@@ -250,7 +248,7 @@ def test_delete_provider_with_linked_users(client, admin_token):
     provider_id = create_resp.json()["id"]
 
     # Manually insert a user linked to this provider
-    from backend.app.api.db import execute, get_connection
+    from backend.app.api.db import get_connection
     conn = get_connection()
     with conn.cursor() as cur:
         cur.execute(
