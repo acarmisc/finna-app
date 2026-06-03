@@ -15,7 +15,7 @@ interface LoginComponentProps {
  */
 const ALLOWED_REDIRECT_ORIGINS = (
   import.meta.env.VITE_ALLOWED_REDIRECT_ORIGINS?.split(',') || [window.location.origin]
-).map(origin => origin.trim()).filter(Boolean)
+).map((origin: string) => origin.trim()).filter(Boolean)
 
 /**
  * Safely validate and redirect to a URL.
