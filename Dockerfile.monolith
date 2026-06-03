@@ -32,7 +32,7 @@ WORKDIR /build-ui
 
 # Copy frontend source
 COPY ui/package*.json ./ui/
-RUN cd ui && npm ci --if-present
+RUN cd ui && npm ci --if-present --legacy-peer-deps
 
 COPY ui/ ./ui/
 RUN cd ui && npm run build
