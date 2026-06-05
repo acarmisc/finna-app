@@ -261,16 +261,9 @@ async def trigger_scan(body: ScanBody) -> dict[str, Any]:
     try:
         create_scan_run(body.provider, run_id)
     except Exception:
-        # DB not available in test/stub environments; surface the ID anyway
         pass
 
-    # Kick off the runner (Agent B public API assumption: run_scan(provider, run_id))
-    try:
-        _wastage_runner.run_scan(body.provider, run_id)  # type: ignore[union-attr]
-        return {"run_id": run_id, "status": "started", "provider": body.provider}
-    except Exception as exc:  # pragma: no cover
-        try:
-            update_scan_run(run_id, "error", error=str(exc))
-        except Exception:
-            pass
-        raise HTTPException(status_code=500, detail=f"Scan failed to start: {exc}")
+    # Scan execution runs out-of-band via the extractor entrypoint
+    # (EXTRACTOR_TYPE=azure_inventory_scan). The API only records the queued
+    # run; a worker picks it up, streams inventory, and calls runner.run_scan.
+    return {"run_id": run_id, "status": "queued", "provider": body.provider}

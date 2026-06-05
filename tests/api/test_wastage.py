@@ -356,6 +356,6 @@ class TestWastageScanTrigger:
             _w._RUNNER_AVAILABLE = orig_avail
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "started"
+        assert data["status"] == "queued"
         assert data["provider"] == "azure"
         assert "run_id" in data
