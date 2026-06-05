@@ -351,3 +351,94 @@ class ProjectCreate(BaseModel):
     tags: dict[str, Any] = {}
     note: str = ""
     provider: Optional[str] = None
+
+
+# ============================================================================
+# Wastage schemas
+# ============================================================================
+
+
+class WastageStatus(str, Enum):
+    OPEN = "open"
+    ACKED = "acked"
+    RESOLVED = "resolved"
+    IGNORED = "ignored"
+
+
+class WastageSeverity(str, Enum):
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    INFO = "info"
+
+
+class WastageFindingResponse(BaseModel):
+    """Response schema for a single wastage finding."""
+
+    finding_id: str
+    provider: str
+    account_id: str
+    resource_group: Optional[str] = None
+    region: Optional[str] = None
+    resource_id: str
+    resource_type: str
+    rule_id: str
+    severity: str
+    category: str
+    estimated_monthly_usd: float = 0.0
+    currency: str = "USD"
+    evidence: dict[str, Any] = {}
+    first_seen_at: Optional[str] = None
+    last_seen_at: Optional[str] = None
+    status: str = "open"
+    tags: dict[str, str] = {}
+
+
+class WastageRuleResponse(BaseModel):
+    """Response schema for a rule catalog entry."""
+
+    id: str
+    severity: str
+    category: str
+    description: str
+
+
+class WastageSummaryCategory(BaseModel):
+    """Per-category summary entry."""
+
+    category: str
+    finding_count: int
+    total_monthly_usd: float
+
+
+class WastageSummaryResponse(BaseModel):
+    """Response schema for the wastage summary endpoint."""
+
+    categories: list[WastageSummaryCategory] = []
+    total_monthly_usd: float = 0.0
+    total_finding_count: int = 0
+
+
+class WastageScanRunResponse(BaseModel):
+    """Response schema for a scan run record."""
+
+    id: str
+    provider: str
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
+    status: str
+    findings_count: Optional[int] = None
+    error: Optional[str] = None
+
+
+class IgnoreRequest(BaseModel):
+    """Request body for POST /wastage/{finding_id}/ignore."""
+
+    reason: str = ""
+
+
+class ScanRequest(BaseModel):
+    """Request body for POST /wastage/scan."""
+
+    provider: str

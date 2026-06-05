@@ -191,6 +191,7 @@ from .routes import (  # noqa: E402
     costs,
     extractors_registry,
     oidc_auth,
+    wastage,
 )
 
 app.include_router(config.router, prefix="/api/v1", tags=["config"])
@@ -200,6 +201,7 @@ app.include_router(auth_providers.router, prefix="/api/v1", tags=["auth"])
 app.include_router(oidc_auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(costs.router, prefix="/api/v1", tags=["costs"])
 app.include_router(alerts.router, prefix="/api/v1", tags=["alerts"])
+app.include_router(wastage.router, prefix="/api/v1", tags=["wastage"])
 
 # Dev-only raw SQL endpoints (gated)
 _env = os.environ.get("ENV", "")
