@@ -211,5 +211,6 @@ jobs:
           name: Release ${{ github.ref_name }}
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
-          bodyPath: CHANGELOG.md
+          bodyFile: CHANGELOG.md
           generateReleaseNotes: true
+          allowUpdates: true
