@@ -104,3 +104,75 @@ export const mockExtractorRuns = {
     { id: 'run3', run_id: 'run3', extractor_type: 'azure-costs', provider: 'azure', status: 'failed', records_extracted: 0, started_at: '2024-01-04T12:00:00Z', finished_at: '2024-01-04T12:00:10Z' },
   ],
 }
+
+export const mockWastageFindings = {
+  data: [
+    {
+      finding_id: 'abc123',
+      provider: 'azure',
+      account_id: 'sub-001',
+      resource_group: 'rg-prod',
+      region: 'westeurope',
+      resource_id: '/subscriptions/sub-001/resourceGroups/rg-prod/providers/Microsoft.Compute/disks/disk-orphan',
+      resource_type: 'Microsoft.Compute/disks',
+      rule_id: 'azure.disk.orphan',
+      severity: 'high',
+      category: 'storage',
+      estimated_monthly_usd: 45.0,
+      currency: 'USD',
+      evidence: { size_gb: 128, sku: 'Premium_LRS' },
+      first_seen_at: '2024-01-02T00:00:00Z',
+      last_seen_at: '2024-01-05T00:00:00Z',
+      status: 'open',
+      tags: {},
+    },
+    {
+      finding_id: 'def456',
+      provider: 'azure',
+      account_id: 'sub-001',
+      resource_group: 'rg-prod',
+      region: 'westeurope',
+      resource_id: '/subscriptions/sub-001/resourceGroups/rg-prod/providers/Microsoft.Network/publicIPAddresses/pip-unused',
+      resource_type: 'Microsoft.Network/publicIPAddresses',
+      rule_id: 'azure.public_ip.unattached',
+      severity: 'medium',
+      category: 'network',
+      estimated_monthly_usd: 12.50,
+      currency: 'USD',
+      evidence: { sku: 'Standard' },
+      first_seen_at: '2024-01-01T00:00:00Z',
+      last_seen_at: '2024-01-05T00:00:00Z',
+      status: 'open',
+      tags: {},
+    },
+  ],
+  total: 2,
+  limit: 50,
+  offset: 0,
+  has_next: false,
+  has_prev: false,
+}
+
+export const mockWastageSummary = {
+  categories: [
+    { category: 'storage', finding_count: 1, total_monthly_usd: 45.0 },
+    { category: 'network', finding_count: 1, total_monthly_usd: 12.5 },
+  ],
+  total_monthly_usd: 57.5,
+  total_finding_count: 2,
+}
+
+export const mockWastageRules = {
+  rules: [
+    { id: 'azure.disk.orphan', severity: 'high', category: 'storage', description: 'Orphaned managed disk' },
+    { id: 'azure.public_ip.unattached', severity: 'medium', category: 'network', description: 'Unattached public IP' },
+  ],
+  count: 2,
+}
+
+export const mockWastageScans = {
+  scans: [
+    { id: 'scan-001', provider: 'azure', started_at: '2024-01-05T00:00:00Z', finished_at: '2024-01-05T00:01:00Z', status: 'done', findings_count: 2, error: null },
+  ],
+  count: 1,
+}

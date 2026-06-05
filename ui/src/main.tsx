@@ -26,6 +26,7 @@ import {
   ExtractorsPage,
   RunHistoryPage,
   DataSourcesPage,
+  WastagePage,
 } from '@/pages'
 
 function Router() {
@@ -47,6 +48,7 @@ function Router() {
         <Route path="/extractors" element={<ExtractorsPage />} />
         <Route path="/runs" element={<RunHistoryPage />} />
         <Route path="/sources" element={<DataSourcesPage />} />
+        <Route path="/wastage" element={<WastagePage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </AppShell>

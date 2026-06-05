@@ -184,6 +184,7 @@ const NAV_ITEMS: Array<SectionItem | NavItem> = [
   { id: 'extractors', label: 'Extractors', icon: 'database', path: '/extractors' },
   { sec: 'Monitoring' },
   { id: 'alerts', label: 'Alerts', icon: 'bell', path: '/alerts', countKey: 'alerts' },
+  { id: 'wastage', label: 'Wastage', icon: 'trash-2', path: '/wastage', countKey: 'wastage' },
   { id: 'settings', label: 'Settings', icon: 'settings-2', path: '/settings' },
 ]
 
