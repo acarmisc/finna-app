@@ -1,0 +1,126 @@
+{
+  "_meta": {
+    "currency": "EUR",
+    "source": "Azure Retail Prices API (api.azure.com/retail/prices)",
+    "refreshed": "2026-06-05",
+    "note": "West Europe list prices, no EA/CSP discount. See data/prices/README.md for refresh procedure."
+  },
+  "managed_disk": {
+    "_unit": "EUR/GB/month",
+    "westeurope": {
+      "Premium_LRS": 0.1397,
+      "StandardSSD_LRS": 0.0766,
+      "Standard_LRS": 0.0450,
+      "UltraSSD_LRS": 0.1150
+    },
+    "northeurope": {
+      "Premium_LRS": 0.1320,
+      "StandardSSD_LRS": 0.0724,
+      "Standard_LRS": 0.0425,
+      "UltraSSD_LRS": 0.1088
+    }
+  },
+  "snapshot": {
+    "_unit": "EUR/GB/month",
+    "westeurope": {
+      "Standard_LRS": 0.0450
+    },
+    "northeurope": {
+      "Standard_LRS": 0.0425
+    }
+  },
+  "public_ip": {
+    "_unit": "EUR/month",
+    "westeurope": {
+      "Standard_Static": 3.36,
+      "Basic_Dynamic": 0.00,
+      "Basic_Static": 3.36
+    },
+    "northeurope": {
+      "Standard_Static": 3.36,
+      "Basic_Dynamic": 0.00,
+      "Basic_Static": 3.36
+    }
+  },
+  "app_service_plan": {
+    "_unit": "EUR/month (per plan instance)",
+    "westeurope": {
+      "B1": 13.14,
+      "B2": 26.28,
+      "B3": 52.56,
+      "S1": 69.35,
+      "S2": 138.70,
+      "S3": 277.40,
+      "P1v2": 131.40,
+      "P2v2": 262.80,
+      "P3v2": 525.60,
+      "P1v3": 152.40,
+      "P2v3": 304.80,
+      "P3v3": 609.60
+    },
+    "northeurope": {
+      "B1": 12.41,
+      "B2": 24.82,
+      "B3": 49.64,
+      "S1": 65.52,
+      "S2": 131.04,
+      "S3": 262.08,
+      "P1v2": 124.22,
+      "P2v2": 248.44,
+      "P3v2": 496.88,
+      "P1v3": 144.01,
+      "P2v3": 288.02,
+      "P3v3": 576.04
+    }
+  },
+  "redis": {
+    "_unit": "EUR/month",
+    "westeurope": {
+      "C0": 16.06,
+      "C1": 84.67,
+      "C2": 169.34,
+      "C3": 338.68,
+      "P1": 331.21,
+      "P2": 662.42
+    },
+    "northeurope": {
+      "C0": 15.19,
+      "C1": 80.06,
+      "C2": 160.12,
+      "C3": 320.24,
+      "P1": 313.24,
+      "P2": 626.48
+    }
+  },
+  "virtual_machine": {
+    "_unit": "EUR/month (pay-as-you-go, Linux)",
+    "westeurope": {
+      "Standard_D2_v3":   96.36,
+      "Standard_D4_v3":  192.72,
+      "Standard_D8_v3":  385.44,
+      "Standard_E2_v4":  116.80,
+      "Standard_E4_v4":  233.60,
+      "Standard_B2s":     37.23,
+      "Standard_B4ms":   148.92,
+      "Standard_A4_v2":   80.30,
+      "Standard_D2as_v5":  76.65,
+      "Standard_D4as_v5": 153.30,
+      "Standard_D4s_v3":  192.72,
+      "Standard_D8s_v3":  385.44
+    },
+    "northeurope": {
+      "Standard_D2_v3":   91.10,
+      "Standard_D4_v3":  182.20,
+      "Standard_D8_v3":  364.40,
+      "Standard_E2_v4":  110.44,
+      "Standard_E4_v4":  220.88,
+      "Standard_B2s":     35.19,
+      "Standard_B4ms":   140.76,
+      "Standard_A4_v2":   75.90,
+      "Standard_D2as_v5":  72.47,
+      "Standard_D4as_v5": 144.94,
+      "Standard_D4s_v3":  182.20,
+      "Standard_D8s_v3":  364.40
+    }
+  }
+}

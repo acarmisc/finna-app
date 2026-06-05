@@ -1,0 +1,41 @@
+{
+  "_meta": {
+    "currency": "USD",
+    "source": "GCP Cloud Billing Catalog API (cloudbilling.googleapis.com)",
+    "refreshed": "2026-06-05",
+    "note": "On-demand list prices, europe-west1. See data/prices/README.md for refresh procedure."
+  },
+  "persistent_disk": {
+    "_unit": "USD/GB/month",
+    "europe-west1": {
+      "pd-standard": 0.0440,
+      "pd-balanced": 0.1000,
+      "pd-ssd": 0.1870,
+      "pd-extreme": 0.1250
+    },
+    "europe-west4": {
+      "pd-standard": 0.0440,
+      "pd-balanced": 0.1000,
+      "pd-ssd": 0.1870,
+      "pd-extreme": 0.1250
+    }
+  },
+  "pd_snapshot": {
+    "_unit": "USD/GB/month",
+    "europe-west1": {
+      "standard": 0.0260
+    },
+    "europe-west4": {
+      "standard": 0.0260
+    }
+  },
+  "static_ip": {
+    "_unit": "USD/month (unused/unattached external IP)",
+    "europe-west1": {
+      "regional_unused": 7.30
+    },
+    "europe-west4": {
+      "regional_unused": 7.30
+    }
+  }
+}

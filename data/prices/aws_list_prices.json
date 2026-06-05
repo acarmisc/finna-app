@@ -1,0 +1,42 @@
+{
+  "_meta": {
+    "currency": "USD",
+    "source": "AWS Pricing API (pricing.us-east-1.amazonaws.com)",
+    "refreshed": "2026-06-05",
+    "note": "On-demand list prices, eu-west-1 (Ireland). See data/prices/README.md for refresh procedure."
+  },
+  "ebs": {
+    "_unit": "USD/GB/month",
+    "eu-west-1": {
+      "gp3": 0.0960,
+      "gp2": 0.1160,
+      "io1": 0.1380,
+      "io2": 0.1380,
+      "st1": 0.0500,
+      "sc1": 0.0250,
+      "standard": 0.0560
+    }
+  },
+  "ebs_iops": {
+    "_unit": "USD/IOPS-month (provisioned beyond baseline)",
+    "eu-west-1": {
+      "io1": 0.0780,
+      "io2_tier1": 0.0780,
+      "io2_tier2": 0.0540,
+      "io2_tier3": 0.0390,
+      "gp3": 0.0060
+    }
+  },
+  "ebs_snapshot": {
+    "_unit": "USD/GB/month",
+    "eu-west-1": {
+      "standard": 0.0530
+    }
+  },
+  "eip": {
+    "_unit": "USD/month (idle / unassociated)",
+    "eu-west-1": {
+      "unattached": 3.60
+    }
+  }
+}
