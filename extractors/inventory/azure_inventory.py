@@ -151,7 +151,7 @@ Resources
     location,
     subscriptionId,
     tags,
-    kind = kind,
+    kind,
     skuName = sku.name,
     skuTier = sku.tier,
     accessTier = properties.accessTier
