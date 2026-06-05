@@ -5,7 +5,7 @@
 # Run:    docker run --rm -e EXTRACTOR_TYPE=gcp_billing finops-extractor
 #
 # EXTRACTOR_TYPE selects which extractor to run:
-#   gcp_billing | azure_cost | exchange_rates
+#   gcp_billing | azure_cost | exchange_rates | azure_inventory_scan
 # ---------------------------------------------------------------------------
 
 # ---- Stage 1: Builder ----
@@ -32,6 +32,8 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 COPY models/ ./models/
 COPY extractors/ ./extractors/
 COPY config/ ./config/
+COPY backend/ ./backend/
+COPY data/prices/ ./data/prices/
 
 ENV EXTRACTOR_TYPE=""
 
