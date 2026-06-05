@@ -34,6 +34,14 @@ finna-app/
 - **AWS**: Cost Explorer API (coming soon)
 - **LLM**: OpenTelemetry collector integration
 
+### Resource Wastage Detection
+Rule-based, deterministic detection of unused and orphaned cloud resources — no AI required.
+- 10 built-in Azure rules (orphaned disks, unattached IPs, idle NICs, old snapshots, stopped VMs with disks, idle AKS node pools, oversized App Service Plans, legacy storage kinds, and more)
+- Extensible rule registry via `@rule` decorator — see [`docs/wastage.md`](docs/wastage.md) for the rule catalog and how to add rules
+- Estimated monthly savings based on public list prices (EUR/USD); disclaimer shown in UI
+- Full lifecycle per finding: open → ack → resolved / ignored
+- REST API: `GET /api/v1/wastage`, `POST /api/v1/wastage/{id}/ack|resolve|ignore`, `POST /api/v1/wastage/scan`
+
 ### API Endpoints
 
 | Method | Endpoint | Description |

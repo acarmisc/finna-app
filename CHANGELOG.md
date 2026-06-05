@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Resource Wastage (Phases 6-8)
+
+**Phase 6 — API** (`backend/app/api/routes/wastage.py`, `backend/app/api/queries/wastage_queries.py`)
+- `GET /api/v1/wastage` — list findings with filters (`provider`, `severity`, `rule_id`, `status`, `account_id`) and offset pagination
+- `GET /api/v1/wastage/summary` — group findings by category, sum `estimated_monthly_usd`
+- `GET /api/v1/wastage/rules` — iterate live `REGISTRY` → rule catalog
+- `GET /api/v1/wastage/scans` — scan run history
+- `GET /api/v1/wastage/{finding_id}` — single finding detail
+- `POST /api/v1/wastage/{finding_id}/ack` — set status `acked`
+- `POST /api/v1/wastage/{finding_id}/resolve` — set status `resolved`
+- `POST /api/v1/wastage/{finding_id}/ignore` — set status `ignored`, store reason in tags
+- `POST /api/v1/wastage/scan` — enqueue runner (returns 503 if Agent B runner not yet merged)
+- Pydantic schemas added to `backend/app/api/models.py` (Wastage* family)
+- Router registered in `backend/app/api/main.py`
+- API tests: `tests/api/test_wastage.py` (happy path, auth checks, filter tests, pagination, 503-stub)
+
+**Phase 7 — UI** (`ui/src/features/wastage/`)
+- `WastagePage` with summary cards, list-price disclaimer banner, filter bar (provider / severity / rule / status), findings table sortable by savings, row-click detail drawer (evidence JSON, ack / resolve / ignore buttons)
+- Types: `ui/src/types/wastage.ts`
+- React Query hooks: `ui/src/api/hooks/useWastage.ts`
+- Sidebar nav entry ("Wastage", `trash-2` icon, `/wastage` route)
+- Route added in `ui/src/main.tsx`
+- Component tests: `ui/src/features/wastage/WastagePage.spec.tsx`
+- Playwright E2E: `ui/e2e/wastage.spec.ts`
+
+**Phase 8 — Docs**
+- `README.md` Core Features: added Resource Wastage Detection section
+- `docs/wastage.md`: rule catalog, how-to-add-a-rule guide, price refresh process
+- CHANGELOG entry (this entry)
+
 ## [v1.3.0] - 2026-05-14
 
 ### Added
