@@ -8,11 +8,13 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
 
+import psycopg
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_fastapi_instrumentator import Instrumentator
+from psycopg_pool import PoolTimeout
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -95,12 +97,6 @@ app.add_middleware(
 
 # Re-export routes module to avoid circular import issues
 __all__ = ["app", "auth", "db", "routes"]
-
-# DB middleware imports
-import logging
-
-import psycopg
-from psycopg_pool import PoolTimeout
 
 _logger = logging.getLogger("api.main")
 

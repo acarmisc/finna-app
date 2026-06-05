@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import time
-from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -280,11 +279,11 @@ async def oidc_callback(req: OIDCCallbackRequest, request: Request) -> OIDCCallb
             # Create new user
             import uuid
             user_id = str(uuid.uuid4())
-            now = datetime.now(timezone.utc)
 
             insert_and_return(
                 """
-                INSERT INTO auth_users (id, username, email, oidc_provider_id, oidc_subject, oidc_claims, is_admin, is_active)
+                INSERT INTO auth_users
+                    (id, username, email, oidc_provider_id, oidc_subject, oidc_claims, is_admin, is_active)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, true)
                 RETURNING id
                 """,

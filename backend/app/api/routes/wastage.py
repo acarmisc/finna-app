@@ -9,7 +9,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from .. import auth as auth_module
-from ..pagination import add_pagination_headers, get_pagination_params
 from ..queries.wastage_queries import (
     count_wastage_findings,
     create_scan_run,
@@ -18,7 +17,6 @@ from ..queries.wastage_queries import (
     list_scan_runs,
     list_wastage_findings,
     set_finding_status,
-    update_scan_run,
 )
 from .openapi_extensions import ERROR_RESPONSE_404, ERROR_RESPONSE_422
 

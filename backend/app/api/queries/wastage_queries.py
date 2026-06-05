@@ -7,7 +7,6 @@ from typing import Any
 
 from ..db import execute, insert_and_return, query_all, query_one
 
-
 # ---------------------------------------------------------------------------
 # Findings queries
 # ---------------------------------------------------------------------------

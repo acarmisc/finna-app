@@ -131,7 +131,10 @@ async def get_provider(provider_id: str) -> AuthProviderResponse:
 
 
 @router.post("/auth/providers", dependencies=[Depends(require_admin)])
-async def create_provider(request: AuthProviderInput, user: dict[str, Any] = Depends(require_admin)) -> AuthProviderResponse:
+async def create_provider(
+    request: AuthProviderInput,
+    user: dict[str, Any] = Depends(require_admin),
+) -> AuthProviderResponse:
     """Create new OIDC provider."""
     provider_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
@@ -175,7 +178,10 @@ async def update_provider(provider_id: str, request: AuthProviderInput) -> AuthP
 
     # Check for duplicate name (excluding self)
     if request.name != row["name"]:
-        existing = query_one("SELECT id FROM auth_providers WHERE lower(name) = lower(%s) AND id != %s", (request.name, provider_id))
+        existing = query_one(
+            "SELECT id FROM auth_providers WHERE lower(name) = lower(%s) AND id != %s",
+            (request.name, provider_id),
+        )
         if existing:
             raise HTTPException(status_code=409, detail="Provider name already exists")
 
