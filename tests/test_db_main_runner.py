@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import secrets
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -14,7 +15,7 @@ os.environ["TESTING"] = "1"
 os.environ["PG_DSN"] = "postgresql://test:***@localhost/testdb"
 os.environ["POOL_MIN_CONNS"] = "1"
 os.environ["POOL_MAX_CONNS"] = "5"
-os.environ["JWT_SECRET"] = "test-secret-key"
+os.environ["JWT_SECRET"] = secrets.token_urlsafe(32)
 os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ["JWT_EXPIRATION_MINUTES"] = "60"
 
