@@ -113,7 +113,7 @@ Fix: Reduce concurrent jobs, add connection timeouts, or increase `max_connectio
 ./cloud-sql-proxy <PROJECT>:<REGION>:<INSTANCE> --port 5432 &
 
 # Connect
-psql "postgresql://finops:password@localhost:5432/finops"
+psql "postgresql://finops:change-me-set-real-password@localhost:5432/finops"
 ```
 
 Common issues:

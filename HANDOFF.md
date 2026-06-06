@@ -27,8 +27,8 @@ OIDC (OpenID Connect) SSO integration for Finna app is largely complete. Backend
 **Store these in `.env.local` or GKE secrets immediately:**
 
 ```env
-JWT_SECRET=REDACTED-JWT-SECRET
-ENCRYPTION_KEY=REDACTED-FERNET-KEY
+JWT_SECRET=<store in GKE secret finops-secrets:jwt-secret>
+ENCRYPTION_KEY=<store in GKE secret finops-secrets:encryption-key>
 AUTO_MIGRATE=true
 ```
 

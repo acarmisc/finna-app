@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 import sys
 from pathlib import Path
 
@@ -14,8 +15,8 @@ os.environ["TESTING"] = "1"
 os.environ["PG_DSN"] = "postgresql://test:***@localhost/testdb"
 os.environ["POOL_MIN_CONNS"] = "1"
 os.environ["POOL_MAX_CONNS"] = "5"
-os.environ["ENCRYPTION_KEY"] = "fd7Em6qcDLS1FfjAgi0oSc6-keC5uK8r8rshY_UVw5I="
-os.environ["JWT_SECRET"] = "test-secret-key"
+os.environ["ENCRYPTION_KEY"] = secrets.token_urlsafe(32)
+os.environ["JWT_SECRET"] = secrets.token_urlsafe(32)
 os.environ["JWT_ALGORITHM"] = "HS256"
 os.environ["JWT_EXPIRATION_MINUTES"] = "60"
 

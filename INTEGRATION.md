@@ -255,8 +255,8 @@ npm test
 ```bash
 # Backend
 export VITE_API_URL=http://localhost:8000
-export DATABASE_URL=postgresql://finops:password@localhost:5432/finops
-export JWT_SECRET=your-secret-key
+export DATABASE_URL=postgresql://finops:change-me-set-real-password@localhost:5432/finops
+export JWT_SECRET=change-me-set-real-secret-at-least-32-chars
 
 # Frontend
 export API_URL=http://localhost:8000

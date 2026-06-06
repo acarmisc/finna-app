@@ -80,3 +80,7 @@ credentials/
 .coverage
 htmlcov/
 deploy/
+
+# Raw cost data exports (may contain real account IDs / project names)
+data/*.csv
+data/*.parquet

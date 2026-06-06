@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -19,8 +20,8 @@ os.environ["TESTING"] = "1"
 os.environ.setdefault("PG_DSN", "postgresql://test:***@localhost/testdb")
 os.environ.setdefault("POOL_MIN_CONNS", "1")
 os.environ.setdefault("POOL_MAX_CONNS", "5")
-os.environ.setdefault("ENCRYPTION_KEY", "fd7Em6qcDLS1FfjAgi0oSc6-keC5uK8r8rshY_UVw5I=")
-os.environ.setdefault("JWT_SECRET", "test-secret-key")
+os.environ.setdefault("ENCRYPTION_KEY", secrets.token_urlsafe(32))
+os.environ.setdefault("JWT_SECRET", secrets.token_urlsafe(32))
 os.environ.setdefault("JWT_ALGORITHM", "HS256")
 os.environ.setdefault("JWT_EXPIRATION_MINUTES", "60")
 

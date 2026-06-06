@@ -151,11 +151,11 @@ Azure cost extraction works with stored SP credentials.
 
 ### Infrastructure
 
-- **Cluster**: `REDACTED-CLUSTER-NAME`
+- **Cluster**: `gke_<project>_europe-west1_<cluster>` (see GKE console for current name)
 - **Namespace**: `finna-app-staging`
-- **Cloud SQL**: `REDACTED-INSTANCE-NAME` private IP `REDACTED-PRIVATE-IP:5432`
-- **Database**: `finna-staging` (user: `finna-staging`, password: `REDACTED-DB-PASSWORD`)
-- **Ingress**: Traefik with letsencrypt-prod, LB `REDACTED-LB-IP`
+- **Cloud SQL**: `<instance-name>` private IP `<redacted-private-ip>:5432` (query `gcloud sql instances list` for current value)
+- **Database**: `finna-staging` (user: `finna-staging`, password: stored in `kubectl get secret finna-staging-db -o jsonpath='{.data.password}' | base64 -d`)
+- **Ingress**: Traefik with letsencrypt-prod, public LB resolves via DNS
 - **API URL**: `https://finna-app.ces.abssrv.it`
 
 ### Key Issues Fixed
