@@ -63,11 +63,29 @@ package-lock.json
 
 # Claude/GStack worktrees (embedded repos that should never be committed)
 .claude/
+.hermes/
+.opencode/
+.planning/
 
 # Tooling caches
 .playwright-mcp/
 test-results/
 graphify-out/
+
+# Python test artifacts
+.coverage
+htmlcov/
+.coverage.*
+coverage/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# UI build artifacts
+ui/dist/
+ui/coverage/
+ui/screenshots/
+ui/.cache/
 
 # Cloud credential dumps (never commit)
 azure-sp*.txt
@@ -76,11 +94,26 @@ gcp-sa*.json
 *.sp.txt
 credentials/
 
-# Test artifacts
-.coverage
-htmlcov/
-deploy/
+# Egg metadata
+*.egg-info/
 
 # Raw cost data exports (may contain real account IDs / project names)
 data/*.csv
 data/*.parquet
+
+# Local scratch / status docs (one-off reports, plan files, scratchpads)
+TODO*.md
+todo.txt
+ACTION-PLAN.md
+COMPLETION_REPORT.md
+E2E_TEST_RESULTS.md
+GITHUB_ISSUES_TEMPLATE.md
+MVP_COMPLETE.md
+OIDC-PLAN.md
+README_INTEGRATION.md
+STATUS_UPDATE.md
+gap-analysis/
+*.IMPLEMENTATION_PLAN.md
+*.IMPLEMENTATION_PROGRESS.md
+*.MIGRATION_NOTES.md
+*.TEST_REPORT.md
