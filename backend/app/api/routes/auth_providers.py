@@ -48,8 +48,8 @@ class AuthProviderResponse(BaseModel):
     kind: str
     enabled: bool
     config: dict[str, Any]
-    created_at: str
-    updated_at: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
     created_by: Optional[str] = None
     last_test_at: Optional[str] = None
     last_test_ok: Optional[bool] = None

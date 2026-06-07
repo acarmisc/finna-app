@@ -29,7 +29,7 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import psycopg
@@ -74,15 +74,15 @@ def _fetch_page(
         "start_date": start_date,
         "end_date": end_date,
         "summarize": "false",
-        "page": page,
-        "page_size": page_size,
+        "page": str(page),
+        "page_size": str(page_size),
     }
     resp = client.get(url, params=params)
     resp.raise_for_status()
-    data = resp.json()
+    data: dict[str, Any] = resp.json()
     if isinstance(data, list):
         return {"data": data, "total_pages": 1}
-    return data
+    return cast(dict[str, Any], data)
 
 
 def fetch_spend_logs(

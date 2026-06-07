@@ -63,7 +63,7 @@ if not os.environ.get("TESTING"):
 
 # Wire rate limiter (slowapi) — global default + per-route overrides
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
 app.add_middleware(SlowAPIMiddleware)
 
 # Register custom error handlers

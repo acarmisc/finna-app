@@ -18,7 +18,7 @@ import json
 import logging
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ def _load_catalog(provider: str) -> dict[str, Any]:
         return {}
 
     with catalog_path.open() as fh:
-        data = json.load(fh)
+        data = cast(dict[str, Any], json.load(fh))
     _CATALOGS[provider] = data
     return data
 
