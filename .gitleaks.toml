@@ -1,0 +1,62 @@
+# Gitleaks configuration for finna-app
+# https://github.com/gitleaks/gitleaks#configuration
+#
+# Built-in rules cover most patterns. This file customizes:
+# - allowlists for test fixtures (AWS example keys, sanitizer test inputs)
+# - allowlists for known false positives (e.g. refusal-check strings,
+#   placeholder passwords in operator docs)
+# - an extra rule for our specific environment-variable conventions
+
+title = "finna-app gitleaks config"
+
+# Scan everything; allowlist the obvious noise below
+[allowlist]
+  description = "Global allowlist"
+  paths = [
+    '''(?i).*\.lock$''',
+    '''(?i).*\.lock\.json$''',
+    '''(^|/)uv\.lock$''',
+    '''(^|/)package-lock\.json$''',
+    '''(^|/)yarn\.lock$''',
+    '''(^|/)pnpm-lock\.yaml$''',
+  ]
+  # Common false-positive regexes
+  regexes = [
+    # AWS published example keys
+    '''AKIAIOSFODNN7EXAMPLE''',
+    '''wJalrXUtnFEMI[K/]+EXAMPLEKEY''',
+    # The refusal-check string used to reject insecure defaults
+    '''dev-secret-key-change-in-production''',
+    '''dev-key-change-in-production''',
+    # Operator doc placeholders
+    '''change-me-set-real-password''',
+    '''change-me-set-real-secret-at-least-32-chars''',
+  ]
+
+# File-specific allowlist for the test fixture pattern used in tests/conftest.py
+# and similar: the conftest generates a random secret at test-session start.
+# We use a regex over a multiline range to skip whole code blocks that
+# explicitly look like fixtures. This is intentionally narrow.
+  [[allowlist.rules]]
+    description = "test fixture files use secrets.token_urlsafe(32) and never hardcode"
+    paths = [
+      '''(^|/)tests/conftest\.py$''',
+      '''(^|/)tests/test_.*\.py$''',
+      '''(^|/)tests/api/test_.*\.py$''',
+    ]
+    # Skip blocks that look like runtime-generated secrets
+    regexes = [
+      '''secrets\.token_urlsafe\(32\)''',
+    ]
+
+# Allowlist the SECURITY_AUDIT.md and QUALITY-REVIEW.md docs that
+# intentionally *discuss* rotated/redacted secrets. These are documentation
+# of historical incidents; the secrets themselves are not present (they are
+# referred to by description only).
+  [[allowlist.rules]]
+    description = "Review docs that document past incidents"
+    paths = [
+      '''SECURITY_AUDIT\.md$''',
+      '''QUALITY-REVIEW\.md$''',
+      '''SECURITY-REVIEW\.md$''',
+    ]
