@@ -35,7 +35,7 @@ jobs:
       - name: Run Ruff linter
         run: ruff check backend/ extractors/ models/
       - name: Run mypy
-        run: mypy backend/ extractors/ models/ --ignore-missing-imports
+        run: mypy backend/ extractors/ models/ --ignore-missing-imports --explicit-package-bases
 
   ui-typecheck:
     name: UI Type Check
