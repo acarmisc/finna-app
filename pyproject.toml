@@ -1,6 +1,6 @@
 [project]
 name = "finna-app"
-version = "0.2.0"
+version = "0.7.0"
 description = "Multi-cloud FinOps platform — normalize, aggregate, and visualize cost data from GCP, Azure, and LLM gateways"
 readme = "README.md"
 license = "Apache-2.0"

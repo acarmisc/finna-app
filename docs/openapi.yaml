@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Finna FinOps API
-  version: 0.2.0
+  version: 0.7.0
   description: 'The Finna FinOps API is the backend for the Finna cloud cost management platform. It handles multi-cloud cost
     ingestion (Azure Cost Management, GCP Billing, LLM usage), resource wastage detection, alert management, and per-project
     FinOps dashboards. Extracted cost records are normalised into a unified schema and made available through a rich query
