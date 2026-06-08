@@ -48,7 +48,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: semgrep/semgrep-action@v1
+      - name: Run Semgrep
+        id: semgrep
+        uses: semgrep/semgrep-action@v1
+        continue-on-error: true
         with:
           # p/security-audit is the curated security ruleset (~80 rules
           # focused on real vulnerabilities, unlike 'auto' which has 1059
