@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import httpx
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 

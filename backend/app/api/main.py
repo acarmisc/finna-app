@@ -35,6 +35,9 @@ async def lifespan(app: FastAPI) -> Any:
     yield
     # Shutdown
     if not os.environ.get("TESTING"):
+        from .runner import shutdown_all
+
+        shutdown_all()
         db.close_pools()
 
 

@@ -24,6 +24,7 @@ logger = logging.getLogger("api.runner")
 # Global registry of running processes
 _running_processes: dict[str, subprocess.Popen] = {}
 _process_lock = threading.Lock()
+_shutdown_event = threading.Event()
 
 
 def _get_pg_dsn() -> str:
@@ -245,7 +246,7 @@ def start_extractor(
         start_time = time.monotonic()
         output_lines = []
         try:
-            while True:
+            while not _shutdown_event.is_set():
                 line = proc.stdout.readline()
                 if line:
                     output_lines.append(line)
@@ -296,10 +297,31 @@ def start_extractor(
 
         logger.info(f"Extractor {run_id} finished with status: {status}")
 
-    thread = threading.Thread(target=monitor, daemon=True)
+    thread = threading.Thread(target=monitor, daemon=False)
     thread.start()
 
     return run_id
+
+
+def shutdown_all() -> None:
+    """Cancel all running extractor subprocesses (call during shutdown)."""
+    _shutdown_event.set()
+    with _process_lock:
+        for run_id, proc in list(_running_processes.items()):
+            try:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+            except Exception:
+                pass
+            try:
+                _update_run_status(run_id, "failed", 0, "Server shutdown")
+            except Exception:
+                pass
+    _running_processes.clear()
 
 
 def get_run_status(run_id: str) -> Optional[dict[str, Any]]:
