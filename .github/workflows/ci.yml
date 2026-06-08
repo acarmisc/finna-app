@@ -91,6 +91,8 @@ jobs:
           alembic upgrade head
         env:
           DATABASE_URL: postgresql://finna:finna@localhost:5432/finna
+      - name: Verify psycopg connection
+        run: python -c "import psycopg; conn = psycopg.connect('postgresql://finna:finna@localhost:5432/finna'); print('OK:', conn.info.dbname); conn.close()"
       - name: Run pytest
         run: pytest
         env:
