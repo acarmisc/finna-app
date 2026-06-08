@@ -3,7 +3,7 @@
 import base64
 import hashlib
 import time
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -91,7 +91,7 @@ async def test_discover_provider_success(mock_provider_metadata):
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
-        mock_resp = AsyncMock()
+        mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = mock_provider_metadata
         mock_client.get.return_value = mock_resp
@@ -117,7 +117,7 @@ async def test_discover_provider_missing_endpoints(mock_provider_metadata):
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
-        mock_resp = AsyncMock()
+        mock_resp = MagicMock()
         mock_resp.json.return_value = incomplete
         mock_client.get.return_value = mock_resp
 
@@ -135,7 +135,7 @@ async def test_discover_provider_caching(mock_provider_metadata):
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
-        mock_resp = AsyncMock()
+        mock_resp = MagicMock()
         mock_resp.json.return_value = mock_provider_metadata
         mock_client.get.return_value = mock_resp
 
@@ -159,11 +159,11 @@ async def test_get_jwks(mock_provider_metadata, mock_jwks):
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
         # First GET: discovery
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = mock_provider_metadata
 
         # Second GET: JWKS
-        jwks_resp = AsyncMock()
+        jwks_resp = MagicMock()
         jwks_resp.json.return_value = mock_jwks
 
         mock_client.get.side_effect = [disc_resp, jwks_resp]
@@ -213,7 +213,7 @@ async def test_exchange_code_success(mock_provider_metadata, rsa_keypair):
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
-        mock_resp = AsyncMock()
+        mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {
             "access_token": "access123",
@@ -331,11 +331,11 @@ async def test_verify_id_token_success(rsa_keypair, mock_provider_metadata, mock
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
         # First GET: discovery
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = mock_provider_metadata
 
         # Second GET: JWKS
-        jwks_resp = AsyncMock()
+        jwks_resp = MagicMock()
         jwks_resp.json.return_value = mock_jwks
 
         mock_client.get.side_effect = [disc_resp, jwks_resp]
@@ -366,9 +366,9 @@ async def test_verify_id_token_wrong_issuer(rsa_keypair, mock_provider_metadata,
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = mock_provider_metadata
-        jwks_resp = AsyncMock()
+        jwks_resp = MagicMock()
         jwks_resp.json.return_value = mock_jwks
 
         mock_client.get.side_effect = [disc_resp, jwks_resp]
@@ -397,9 +397,9 @@ async def test_verify_id_token_expired(rsa_keypair, mock_provider_metadata, mock
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = mock_provider_metadata
-        jwks_resp = AsyncMock()
+        jwks_resp = MagicMock()
         jwks_resp.json.return_value = mock_jwks
 
         mock_client.get.side_effect = [disc_resp, jwks_resp]
@@ -427,9 +427,9 @@ async def test_verify_id_token_nonce_mismatch(rsa_keypair, mock_provider_metadat
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = mock_provider_metadata
-        jwks_resp = AsyncMock()
+        jwks_resp = MagicMock()
         jwks_resp.json.return_value = mock_jwks
 
         mock_client.get.side_effect = [disc_resp, jwks_resp]
@@ -458,9 +458,9 @@ async def test_verify_id_token_wrong_audience(rsa_keypair, mock_provider_metadat
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = mock_provider_metadata
-        jwks_resp = AsyncMock()
+        jwks_resp = MagicMock()
         jwks_resp.json.return_value = mock_jwks
 
         mock_client.get.side_effect = [disc_resp, jwks_resp]

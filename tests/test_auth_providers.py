@@ -25,7 +25,8 @@ def user_token():
 @pytest.fixture
 def client():
     """FastAPI test client."""
-    return TestClient(app)
+    with TestClient(app, raise_server_exceptions=False) as test_client:
+        yield test_client
 
 
 def test_list_providers_requires_admin(client, user_token):

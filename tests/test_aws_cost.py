@@ -482,7 +482,7 @@ class TestExtractCosts:
             date_to=datetime(2024, 3, 31, tzinfo=timezone.utc),
         )
         assert total == 0
-        mock_conn.close.assert_called_once()
+        mock_pg_connect.assert_not_called()
 
     def test_missing_credentials_returns_zero(self):
         total = extract_costs(

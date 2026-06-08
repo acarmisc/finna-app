@@ -7,6 +7,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+import httpx
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -235,8 +237,6 @@ async def delete_provider(provider_id: str) -> dict[str, str]:
 @router.post("/auth/providers/{provider_id}/test", dependencies=[Depends(require_admin)])
 async def test_provider(provider_id: str) -> dict[str, Any]:
     """Test provider discovery and JWKS accessibility."""
-    import httpx
-
     row = query_one(
         """
         SELECT config FROM auth_providers WHERE id = %s

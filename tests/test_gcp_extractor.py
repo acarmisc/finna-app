@@ -168,6 +168,9 @@ class TestBuildQuery:
 class TestBatchInsert:
     def test_batch_insert_returns_count(self) -> None:
         mock_conn = MagicMock()
+        mock_cur = mock_conn.cursor.return_value.__enter__.return_value
+        mock_cur.__iter__ = MagicMock(return_value=iter([(1,), (2,), (3,)]))
+        mock_cur.nextset.return_value = False
         records = [normalise_row(_make_bq_row(cost=i)) for i in range(3)]
         inserted = _batch_insert(mock_conn, records)
         assert inserted == 3

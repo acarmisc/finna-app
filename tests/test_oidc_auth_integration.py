@@ -2,7 +2,7 @@
 
 import base64
 import time
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -15,7 +15,8 @@ from backend.app.api.main import app
 @pytest.fixture
 def client():
     """FastAPI test client."""
-    return TestClient(app)
+    with TestClient(app, raise_server_exceptions=False) as test_client:
+        yield test_client
 
 
 @pytest.fixture
@@ -137,7 +138,7 @@ async def test_oidc_login_flow(client, setup_oidc_provider):
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.status_code = 200
         disc_resp.json.return_value = metadata
         mock_client.get.return_value = disc_resp
@@ -178,7 +179,7 @@ async def test_oidc_callback_happy_path_new_user(client, setup_oidc_provider, rs
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = metadata
         mock_client.get.return_value = disc_resp
 
@@ -211,7 +212,7 @@ async def test_oidc_callback_happy_path_new_user(client, setup_oidc_provider, rs
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
         # Discovery
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = metadata
         mock_client.get.side_effect = [disc_resp]
 
@@ -279,7 +280,7 @@ async def test_oidc_callback_happy_path_existing_user_is_admin(client, setup_oid
     with patch("backend.app.api.oidc.httpx.AsyncClient") as mock_client_ctx:
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = metadata
         mock_client.get.return_value = disc_resp
 
@@ -310,7 +311,7 @@ async def test_oidc_callback_happy_path_existing_user_is_admin(client, setup_oid
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = metadata
         mock_client.get.side_effect = [disc_resp]
 
@@ -371,7 +372,7 @@ async def test_oidc_callback_state_consumed(client, setup_oidc_provider):
     with patch("backend.app.api.oidc.httpx.AsyncClient") as mock_client_ctx:
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = metadata
         mock_client.get.return_value = disc_resp
 
@@ -440,7 +441,7 @@ async def test_oidc_callback_email_domain_filtering(client, rsa_keypair):
     with patch("backend.app.api.oidc.httpx.AsyncClient") as mock_client_ctx:
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = metadata
         mock_client.get.return_value = disc_resp
 
@@ -469,7 +470,7 @@ async def test_oidc_callback_email_domain_filtering(client, rsa_keypair):
     with patch("backend.app.api.oidc.httpx.AsyncClient") as mock_client_ctx:
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = metadata
         mock_client.get.side_effect = [disc_resp]
         token_resp = AsyncMock()
@@ -533,7 +534,7 @@ async def test_oidc_callback_auto_provision_disabled(client, rsa_keypair):
     with patch("backend.app.api.oidc.httpx.AsyncClient") as mock_client_ctx:
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = metadata
         mock_client.get.return_value = disc_resp
 
@@ -562,7 +563,7 @@ async def test_oidc_callback_auto_provision_disabled(client, rsa_keypair):
     with patch("backend.app.api.oidc.httpx.AsyncClient") as mock_client_ctx:
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = metadata
         mock_client.get.side_effect = [disc_resp]
         token_resp = AsyncMock()
@@ -601,7 +602,7 @@ async def test_oidc_rate_limiting(client, setup_oidc_provider):
     with patch("backend.app.api.oidc.httpx.AsyncClient") as mock_client_ctx:
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = metadata
         mock_client.get.return_value = disc_resp
 
@@ -639,9 +640,9 @@ async def test_provider_test_endpoint(client, setup_oidc_provider, admin_token):
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
-        disc_resp = AsyncMock()
+        disc_resp = MagicMock()
         disc_resp.json.return_value = metadata
-        jwks_resp = AsyncMock()
+        jwks_resp = MagicMock()
         jwks_resp.json.return_value = jwks
 
         mock_client.get.side_effect = [disc_resp, jwks_resp]

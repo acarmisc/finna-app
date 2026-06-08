@@ -155,12 +155,8 @@ def init_sync_pool() -> ConnectionPool:
 async def get_async_pool() -> AsyncConnectionPool:
     """Get or create async connection pool."""
     global _async_pool
-    if os.environ.get("TESTING"):
-        if _async_pool is None:
-            await init_async_pool()
-        if _async_pool is None:
-            raise ValueError("Async connection pool not initialized")
-        return _async_pool
+    if _async_pool is not None and _async_pool.closed:
+        _async_pool = None
     if _async_pool is None:
         await init_async_pool()
     if _async_pool is None:
@@ -171,12 +167,8 @@ async def get_async_pool() -> AsyncConnectionPool:
 def get_sync_pool() -> ConnectionPool:
     """Get or create sync connection pool."""
     global _sync_pool
-    if os.environ.get("TESTING"):
-        if _sync_pool is None:
-            init_sync_pool()
-        if _sync_pool is None:
-            raise ValueError("Sync connection pool not initialized")
-        return _sync_pool
+    if _sync_pool is not None and _sync_pool.closed:
+        _sync_pool = None
     if _sync_pool is None:
         init_sync_pool()
     if _sync_pool is None:
@@ -216,27 +208,34 @@ def get_connection() -> psycopg.Connection:
     base_delay = 0.1  # 100ms
 
     for attempt in range(max_retries):
+        conn = None
         try:
-            conn = pool.getconn()
-            if conn is None or conn.closed:
-                logger.warning("Got invalid connection from pool, closing and getting new one")
-                if conn is not None:
-                    conn.close()
-                # Try to get a new connection
-                conn = pool.getconn()
-                if conn is None or conn.closed:
-                    raise psycopg.OperationalError("Failed to obtain a valid connection from the pool")
-            return conn
+            conn = pool.getconn(timeout=5.0)
+            if conn is not None and not conn.closed:
+                return conn
+            # Stale connection: return it so the pool can recycle it, then retry.
+            logger.warning("Got stale connection from pool, returning and retrying")
+            try:
+                pool.putconn(conn)
+            except Exception:
+                pass
+            conn = None
+            raise PoolTimeout("stale connection")
         except PoolTimeout:
-            if attempt == max_retries - 1:  # Last attempt
+            if attempt == max_retries - 1:
                 logger.error("Connection pool exhausted after %d retries", max_retries)
                 raise
-            delay = base_delay * (2 ** attempt)  # Exponential backoff
+            delay = base_delay * (2 ** attempt)
             logger.warning("Connection pool exhausted, retrying in %.2fs (attempt %d/%d)",
                          delay, attempt + 1, max_retries)
             time.sleep(delay)
         except psycopg.Error as e:
             logger.exception("Failed to get connection from pool: %s", e)
+            if conn is not None:
+                try:
+                    pool.putconn(conn)
+                except Exception:
+                    pass
             raise
     raise RuntimeError("unreachable: get_connection retry loop exited without return")
 
@@ -297,17 +296,19 @@ def get_pool_stats() -> dict[str, Any]:
     stats: dict[str, Any] = {"async": None, "sync": None}
 
     if _async_pool is not None:
+        _astats = _async_pool.get_stats()
         stats["async"] = {
             "min_size": _async_pool.min_size,
             "max_size": _async_pool.max_size,
-            "size": len(_async_pool),  # type: ignore[arg-type]
+            "size": _astats.get("pool_size", 0),
         }
 
     if _sync_pool is not None:
+        _sstats = _sync_pool.get_stats()
         stats["sync"] = {
             "min_size": _sync_pool.min_size,
             "max_size": _sync_pool.max_size,
-            "size": len(_sync_pool),  # type: ignore[arg-type]
+            "size": _sstats.get("pool_size", 0),
         }
 
     return stats
