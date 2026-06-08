@@ -28,6 +28,7 @@ from typing import Any
 
 import psycopg
 from botocore.exceptions import ClientError  # type: ignore[import-untyped]
+from psycopg import sql as psycopg_sql
 from tenacity import (
     before_sleep_log,
     retry,
@@ -229,7 +230,11 @@ def _load_exchange_rates(
         raise ValueError(f"Invalid exchange rate table: {table}")
     try:
         with conn.cursor() as cur:
-            cur.execute(f"SELECT currency, rate_to_usd FROM {table}")  # noqa: S608
+            cur.execute(
+                psycopg_sql.SQL("SELECT currency, rate_to_usd FROM {}").format(
+                    psycopg_sql.Identifier(table)
+                )
+            )
             for row in cur.fetchall():
                 rates[row[0]] = Decimal(str(row[1]))
     except psycopg.Error:

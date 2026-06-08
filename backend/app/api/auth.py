@@ -28,15 +28,6 @@ GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
 GITHUB_CALLBACK_URL = os.getenv("GITHUB_CALLBACK_URL", "http://localhost:5173/#/auth/callback")
 
-# Simple in-memory user storage (for demo purposes)
-USERS_TABLE = {
-    "admin": {
-        "password_hash": "placeholder",
-        "username": "admin",
-        "email": "admin@finops.local"
-    }
-}
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
