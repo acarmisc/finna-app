@@ -211,18 +211,19 @@ instrumentator = Instrumentator()
 instrumentator.instrument(app)
 instrumentator.expose(app, include_in_schema=False)
 
-# Initialize OpenTelemetry tracing
-try:
-    from opentelemetry import trace
-    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+# Initialize OpenTelemetry tracing (skip in test/disabled environments)
+if not os.environ.get("TESTING") and os.environ.get("OTEL_SDK_DISABLED", "").lower() != "true":
+    try:
+        from opentelemetry import trace
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 
-    provider = TracerProvider()
-    processor = BatchSpanProcessor(ConsoleSpanExporter())
-    provider.add_span_processor(processor)
-    trace.set_tracer_provider(provider)
+        provider = TracerProvider()
+        processor = BatchSpanProcessor(ConsoleSpanExporter())
+        provider.add_span_processor(processor)
+        trace.set_tracer_provider(provider)
 
-    FastAPIInstrumentor().instrument()
-except ImportError:
-    pass
+        FastAPIInstrumentor().instrument()
+    except ImportError:
+        pass
