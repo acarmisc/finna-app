@@ -16,6 +16,7 @@ jobs:
           python-version: '3.12'
       - run: pip install uv
       - run: uv sync --extra dev
+      - run: uv run pip install pip-audit
       - run: uv run pip-audit --skip-editable
       - run: uv run ruff check .
 

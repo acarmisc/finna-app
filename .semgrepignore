@@ -1,0 +1,16 @@
+# Semgrep ignore patterns for finna-app
+# https://semgrep.dev/docs/ignoring-files
+
+# Test fixtures containing intentionally low-entropy or example values
+# that semgrep's secrets rule would otherwise flag.
+tests/
+
+# Seed/admin SQL files contain literal bcrypt hashes for the default
+# admin user (username: admin, password: admin). These are documented
+# fixtures, not real credentials.
+sql/add_admin_user.sql
+sql/seed/
+
+# Documentation may quote example secrets, hashes, or patterns
+docs/
+*.md

@@ -41,12 +41,12 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against a hash."""
-    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+    return bool(bcrypt.checkpw(plain_password.encode(), hashed_password.encode()))
 
 
 def get_password_hash(password: str) -> str:
     """Hash a password."""
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    return str(bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode())
 
 
 def create_access_token(data: dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
