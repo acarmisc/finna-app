@@ -447,7 +447,7 @@ async def update_config(config_id: str, data: CloudConfigUpdate) -> dict[str, An
         WHERE id = %s
         RETURNING id, provider, name, credential_type, config, created_at, updated_at,
                   last_test, last_test_at, err
-    """
+    """  # noqa: S608
 
     result = query_one(sql, tuple(params))
     if not result:

@@ -135,7 +135,7 @@ async def get_provider(provider_id: str) -> AuthProviderResponse:
 @router.post("/auth/providers", dependencies=[Depends(require_admin)])
 async def create_provider(
     request: AuthProviderInput,
-    user: dict[str, Any] = Depends(require_admin),
+    user: dict[str, Any] = Depends(require_admin),  # noqa: B008
 ) -> AuthProviderResponse:
     """Create new OIDC provider."""
     provider_id = str(uuid.uuid4())
@@ -300,4 +300,4 @@ async def test_provider(provider_id: str) -> dict[str, Any]:
             "UPDATE auth_providers SET last_test_at = %s, last_test_ok = %s WHERE id = %s",
             (datetime.now(UTC), False, provider_id),
         )
-        raise HTTPException(status_code=400, detail=f"Discovery error: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Discovery error: {str(e)}") from e

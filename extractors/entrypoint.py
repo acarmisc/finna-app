@@ -46,15 +46,14 @@ def _run_inventory_scan(provider: str) -> None:
     if provider == "azure":
         subscription_id = os.getenv("AZURE_SUBSCRIPTION_ID", "").strip()
         if not subscription_id:
-            print(
-                "ERROR: AZURE_SUBSCRIPTION_ID is required for azure_inventory_scan",
-                file=sys.stderr,
+            sys.stderr.write(
+                "ERROR: AZURE_SUBSCRIPTION_ID is required for azure_inventory_scan\n"
             )
             sys.exit(1)
 
         pg_dsn = os.getenv("PG_DSN", "").strip()
         if not pg_dsn:
-            print("ERROR: PG_DSN is required", file=sys.stderr)
+            sys.stderr.write("ERROR: PG_DSN is required\n")
             sys.exit(1)
 
         threshold = int(os.getenv("WASTAGE_MISS_THRESHOLD", "3"))
@@ -77,9 +76,9 @@ def _run_inventory_scan(provider: str) -> None:
                 consecutive_miss_threshold=threshold,
             )
 
-        print(f"Wastage scan complete. Run ID: {run_id}")
+        sys.stderr.write(f"Wastage scan complete. Run ID: {run_id}\n")
     else:
-        print(f"ERROR: unsupported provider {provider!r}", file=sys.stderr)
+        sys.stderr.write(f"ERROR: unsupported provider {provider!r}\n")
         sys.exit(1)
 
 
@@ -88,10 +87,9 @@ def main() -> None:
 
     if not extractor_type:
         all_types = list(EXTRACTOR_MAP) + ["azure_inventory_scan"]
-        print(
+        sys.stderr.write(
             "ERROR: EXTRACTOR_TYPE env var is required. "
-            f"Valid values: {', '.join(all_types)}",
-            file=sys.stderr,
+            f"Valid values: {', '.join(all_types)}\n"
         )
         sys.exit(1)
 
@@ -102,10 +100,9 @@ def main() -> None:
 
     if extractor_type not in EXTRACTOR_MAP:
         all_types = list(EXTRACTOR_MAP) + ["azure_inventory_scan"]
-        print(
+        sys.stderr.write(
             f"ERROR: Unknown EXTRACTOR_TYPE '{extractor_type}'. "
-            f"Valid values: {', '.join(all_types)}",
-            file=sys.stderr,
+            f"Valid values: {', '.join(all_types)}\n"
         )
         sys.exit(1)
 
@@ -117,11 +114,11 @@ def main() -> None:
 
         module = importlib.import_module(module_name)
     except ImportError as exc:
-        print(f"ERROR: Failed to import {module_name}: {exc}", file=sys.stderr)
+        sys.stderr.write(f"ERROR: Failed to import {module_name}: {exc}\n")
         sys.exit(1)
 
     if not hasattr(module, "main"):
-        print(f"ERROR: {module_name} has no main() function", file=sys.stderr)
+        sys.stderr.write(f"ERROR: {module_name} has no main() function\n")
         sys.exit(1)
 
     module.main()

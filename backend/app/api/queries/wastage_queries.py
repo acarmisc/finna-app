@@ -68,7 +68,7 @@ def list_wastage_findings(
         {where}
         ORDER BY estimated_monthly_usd DESC, first_seen_at DESC
         LIMIT %s OFFSET %s
-    """
+    """  # noqa: S608
     params.extend([limit, offset])
     return query_all(sql, tuple(params))
 
@@ -102,7 +102,7 @@ def count_wastage_findings(
         params.append(account_id)
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
-    sql = f"SELECT COUNT(*) as cnt FROM resource_wastage {where}"
+    sql = f"SELECT COUNT(*) as cnt FROM resource_wastage {where}"  # noqa: S608
     row = query_one(sql, tuple(params) if params else None)
     return int(row["cnt"]) if row else 0
 

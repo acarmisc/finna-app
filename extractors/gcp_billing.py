@@ -108,7 +108,7 @@ def _build_query(
 ) -> tuple[str, list[Any]]:
     """Return parameterised SQL and query params for BigQuery."""
     query = (
-        f"SELECT\n"
+        f"SELECT\n"  # noqa: S608
         f"    project.id              AS project_id,\n"
         f"    project.number          AS project_number,\n"
         f"    billing_account_id,\n"

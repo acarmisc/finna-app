@@ -226,7 +226,7 @@ def start_extractor(
 
     # Start subprocess
     logger.info(f"Starting extractor {extractor_type} for config {config_id}")
-    proc = subprocess.Popen(
+    proc = subprocess.Popen(  # noqa: S603
         cmd,
         env=env,
         stdout=subprocess.PIPE,
@@ -316,11 +316,11 @@ def shutdown_all() -> None:
                     proc.kill()
                     proc.wait()
             except Exception:
-                pass
+                logger.debug("Shutdown cleanup error", exc_info=True)
             try:
                 _update_run_status(run_id, "failed", 0, "Server shutdown")
             except Exception:
-                pass
+                logger.debug("Shutdown cleanup error", exc_info=True)
     _running_processes.clear()
 
 

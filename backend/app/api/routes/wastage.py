@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any
 
@@ -21,6 +22,8 @@ from ..queries.wastage_queries import (
 from .openapi_extensions import ERROR_RESPONSE_404, ERROR_RESPONSE_422
 
 require_auth = auth_module.require_auth
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -259,7 +262,7 @@ async def trigger_scan(body: ScanBody) -> dict[str, Any]:
     try:
         create_scan_run(body.provider, run_id)
     except Exception:
-        pass
+        logger.warning("Failed to create scan run record for run_id=%s", run_id, exc_info=True)
 
     # Scan execution runs out-of-band via the extractor entrypoint
     # (EXTRACTOR_TYPE=azure_inventory_scan). The API only records the queued

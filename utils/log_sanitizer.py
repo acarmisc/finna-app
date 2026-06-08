@@ -95,7 +95,7 @@ def sanitize_log(text: str) -> str:
         return text
 
     result = text
-    for name, pattern in _SENSITIVE_PATTERNS:
+    for _name, pattern in _SENSITIVE_PATTERNS:
         result = pattern.sub(SANITIZE_REPLACEMENT, result)
 
     return result

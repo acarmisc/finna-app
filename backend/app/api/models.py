@@ -3,19 +3,19 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class Provider(str, Enum):
+class Provider(StrEnum):
     AZURE = "azure"
     GCP = "gcp"
     LLM = "llm"
 
 
-class CredentialType(str, Enum):
+class CredentialType(StrEnum):
     SERVICE_PRINCIPAL = "service_principal"
     MANAGED_IDENTITY = "managed_identity"
     CLI = "cli"
@@ -192,7 +192,7 @@ class TokenResponse(BaseModel):
     """Response schema for token endpoint."""
 
     access_token: str
-    token_type: str = "bearer"
+    token_type: str = "bearer"  # noqa: S105
 
 
 # ============================================================================
@@ -280,13 +280,13 @@ class ExtractorRunTriggerResponse(BaseModel):
 # ============================================================================
 
 
-class AlertStatus(str, Enum):
+class AlertStatus(StrEnum):
     FIRING = "firing"
     ACKNOWLEDGED = "ack"
     RESOLVED = "resolved"
 
 
-class AlertSeverity(str, Enum):
+class AlertSeverity(StrEnum):
     CRITICAL = "critical"
     WARNING = "warning"
     INFO = "info"
@@ -358,14 +358,14 @@ class ProjectCreate(BaseModel):
 # ============================================================================
 
 
-class WastageStatus(str, Enum):
+class WastageStatus(StrEnum):
     OPEN = "open"
     ACKED = "acked"
     RESOLVED = "resolved"
     IGNORED = "ignored"
 
 
-class WastageSeverity(str, Enum):
+class WastageSeverity(StrEnum):
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"

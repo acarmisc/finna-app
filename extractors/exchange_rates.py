@@ -77,8 +77,8 @@ def _fetch_ecb_xml(url: str, timeout: int = 30) -> str:
     Retries on transient network errors.
     """
     logger.info("Fetching ECB exchange rates from %s", url)
-    req = urllib.request.Request(url, headers={"User-Agent": "finna-exchange-rates/1.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
+    req = urllib.request.Request(url, headers={"User-Agent": "finna-exchange-rates/1.0"})  # noqa: S310
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
         payload = resp.read().decode("utf-8")
     logger.debug("Received %d bytes from ECB", len(payload))
     return payload  # type: ignore[no-any-return]
@@ -106,7 +106,7 @@ def _parse_ecb_xml(xml_text: str) -> tuple[date, dict[str, Decimal]]:
     #   </gesmes:Envelope>
 
     # Locate the date container — first <Cube> with a "time" attribute
-    date_container = root.find(".//{%s}Cube[@time]" % ECB_NS["ecb"])
+    date_container = root.find(f".//{{{ECB_NS['ecb']}}}Cube[@time]")
     if date_container is None:
         raise ValueError("Could not find date container in ECB XML")
 
@@ -114,7 +114,7 @@ def _parse_ecb_xml(xml_text: str) -> tuple[date, dict[str, Decimal]]:
 
     # Extract all currency rates from child <Cube currency="..." rate="..."/> elements
     rates_vs_eur: dict[str, Decimal] = {}
-    for cube in date_container.findall("{%s}Cube" % ECB_NS["ecb"]):
+    for cube in date_container.findall(f"{{{ECB_NS['ecb']}}}Cube"):
         currency = cube.get("currency")
         rate_str = cube.get("rate")
         if currency and rate_str:

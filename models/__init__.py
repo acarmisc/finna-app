@@ -3,22 +3,21 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class Provider(str, Enum):
+class Provider(StrEnum):
     AWS = "aws"
     GCP = "gcp"
     AZURE = "azure"
     LLM = "llm"
 
 
-class ServiceCategory(str, Enum):
+class ServiceCategory(StrEnum):
     COMPUTE = "compute"
     STORAGE = "storage"
     NETWORK = "network"

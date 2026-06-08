@@ -398,7 +398,7 @@ def _mark_health_start(conn: psycopg.Connection) -> None:
                     records_extracted = 0,
                     error_message = NULL,
                     updated_at = now()
-        """
+        """  # noqa: S608
         with conn.cursor() as cur:
             cur.execute(sql, (EXTRACTOR_NAME,))
         conn.commit()
@@ -420,7 +420,7 @@ def _mark_health_success(conn: psycopg.Connection, record_count: int) -> None:
                 records_extracted = %s,
                 updated_at = now()
             WHERE extractor_name = %s
-        """
+        """  # noqa: S608
         with conn.cursor() as cur:
             cur.execute(sql, (record_count, EXTRACTOR_NAME))
         conn.commit()
@@ -443,7 +443,7 @@ def _mark_health_failure(conn: psycopg.Connection, error_message: str) -> None:
                 error_message = %s,
                 updated_at = now()
             WHERE extractor_name = %s
-        """
+        """  # noqa: S608
         with conn.cursor() as cur:
             cur.execute(sql, (error_message[:2000], EXTRACTOR_NAME))
         conn.commit()

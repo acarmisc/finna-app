@@ -39,8 +39,8 @@ class CostFilter(BaseModel):
 async def list_costs(
     provider: str | None = Query(None, description="Filter by provider: gcp, azure, llm"),
     project: str | None = Query(None, description="Filter by project name"),
-    start_date: str | datetime | None = Query(None, description="Start date in ISO format"),
-    end_date: str | datetime | None = Query(None, description="End date in ISO format"),
+    start_date: str | datetime | None = Query(None, description="Start date in ISO format"),  # noqa: B008
+    end_date: str | datetime | None = Query(None, description="End date in ISO format"),  # noqa: B008
     start: str | None = Query(None, alias="start", include_in_schema=False),
     end: str | None = Query(None, alias="end", include_in_schema=False),
     window: str | None = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
@@ -90,7 +90,7 @@ async def list_costs(
         {where_clause}
         ORDER BY usage_start DESC, cost_usd DESC
         LIMIT 1000
-    """
+    """  # noqa: S608
 
     results = query_all(sql, tuple(params))
 
@@ -137,8 +137,8 @@ async def list_costs(
 async def export_costs(
     provider: str | None = Query(None),
     project: str | None = Query(None),
-    start_date: str | datetime | None = Query(None),
-    end_date: str | datetime | None = Query(None),
+    start_date: str | datetime | None = Query(None),  # noqa: B008
+    end_date: str | datetime | None = Query(None),  # noqa: B008
     window: str | None = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
 ) -> StreamingResponse:
     """Export cost data as CSV."""
@@ -169,7 +169,7 @@ async def export_costs(
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
     sql = f"""SELECT record_id, provider, project_name, service_name, usage_start, net_cost_usd, currency_original
-        FROM cost_records {where} ORDER BY usage_start DESC LIMIT 10000"""
+        FROM cost_records {where} ORDER BY usage_start DESC LIMIT 10000"""  # noqa: S608
 
     results = query_all(sql, tuple(params))
 
@@ -190,8 +190,8 @@ async def export_costs(
 
 @router.get("/costs/totals", dependencies=[Depends(require_auth)])
 async def get_cost_totals(
-    start_date: str | datetime | None = Query(None),
-    end_date: str | datetime | None = Query(None),
+    start_date: str | datetime | None = Query(None),  # noqa: B008
+    end_date: str | datetime | None = Query(None),  # noqa: B008
     window: str | None = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
 ) -> dict[str, Any]:
     """Get aggregated cost totals per provider with mtd/prev/delta structure."""
@@ -294,7 +294,7 @@ async def get_costs_by_sku(
         GROUP BY provider, project_id, project_name, service_name
         ORDER BY mtd DESC
         LIMIT %s
-    """
+    """  # noqa: S608
 
     results = query_all(sql, tuple(params) + (limit,))
 
@@ -316,8 +316,8 @@ async def get_costs_by_sku(
 
 @router.get("/costs/daily", dependencies=[Depends(require_auth)])
 async def get_daily_costs(
-    start_date: str | datetime | None = Query(None),
-    end_date: str | datetime | None = Query(None),
+    start_date: str | datetime | None = Query(None),  # noqa: B008
+    end_date: str | datetime | None = Query(None),  # noqa: B008
     start: str | None = Query(None, alias="start", include_in_schema=False),
     end: str | None = Query(None, alias="end", include_in_schema=False),
     provider: str | None = Query(None),
@@ -351,7 +351,7 @@ async def get_daily_costs(
         WHERE {" AND ".join(conditions)}
         GROUP BY DATE(usage_start), provider
         ORDER BY date DESC
-    """
+    """  # noqa: S608
 
     results = query_all(sql, tuple(params))
 
@@ -381,8 +381,8 @@ async def get_daily_costs(
 
 @router.get("/costs/summary", dependencies=[Depends(require_auth)])
 async def cost_summary(
-    start_date: str | datetime | None = Query(None),
-    end_date: str | datetime | None = Query(None),
+    start_date: str | datetime | None = Query(None),  # noqa: B008
+    end_date: str | datetime | None = Query(None),  # noqa: B008
     start: str | None = Query(None, alias="start", include_in_schema=False),
     end: str | None = Query(None, alias="end", include_in_schema=False),
     window: str | None = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
@@ -432,8 +432,8 @@ async def cost_summary(
 
 @router.get("/costs/breakdown", dependencies=[Depends(require_auth)])
 async def cost_breakdown(
-    start_date: str | datetime | None = Query(None),
-    end_date: str | datetime | None = Query(None),
+    start_date: str | datetime | None = Query(None),  # noqa: B008
+    end_date: str | datetime | None = Query(None),  # noqa: B008
     start: str | None = Query(None, alias="start", include_in_schema=False),
     end: str | None = Query(None, alias="end", include_in_schema=False),
     window: str | None = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
@@ -469,7 +469,7 @@ async def cost_breakdown(
         GROUP BY service_name
         ORDER BY cost DESC
         LIMIT %s
-    """
+    """  # noqa: S608
     rows = query_all(sql, tuple(params) + (limit,))
     data = [{"sku": r["sku"], "cost": float(r["cost"])} for r in rows]
     return {"data": data, "total": len(data)}

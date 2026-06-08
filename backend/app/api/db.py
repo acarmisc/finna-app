@@ -219,7 +219,7 @@ def get_connection() -> psycopg.Connection:
             try:
                 pool.putconn(conn)
             except Exception:
-                pass
+                logger.debug("Cleanup path - pool connection error", exc_info=True)
             conn = None
             raise PoolTimeout("stale connection")
         except PoolTimeout:
@@ -236,7 +236,7 @@ def get_connection() -> psycopg.Connection:
                 try:
                     pool.putconn(conn)
                 except Exception:
-                    pass
+                    logger.debug("Cleanup path - pool connection error", exc_info=True)
             raise
     raise RuntimeError("unreachable: get_connection retry loop exited without return")
 
@@ -253,7 +253,7 @@ def release_connection(conn: psycopg.Connection | None) -> None:
             try:
                 conn.close()
             except Exception:
-                pass  # Best effort to close
+                logger.debug("Cleanup path - pool connection error", exc_info=True)
 
 
 def close_pools() -> None:

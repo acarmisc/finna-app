@@ -73,9 +73,9 @@ async def discover_provider(issuer: str) -> ProviderMetadata:
             response.raise_for_status()
             metadata = response.json()
     except httpx.RequestError as e:
-        raise OIDCError(f"Discovery request failed: {e}")
+        raise OIDCError(f"Discovery request failed: {e}") from e
     except httpx.HTTPStatusError as e:
-        raise OIDCError(f"Discovery HTTP error: {e.response.status_code}")
+        raise OIDCError(f"Discovery HTTP error: {e.response.status_code}") from e
 
     # Validate required endpoints
     required = {"authorization_endpoint", "token_endpoint", "jwks_uri"}
@@ -122,9 +122,9 @@ async def get_jwks(issuer: str) -> dict[str, Any]:
             response.raise_for_status()
             jwks = cast(dict[str, Any], response.json())
     except httpx.RequestError as e:
-        raise OIDCError(f"JWKS request failed: {e}")
+        raise OIDCError(f"JWKS request failed: {e}") from e
     except httpx.HTTPStatusError as e:
-        raise OIDCError(f"JWKS HTTP error: {e.response.status_code}")
+        raise OIDCError(f"JWKS HTTP error: {e.response.status_code}") from e
 
     # Cache
     _jwks_cache[jwks_uri] = (jwks, time.time())
@@ -219,10 +219,10 @@ async def exchange_code(
             response.raise_for_status()
             tokens = cast(dict[str, Any], response.json())
     except httpx.RequestError as e:
-        raise OIDCError(f"Token exchange request failed: {e}")
+        raise OIDCError(f"Token exchange request failed: {e}") from e
     except httpx.HTTPStatusError as e:
         logger.error(f"Token exchange HTTP error: {e.response.status_code} {e.response.text}")
-        raise OIDCError(f"Token exchange failed: {e.response.status_code}")
+        raise OIDCError(f"Token exchange failed: {e.response.status_code}") from e
 
     return tokens
 
@@ -272,7 +272,7 @@ async def verify_id_token(
     try:
         header = jwt.get_unverified_header(id_token)
     except JWTError as e:
-        raise OIDCError(f"Invalid token format: {e}")
+        raise OIDCError(f"Invalid token format: {e}") from e
 
     kid = header.get("kid")
     alg = header.get("alg", "")
@@ -308,7 +308,7 @@ async def verify_id_token(
     try:
         claims = cast(dict[str, Any], jwt.decode(id_token, key, algorithms=[alg], options={"verify_signature": True}))
     except JWTError as e:
-        raise OIDCError(f"Signature verification failed: {e}")
+        raise OIDCError(f"Signature verification failed: {e}") from e
 
     # Validate claims
     now = datetime.now(UTC).timestamp()

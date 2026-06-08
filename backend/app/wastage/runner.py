@@ -220,7 +220,7 @@ def run_scan(
         try:
             conn.rollback()
         except Exception:
-            pass
+            logger.debug("Rollback failed during cleanup", exc_info=True)
         _close_scan_run(conn, run_id, "error", 0, error_msg)
         raise
     else:
@@ -334,7 +334,7 @@ def _auto_resolve_stale(
         try:
             conn.rollback()
         except Exception:
-            pass
+            logger.debug("Rollback failed during cleanup", exc_info=True)
 
 
 def _ensure_azure_rules_loaded() -> None:
@@ -386,14 +386,13 @@ def _cli_main() -> None:
     args = parser.parse_args()
 
     if not args.pg_dsn:
-        print("ERROR: PG_DSN is required (env or --pg-dsn)", file=sys.stderr)
+        sys.stderr.write("ERROR: PG_DSN is required (env or --pg-dsn)\n")
         sys.exit(1)
 
     if args.provider == "azure":
         if not args.subscription_id:
-            print(
-                "ERROR: --subscription-id or AZURE_SUBSCRIPTION_ID is required",
-                file=sys.stderr,
+            sys.stderr.write(
+                "ERROR: --subscription-id or AZURE_SUBSCRIPTION_ID is required\n"
             )
             sys.exit(1)
 
@@ -406,7 +405,7 @@ def _cli_main() -> None:
             client_secret=args.client_secret,
         )
     else:
-        print(f"ERROR: unsupported provider {args.provider!r}", file=sys.stderr)
+        sys.stderr.write(f"ERROR: unsupported provider {args.provider!r}\n")
         sys.exit(1)
 
     with psycopg.connect(args.pg_dsn) as conn:
@@ -417,7 +416,7 @@ def _cli_main() -> None:
             consecutive_miss_threshold=args.miss_threshold,
         )
 
-    print(f"Scan complete. Run ID: {run_id}")
+    sys.stderr.write(f"Scan complete. Run ID: {run_id}\n")
 
 
 if __name__ == "__main__":

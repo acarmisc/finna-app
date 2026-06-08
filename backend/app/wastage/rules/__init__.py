@@ -37,7 +37,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, NamedTuple, Optional
+from typing import Any, NamedTuple
 
 logger = logging.getLogger(__name__)
 

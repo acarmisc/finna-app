@@ -104,7 +104,7 @@ async def get_alert_stats() -> dict[str, Any]:
 
 @router.get("/alerts/active", dependencies=[Depends(require_auth)])
 async def get_active_alerts(
-    user: dict[str, Any] = Depends(require_auth),
+    user: dict[str, Any] = Depends(require_auth),  # noqa: B008
 ) -> dict[str, Any]:
     """Get active firing alerts."""
     sql = """
@@ -141,7 +141,7 @@ async def get_active_alerts(
 @router.post("/alerts/{alert_id}/acknowledge", dependencies=[Depends(require_auth)])
 async def acknowledge_alert(
     alert_id: str,
-    user: dict[str, Any] = Depends(require_auth),
+    user: dict[str, Any] = Depends(require_auth),  # noqa: B008
 ) -> dict[str, Any]:
     """Acknowledge a single alert."""
     sql = """
@@ -158,7 +158,7 @@ async def acknowledge_alert(
 
 @router.post("/alerts/acknowledge-all", dependencies=[Depends(require_auth)])
 async def acknowledge_all_alerts(
-    user: dict[str, Any] = Depends(require_auth),
+    user: dict[str, Any] = Depends(require_auth),  # noqa: B008
 ) -> dict[str, Any]:
     """Bulk acknowledge all firing alerts."""
     sql = """

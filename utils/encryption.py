@@ -8,9 +8,12 @@ Non-sensitive fields remain in plaintext for queryability.
 import base64
 import hashlib
 import json
+import logging
 import os
 
 from cryptography.fernet import Fernet, InvalidToken
+
+logger = logging.getLogger(__name__)
 
 
 def get_encryption_key() -> bytes:
@@ -38,7 +41,7 @@ def get_encryption_key() -> bytes:
         Fernet(env_key.encode() if isinstance(env_key, str) else env_key)
         return env_key.encode() if isinstance(env_key, str) else env_key
     except Exception:
-        pass
+        logger.debug("ENCRYPTION_KEY not valid Fernet key, deriving")
 
     # Fallback: derive a valid key from the string using SHA-256
     hash_obj = hashlib.sha256(env_key.encode())
