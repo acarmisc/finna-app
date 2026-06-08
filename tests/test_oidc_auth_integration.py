@@ -623,6 +623,7 @@ async def test_oidc_rate_limiting(client, setup_oidc_provider):
         assert "Too many" in response.json()["detail"]
 
 
+@pytest.mark.skip(reason="POST /auth/oidc/test endpoint removed")
 @pytest.mark.asyncio
 async def test_provider_test_endpoint(client, setup_oidc_provider, admin_token):
     """Test provider discovery endpoint."""

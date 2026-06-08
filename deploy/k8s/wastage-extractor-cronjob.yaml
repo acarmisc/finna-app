@@ -1,0 +1,94 @@
+# Azure wastage inventory extractor — CronJob
+# Namespace: finna-app-staging
+#
+# Streams Azure Resource Graph inventory and applies 10 wastage rules
+# (orphan disks, unattached IPs, idle nodepools, etc). Upserts findings into
+# resource_wastage and records the run in wastage_scan_runs.
+#
+# Prereqs:
+#   - Secret finna-app-staging/finops-secret (API_USERNAME, API_PASSWORD, PG_DSN)
+#   - Image >= ghcr.io/acarmisc/finna-app/finops-extractor:1.4.0
+#   - Alembic migration 006_resource_wastage applied
+#
+# Schedule offset from azure-cost (:30) and litellm (:15) to avoid contention.
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: finops-extractor-azure-inventory
+  namespace: finna-app-staging
+  labels:
+    app: finops-extractor
+    app.kubernetes.io/name: finops
+    app.kubernetes.io/part-of: finops-app
+    environment: staging
+    extractor: azure-inventory
+spec:
+  # Every 6 hours, offset from azure-cost (:30)
+  schedule: "45 */6 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  suspend: false
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: finops
+        app.kubernetes.io/part-of: finops-app
+        environment: staging
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: finops-extractor
+            app.kubernetes.io/name: finops
+            app.kubernetes.io/part-of: finops-app
+            environment: staging
+            extractor: azure-inventory
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            fsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+          containers:
+          - name: extractor
+            image: ghcr.io/acarmisc/finna-app/finops-extractor:1.4.0
+            imagePullPolicy: IfNotPresent
+            env:
+            - name: EXTRACTOR_TYPE
+              value: azure_inventory_scan
+            - name: EXTRACTOR_PROVIDER
+              value: azure
+            - name: CONFIG_ID
+              value: "1"
+            - name: API_URL
+              value: http://finops-api.finops.svc.cluster.local:8000
+            - name: AUTH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: finops-secret
+                  key: API_USERNAME
+            - name: AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: finops-secret
+                  key: API_PASSWORD
+            - name: PG_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: finops-secret
+                  key: PG_DSN
+            resources:
+              requests:
+                cpu: 250m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop: ["ALL"]

@@ -1,6 +1,6 @@
 [project]
 name = "finna-app"
-version = "0.1.0"
+version = "0.2.0"
 description = "Multi-cloud FinOps platform — normalize, aggregate, and visualize cost data from GCP, Azure, and LLM gateways"
 readme = "README.md"
 license = "Apache-2.0"
@@ -51,7 +51,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["backend*", "extractors*", "models*", "config*", "utils*"]
-exclude = ["tests*", "ui*", "k8s*", "sql*", "data*", "queries*", "alembic*", "superset*", "terraform*", "docs*", "scripts*"]
+exclude = ["tests*", "k8s*", "sql*", "data*", "queries*", "alembic*", "superset*", "terraform*", "docs*", "scripts*"]
 
 [project.optional-dependencies]
 dev = [

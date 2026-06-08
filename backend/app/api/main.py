@@ -70,7 +70,7 @@ app.add_middleware(SlowAPIMiddleware)
 register_error_handlers(app)
 
 # Add CORS middleware with hardened validation
-raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000")
+raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
 allowed_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
 
 # Validate CORS configuration
@@ -199,12 +199,6 @@ app.include_router(costs.router, prefix="/api/v1", tags=["costs"])
 app.include_router(alerts.router, prefix="/api/v1", tags=["alerts"])
 app.include_router(wastage.router, prefix="/api/v1", tags=["wastage"])
 
-# Dev-only raw SQL endpoints (gated)
-_env = os.environ.get("ENV", "")
-if _env.lower() == "development":
-    from .routes import db_dev
-    app.include_router(db_dev.router, prefix="/api/v1", tags=["db"])
-    print("WARNING: db_dev raw SQL endpoints are mounted (ENV=development). Do NOT deploy this to production.")
 
 # Initialize Prometheus metrics instrumentator (must be after middleware)
 instrumentator = Instrumentator()

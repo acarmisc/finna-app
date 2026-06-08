@@ -1,0 +1,89 @@
+# LiteLLM cost extractor — CronJob
+# Namespace: finna-app-staging
+#
+# Prereqs (run once, see ./sync-litellm-secret.sh):
+#   - Secret  finna-app-staging/litellm-master-key  (key: master-key)
+#   - Secret  finna-app-staging/finops-secret       (key: PG_DSN) — already exists
+#
+# Image must contain extractors/litellm_cost.py + httpx in deps.
+# Bump image tag after rebuild via release.yml (git tag vX.Y.Z).
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: finops-extractor-litellm
+  namespace: finna-app-staging
+  labels:
+    app: finops-extractor
+    app.kubernetes.io/name: finops
+    app.kubernetes.io/part-of: finops-app
+    environment: staging
+    extractor: litellm-cost
+spec:
+  # Hourly, offset to avoid azure's :30
+  schedule: "15 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  suspend: false
+  jobTemplate:
+    metadata:
+      labels:
+        app.kubernetes.io/name: finops
+        app.kubernetes.io/part-of: finops-app
+        environment: staging
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: finops-extractor
+            app.kubernetes.io/name: finops
+            app.kubernetes.io/part-of: finops-app
+            environment: staging
+            extractor: litellm-cost
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            fsGroup: 1000
+            runAsNonRoot: true
+            runAsUser: 1000
+          containers:
+          - name: extractor
+            image: ghcr.io/acarmisc/finna-app/finops-extractor:1.3.5
+            imagePullPolicy: IfNotPresent
+            env:
+            - name: EXTRACTOR_TYPE
+              value: litellm_cost
+            - name: LITELLM_BASE_URL
+              value: https://llm-gw.ces.abssrv.it/
+            - name: LITELLM_TASK_TAG_PREFIX
+              value: "task:"
+            - name: LITELLM_PAGE_SIZE
+              value: "1000"
+            - name: LITELLM_TIMEOUT
+              value: "30"
+            - name: BATCH_SIZE
+              value: "500"
+            - name: LITELLM_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-master-key
+                  key: master-key
+            - name: PG_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: finops-secret
+                  key: PG_DSN
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop: ["ALL"]

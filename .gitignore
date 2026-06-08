@@ -56,7 +56,6 @@ gcp-sa*.json
 write_sa.py
 test_gcp_sa.py
 
-# Node frontend (moved to finna-app-ui repo)
 node_modules/
 package-lock.json
 *.tsbuildinfo
@@ -80,12 +79,6 @@ coverage/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-
-# UI build artifacts
-ui/dist/
-ui/coverage/
-ui/screenshots/
-ui/.cache/
 
 # Cloud credential dumps (never commit)
 azure-sp*.txt

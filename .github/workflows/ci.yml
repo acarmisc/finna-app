@@ -16,7 +16,6 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.12"
-  NODE_VERSION: "20"
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}/finops-api
 
@@ -36,24 +35,6 @@ jobs:
         run: ruff check backend/ extractors/ models/
       - name: Run mypy
         run: mypy backend/ extractors/ models/ --ignore-missing-imports --explicit-package-bases
-
-  ui-typecheck:
-    name: UI Type Check
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ui
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: ui/package-lock.json
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
-      - name: Run tsc
-        run: npx tsc --noEmit
 
   test:
     name: Backend Tests
@@ -104,27 +85,9 @@ jobs:
           PYTHONPATH: .
           OTEL_SDK_DISABLED: "true"
 
-  ui-build:
-    name: UI Build Check
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ui
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: ui/package-lock.json
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
-      - name: Build UI
-        run: npm run build
-
   build:
     name: Build Container
-    needs: [backend-typecheck, ui-typecheck, test, ui-build]
+    needs: [backend-typecheck, test]
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:

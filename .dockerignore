@@ -2,9 +2,6 @@
 .git
 .gitignore
 
-# Node frontend (moved to finna-app-ui repo)
-node_modules/
-frontend/node_modules/
 *.log
 npm-debug.log*
 
@@ -70,6 +67,3 @@ credentials/
 *.key
 *.p12
 
-# UI subtree - but we need it for monolith build
-# (build.context will include it, Dockerfile will handle it)
-# ui/

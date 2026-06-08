@@ -7,7 +7,7 @@ import time
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from utils.encryption import decrypt_config
@@ -16,8 +16,6 @@ from .. import auth as api_auth
 from .. import oidc
 from ..db import execute, insert_and_return, query_all, query_one
 
-require_auth = api_auth.require_auth
-require_admin = api_auth.require_admin
 logger = logging.getLogger("api.oidc_auth")
 
 router = APIRouter()
@@ -318,52 +316,3 @@ async def oidc_callback(req: OIDCCallbackRequest, request: Request) -> OIDCCallb
         logger.exception(f"Unexpected error during callback: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-
-@router.post("/auth/oidc/logout", dependencies=[Depends(require_auth)])
-async def oidc_logout(user: dict[str, Any] = Depends(require_auth)) -> dict[str, str]:
-    """Best-effort logout with RP-initiated support."""
-    # For v1: just return success. Token will expire on client.
-    # RP-initiated logout URL returned if provider supports end_session_endpoint.
-    return {"message": "Logged out"}
-
-
-@router.post("/auth/oidc/test", dependencies=[Depends(require_admin)])
-async def test_oidc_provider(request_data: OIDCLoginRequest) -> dict[str, Any]:
-    """Test OIDC provider discovery and configuration."""
-    provider = query_one(
-        "SELECT id, name, config FROM auth_providers WHERE id = %s",
-        (request_data.provider_id,),
-    )
-    if not provider:
-        raise HTTPException(status_code=404, detail="Provider not found")
-
-    config = decrypt_config(provider["config"])
-    issuer = config.get("issuer", "")
-
-    if not issuer:
-        raise HTTPException(status_code=400, detail="Provider config missing issuer")
-
-    try:
-        metadata = await oidc.discover_provider(issuer)
-        jwks = await oidc.get_jwks(issuer)
-
-        return {
-            "success": True,
-            "provider_name": provider["name"],
-            "issuer": issuer,
-            "endpoints": {
-                "authorization": metadata.get("authorization_endpoint"),
-                "token": metadata.get("token_endpoint"),
-                "userinfo": metadata.get("userinfo_endpoint"),
-                "jwks": metadata.get("jwks_uri"),
-                "end_session": metadata.get("end_session_endpoint"),
-            },
-            "jwks_keys_count": len(jwks.get("keys", [])),
-        }
-
-    except oidc.OIDCError as e:
-        logger.error(f"OIDC test error: {e}")
-        raise HTTPException(status_code=400, detail=f"Test failed: {str(e)}")
-    except Exception as e:
-        logger.exception(f"Unexpected error during test: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")

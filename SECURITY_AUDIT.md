@@ -3,7 +3,7 @@
 **Date:** 2026-06-02
 **Auditor:** Senior architect pass (Claude Opus 4.7)
 **Repo:** `/Users/andrea/Projects/personal/finna-app` @ `main` (commit `87edeea`)
-**Scope:** Backend (FastAPI/Python 3.11), Extractors, UI (React/Vite/TS), Docker/compose, dependency supply chain.
+**Scope:** Backend (FastAPI/Python 3.11), Extractors, Docker/compose, dependency supply chain. (Note: React/Vite UI has been archived to finna-app-ui repo — UI-specific findings below are historical.)
 **Goal:** Identify everything that blocks safe production launch with minimum operator configuration burden.
 
 ---
@@ -47,23 +47,22 @@ Ordered by blast radius × ease-of-fix. Top items MUST clear before any internet
 | 1 | 🔴 **CRITICAL** | Live Azure SP secret + GCP service-account JSON sitting on disk in repo root, NOT in `.dockerignore` → will be baked into the Docker image | XS | **YES — rotate now** |
 | 2 | 🔴 **CRITICAL** | `docker-compose.yml` ships hardcoded `JWT_SECRET`, `ENCRYPTION_KEY`, DB password, and `ALLOWED_ORIGINS="*"` — if anyone copies this to prod it's instant takeover | XS | **YES** |
 | 3 | 🔴 **CRITICAL** | Python deps with known CVEs: `pyjwt 2.12.1` (4 advisories), `starlette 0.38.6` (3 incl. CVE-2024-47874), `urllib3`, `idna`, `requests` | S | **YES** |
-| 4 | 🔴 **CRITICAL** | UI deps: 6 npm vulns, 4 **critical** (vitest browser RCE-class, axios DoS/header-injection) | S | YES for CI/dev; not runtime if devDeps only — verify |
+| 4 | 🔴 **CRITICAL** | ~~UI deps: 6 npm vulns, 4 critical (vitest browser RCE-class, axios DoS/header-injection)~~ — *UI archived, no longer applicable* | — | N/A |
 | 5 | 🟠 **HIGH** | SQL string interpolation in `extractors/{aws,azure,litellm}_cost.py` (5 sites flagged by Semgrep `sqlalchemy-execute-raw-query`) | S–M | YES if `table`/inputs reach users |
 | 6 | 🟠 **HIGH** | No rate limiting active despite `slowapi` dependency — `/auth/token`, `/oidc/*` exposed to brute force | S | YES |
-| 7 | 🟠 **HIGH** | UI stores JWT in `localStorage` (XSS-exfiltratable) — multiple call sites | M | Strong recommend before launch |
+| 7 | 🟠 **HIGH** | ~~UI stores JWT in localStorage~~ — *UI archived, not applicable* | — | N/A |
 | 8 | 🟠 **HIGH** | Dynamic `importlib.import_module()` in `extractors/entrypoint.py:55` + `subprocess.Popen` with `extractor_type` derived from API input in `runner.py:206` | M | YES — validate against allowlist |
 | 9 | 🟡 **MED** | `xml.etree.ElementTree.fromstring` in `extractors/exchange_rates.py:93` (XXE on Python ≤3.10; runtime is 3.11 so OK, but switch to `defusedxml` anyway) | XS | No |
-| 10 | 🟡 **MED** | OIDC `redirect_uri`/`window.location` flows tainted (Snyk Open Redirect, `LoginComponent.tsx:96,121`) | S | YES |
+| 10 | 🟡 **MED** | ~~OIDC redirect_uri/window.location flows tainted (LoginComponent.tsx)~~ — *UI archived; backend redirect_uri should still be validated against allowlist* | S | Partially |
 | 11 | 🟡 **MED** | `USERS_TABLE` in-memory demo dict with `password_hash="placeholder"` still present in `backend/app/api/auth.py:32` | XS | YES — delete |
 | 12 | 🟡 **MED** | No `TrustedHostMiddleware` / `HTTPSRedirectMiddleware` / security headers (CSP, HSTS, X-Frame-Options) | S | Recommend |
 | 13 | 🟢 **LOW** | 70 ruff findings (31× F401 unused imports, 25× I001 import order, 5× F841, etc.) | XS | No |
-| 14 | 🟢 **LOW** | 4× Prototype-pollution-shaped patterns in `ui/src/pages/CostsPage.tsx:74-85` (low exploitability, false-positive-prone) | S | Review |
+| 14 | 🟢 **LOW** | ~~Prototype-pollution patterns in ui/src/pages/CostsPage.tsx~~ — *UI archived, not applicable* | — | N/A |
 
 **Minimum viable go-live checklist (≤1 day of work):**
 1. Rotate the two leaked credentials (items #1) + delete the files + add to `.gitignore` and `.dockerignore`.
 2. Strip secrets from `docker-compose.yml`, switch to `.env` with a `.env.example` template (item #2).
 3. Bump `pyjwt`, `starlette`, `urllib3`, `idna`, `requests` to fixed versions (item #3).
-4. Run `npm audit fix` in `ui/` and verify `vitest`/`@vitest/browser` are devDeps only (item #4).
 5. Parametrize the 5 raw-SQL calls or whitelist the `table` identifier (item #5).
 6. Wire `slowapi` into `auth.py` routes (item #6).
 7. Delete `USERS_TABLE` placeholder (item #11).
@@ -133,16 +132,9 @@ urllib3   2.6.3    → 2.7.0     (PYSEC-2026-141/142)
 `starlette` and `pyjwt` are in the request/auth hot path — non-negotiable upgrades.
 Update `pyproject.toml` pins, run `uv lock`, regenerate, re-test.
 
-### 2.4 🔴 Vulnerable JS Dependencies (`ui/npm audit`)
+### 2.4 ~~🔴 Vulnerable JS Dependencies~~ — RESOLVED (UI archived 2026-06-08)
 
-```
-critical  vitest, @vitest/browser, @vitest/browser-playwright, @vitest/coverage-v8
-          → "Vitest browser mode serves unsanitized otelCarrier ... inline script"
-high      axios → IPv4-mapped IPv6 NO_PROXY bypass + Proto-Pollution DoS/Header-Injection
-moderate  ws    → uninit memory disclosure
-```
-
-`axios` is in app runtime — bump it. The `vitest` family is dev/test only; confirm `package.json` puts them in `devDependencies` and that prod nginx image (`ui/Dockerfile`) does `npm ci --omit=dev` for the runtime stage.
+The React frontend (ui/) has been archived to the finna-app-ui repository. npm dependency vulnerabilities in this repo are no longer applicable.
 
 ### 2.5 🟠 SQL Injection Surface
 
@@ -171,10 +163,9 @@ app.state.limiter = limiter
 @limiter.limit("5/minute")
 ```
 
-### 2.7 🟠 UI Token Storage In `localStorage`
+### 2.7 ~~🟠 UI Token Storage In localStorage~~ — RESOLVED (UI archived 2026-06-08)
 
-7+ call sites read `localStorage.getItem('finna_token')` (see `ui/src/pages/*`, `ui/src/features/settings/components/OIDCProvidersSection.tsx`). Any XSS = token theft. Migration target: HttpOnly cookie + CSRF token, or in-memory store with silent refresh.
-- Short term (before launch, if scope-bound): enable a strict CSP (`script-src 'self'`, no inline) in `ui/nginx.conf` and audit React renderings of user input. The Snyk OR (Open Redirect) findings in `LoginComponent.tsx:96,121` also become higher-impact while tokens live in `localStorage`.
+The React frontend (ui/) has been archived. localStorage token storage is no longer in this repo.
 
 ### 2.8 🟠 Dynamic Module Import + Subprocess With API-Influenced Name
 
@@ -203,9 +194,9 @@ extractors/azure_cost.py:432 "Pagination ... token %s"
 
 These format strings include identifiers that *can* be sensitive (tenant_id, continuation_token). `backend/app/api/runner.py:44` already redacts `client_secret=` — extend that redaction to logger formatters globally and confirm logs don't leak to a public sink (Loki/CloudWatch/stdout-shipped-to-vendor).
 
-### 2.10 🟡 OIDC / Login Open Redirect
+### 2.10 🟡 OIDC Backend redirect_uri Validation
 
-`ui/src/components/auth/LoginComponent.tsx:96,121` — Snyk reports remote-data flowing into `window.location` without sanitization. Validate `redirect_uri` against an allowlist of trusted origins.
+~~`ui/src/components/auth/LoginComponent.tsx` — UI archived.~~ The backend `oidc_auth.py` should still validate `redirect_uri` against a trusted-origins allowlist to prevent open redirect via the API itself.
 
 ### 2.11 🟡 Demo User Table Still Present
 
@@ -249,7 +240,7 @@ No `TrustedHostMiddleware`, no `HTTPSRedirectMiddleware`, no Secure-Headers midd
 
 ### 3.3 pip-audit — 14 vulns / 6 packages (detail in §2.3)
 
-### 3.4 npm audit — 6 vulns (4 critical / 1 high / 1 moderate) (detail in §2.4)
+### 3.4 ~~npm audit~~ — N/A (UI archived 2026-06-08)
 
 ### 3.5 Ruff — 70 findings (none security-class)
 
@@ -305,18 +296,18 @@ Suggested one-shot agent assignments, each scoped tight enough for an atomic com
 | **secrets-rotator** | Delete `azure-sp.txt` + `gcp-sa.json`, add gitignore/dockerignore entries, document rotation in `SECURITY.md` | `.gitignore`, `.dockerignore`, root |
 | **compose-hardener** | Replace inline secrets in `docker-compose.yml` with `${VAR}` refs, add `.env.example`, add startup secret validation | `docker-compose.yml`, `.env.example`, `backend/app/api/main.py` |
 | **dep-bumper-py** | Bump pyjwt → 2.13.0+, starlette → 0.47.2+, urllib3 → 2.7.0+, idna → 3.15+, requests → 2.33.0+; regen lockfile; run tests | `pyproject.toml`, `uv.lock` |
-| **dep-bumper-js** | `npm audit fix`; verify vitest is dev-only; pin axios to ≥ patched version | `ui/package.json`, `ui/package-lock.json` |
+| ~~**dep-bumper-js**~~ | *UI archived — not applicable* | — |
 | **sql-injection-fixer** | Replace f-string SQL with allowlist + `psycopg.sql.Identifier` | `extractors/{aws,azure,litellm}_cost.py` |
 | **rate-limiter** | Wire `slowapi` into `auth.py`, `oidc_auth.py`, `auth_providers.py`. 5/min on token endpoints, 100/min global | `backend/app/api/main.py`, `backend/app/api/routes/auth.py`, `backend/app/api/routes/oidc_auth.py` |
 | **extractor-allowlister** | Hard allowlist in `runner.py` + `entrypoint.py`; reject unknown extractor types with 400 | `backend/app/api/runner.py`, `extractors/entrypoint.py` |
 | **dead-auth-remover** | Delete `USERS_TABLE` from `backend/app/api/auth.py`; verify no references | `backend/app/api/auth.py` |
 | **xml-defuser** | Swap `xml.etree.ElementTree` → `defusedxml.ElementTree` in `exchange_rates.py` | `extractors/exchange_rates.py`, `pyproject.toml` |
-| **open-redirect-fixer** | Allowlist `redirect_uri` in `LoginComponent.tsx` and OIDC callback | `ui/src/components/auth/LoginComponent.tsx`, OIDC route |
-| **ui-token-migrator** | Move JWT to HttpOnly cookie + add CSRF + adapt `ui/src/api/client.ts`; transition path documented | `ui/src/api/client.ts`, all `localStorage.getItem('finna_token')` sites, `backend/app/api/routes/auth.py` |
-| **security-headers** | Add CSP/HSTS/XFO middleware + nginx headers | `backend/app/api/main.py`, `ui/nginx.conf` |
+| **open-redirect-fixer** | Allowlist `redirect_uri` in OIDC backend callback | `backend/app/api/routes/oidc_auth.py` |
+| ~~**ui-token-migrator**~~ | *UI archived — not applicable* | — |
+| **security-headers** | Add CSP/HSTS/XFO middleware | `backend/app/api/main.py` |
 | **ruff-cleanup** | `ruff check --fix .` + commit | repo-wide |
 | **ci-gates** | GitHub Actions workflow: pip-audit, npm audit (omit-dev, high+), semgrep ci, ruff, pytest | `.github/workflows/security.yml` |
-| **dockerfile-pinner** | Pin Python to 3.12-slim, Node to 22-alpine; add HEALTHCHECK | `Dockerfile.api`, `ui/Dockerfile` |
+| **dockerfile-pinner** | Pin Python to 3.12-slim; add HEALTHCHECK | `Dockerfile.api` |
 
 Sequence the first 8 before launch. Items 9–15 are post-launch hardening within 1–2 weeks.
 

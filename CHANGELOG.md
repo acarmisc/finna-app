@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-06-08] — Removed bundled UI
+
+### Removed
+- `ui/` directory (React/Vite/Tailwind frontend) — archived to separate `finna-app-ui` repository.
+- `Dockerfile.monolith` — FE+BE monolith image, no longer needed.
+- `build-ui` job from CI and release workflows.
+- `ui-typecheck` and `ui-build` CI jobs.
+- `ui:` service from `docker-compose.yml`.
+- nginx frontend-serving stage from `Dockerfile.api`.
+
+### Changed
+- Backend is now API-only. `Dockerfile.api` serves FastAPI directly on port 8000 without nginx frontend proxy.
+- `docker-entrypoint.sh` simplified to run uvicorn directly (no nginx).
+- `ALLOWED_ORIGINS` default and `.env.example` updated to remove `http://localhost:5173`.
+- `GITHUB_CALLBACK_URL` example updated to backend path.
+
 ## [Unreleased]
 
 ### Added — Resource Wastage (Phases 6-8)

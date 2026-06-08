@@ -276,36 +276,6 @@ async def delete_project(slug: str) -> None:
     execute("DELETE FROM fin_projects WHERE slug = %s", (slug,))
 
 
-@router.get(
-    "/config/provider/{provider}",
-    response_model=list[CloudConfigResponse],
-    dependencies=[Depends(require_auth)],
-)
-async def list_configs_by_provider(provider: str) -> list[dict[str, Any]]:
-    sql = """
-        SELECT id, provider, name, credential_type, config, created_at, updated_at,
-               last_test, last_test_at, err
-        FROM cloud_config
-        WHERE provider = %s
-        ORDER BY name
-    """
-    results = query_all(sql, (provider,))
-    return [
-        {
-            "id": r["id"],
-            "provider": r["provider"],
-            "name": r["name"],
-            "credential_type": r["credential_type"],
-            "config": _mask_secrets(decrypt_config(r["config"])),
-            "created_at": r["created_at"],
-            "updated_at": r["updated_at"],
-            "last_test": r.get("last_test"),
-            "last_test_at": r.get("last_test_at"),
-            "err": r.get("err"),
-        }
-        for r in results
-    ]
-
 
 # ─── Config test endpoint ────────────────────────────────────────────────────
 

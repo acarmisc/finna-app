@@ -140,17 +140,6 @@ async def get_extractor_run_logs(run_id: str) -> dict[str, Any]:
     return {"logs": log_output.splitlines() if log_output else []}
 
 
-# ─── Legacy alias for /extractors/runs (kept for backward compat) ─────────────────
-
-@router.get("/extractors/status", dependencies=[Depends(require_auth)])
-async def list_extractor_status(
-    limit: int = 50, provider: Optional[str] = None
-) -> dict[str, Any]:
-    """Legacy alias – list extractor runs."""
-    runs = list_runs(limit=limit, provider=provider)
-    return {"runs": runs, "count": len(runs)}
-
-
 # ─── Legacy trigger (CLI compat; kept for frontend) ──────────────────────────
 
 @router.post("/extractors/run", dependencies=[Depends(require_auth)])
@@ -209,27 +198,3 @@ async def delete_extractor(extractor_id: str) -> None:
     """Remove an extractor from the registry."""
     execute("DELETE FROM extractors_registry WHERE id = %s", (extractor_id,))
 
-
-# ─── Trigger (delegates to runner) ────────────────────────────────────────────
-
-@router.post("/extractors/{extractor_id}/trigger", dependencies=[Depends(require_auth)])
-async def trigger_extractor(extractor_id: str) -> dict[str, Any]:
-    """Trigger a run for the given extractor registry entry."""
-    row = query_one(
-        "SELECT config_id, provider FROM extractors_registry WHERE id = %s",
-        (extractor_id,),
-    )
-    if not row:
-        raise HTTPException(status_code=404, detail="Extractor not found")
-
-    config_id = row["config_id"]
-    provider = row["provider"]
-    if not config_id:
-        raise HTTPException(status_code=400, detail="Extractor has no linked config")
-
-    run_id = start_extractor(
-        config_id=config_id,
-        provider=provider,
-        extractor_type=provider,
-    )
-    return {"run_id": run_id, "status": "started"}

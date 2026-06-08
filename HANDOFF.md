@@ -8,16 +8,16 @@
 
 ## Summary
 
-OIDC (OpenID Connect) SSO integration for Finna app is largely complete. Backend fully functional, frontend ~90% done. Ready for final assembly and deployment.
+OIDC (OpenID Connect) SSO integration for Finna app backend is complete. The React frontend (ui/) has been archived to a separate repository (finna-app-ui).
 
 **What's merged to main:**
 - ✅ PR-1: auth_providers table + provider CRUD routes (6d7e1b)
 - ✅ PR-2: OIDC client module (discovery, JWKS, token exchange, ID token verification) (95f10ce)
 - ✅ PR-3: OIDC login/callback routes + comprehensive E2E tests (43a2a56)
-- ✅ PR-4: Settings UI for managing OIDC providers (46b981e)
+- ✅ PR-4: Settings UI for managing OIDC providers (46b981e) — *frontend archived, backend routes remain*
 
-**In progress:**
-- 🟡 PR-5: Login page with OIDC provider buttons (branch: `feat/oidc-pr5-login-page`)
+**Archived (UI removed 2026-06-08):**
+- ~~PR-5: Login page with OIDC provider buttons~~ — frontend code archived in finna-app-ui repo
 - ⏳ PR-6: Documentation + Keycloak setup guide (not started)
 
 ---
@@ -40,47 +40,9 @@ AUTO_MIGRATE=true
 
 ---
 
-## PR-5 (Login Page) — What's Left
+## PR-5 (Login Page) — ARCHIVED
 
-**Branch:** `feat/oidc-pr5-login-page`
-
-**Completed files:**
-- `ui/src/components/auth/OIDCCallbackHandler.tsx` — New callback handler for OIDC redirect
-- `ui/src/components/auth/LoginComponent.tsx` — Updated with:
-  - `fetchOidcProviders()` — GET /api/v1/auth/oidc/providers
-  - `oidcLogin(providerId)` — POST /auth/oidc/login, redirect to IdP
-  - Render loop adding OIDC buttons below GitHub button
-
-**Remaining work (< 5 min):**
-
-1. **Register callback route in `ui/src/App.tsx`:**
-   ```tsx
-   import { OIDCCallbackHandler } from '@/components/auth/OIDCCallbackHandler'
-   
-   // In router config, add:
-   <Route path="/auth/oidc/callback" element={<OIDCCallbackHandler />} />
-   ```
-
-2. **Commit PR-5:**
-   ```bash
-   git add ui/src/components/auth/{OIDCCallbackHandler.tsx,LoginComponent.tsx}
-   git commit -m "feat: Login page with OIDC provider buttons (PR-5 of 6)
-   
-   - OIDC providers fetched from GET /auth/oidc/providers (public endpoint)
-   - Post-login redirect handler for OIDC callback
-   - Integration with sessionStorage for provider_id during flow
-   - Buttons render below GitHub OAuth button
-   - Error handling for invalid/failed callbacks
-   
-   Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>"
-   ```
-
-3. **Merge to main:**
-   ```bash
-   git checkout main
-   git merge feat/oidc-pr5-login-page
-   git push origin main
-   ```
+Frontend code (`ui/src/components/auth/OIDCCallbackHandler.tsx`, `ui/src/components/auth/LoginComponent.tsx`) has been archived to the `finna-app-ui` repository. The backend OIDC routes are complete and functional.
 
 ---
 
@@ -99,7 +61,7 @@ Template structure:
 1. Create realm: `finna`
 2. Create client: `finna-app` (confidential)
    - Client secret: generate
-   - Valid redirect URI: `http://localhost:5173/auth/oidc/callback` (or prod URL)
+   - Valid redirect URI: `http://localhost:8000/auth/oidc/callback` (or prod URL)
 3. Create mapper: `groups` (audience-based, add to ID token)
 4. Create users and assign to role/group `finna-admins`
 5. Provider config in Finna Settings:
@@ -155,21 +117,10 @@ Finna supports OpenID Connect for enterprise SSO with:
 
 **Security:** PKCE S256, state/nonce one-time use, ID token signature + claims validation, config encrypted at rest (Fernet), secrets masked in API responses.
 
-### Frontend (PR-5 in progress)
+### Frontend (ARCHIVED — moved to finna-app-ui)
 
-**Files:**
-- `ui/src/features/settings/components/OIDCProvidersSection.tsx` — Settings tab for provider management (PR-4 ✅)
-- `ui/src/components/auth/LoginComponent.tsx` — Updated with OIDC providers (PR-5 in progress)
-- `ui/src/components/auth/OIDCCallbackHandler.tsx` — New callback page (PR-5 in progress)
-
-**Flow:**
-1. User clicks "Sign in with [Keycloak]" on login page
-2. `oidcLogin(providerId)` calls `POST /auth/oidc/login`
-3. Redirect to IdP authorization URL (with PKCE, state, nonce)
-4. User authenticates at IdP, redirected to `/auth/oidc/callback?code=...&state=...`
-5. `OIDCCallbackHandler` calls `POST /auth/oidc/callback`
-6. Backend verifies state, exchanges code, validates ID token, upserts user, issues Finna JWT
-7. Client stores JWT in sessionStorage, navigates to dashboard
+Frontend OIDC files were archived to the finna-app-ui repository on 2026-06-08.
+The backend OIDC flow remains fully functional via the API endpoints.
 
 ### Tests (Complete ✅)
 
@@ -210,17 +161,13 @@ All tests use mocked `httpx.AsyncClient` (no real network calls). Coverage: happ
 
 ## Next Steps (In Order)
 
-1. **Finish PR-5 (< 5 min):**
-   - Add callback route to `ui/src/App.tsx`
-   - Commit and merge to main
-
-2. **Create PR-6 (< 10 min):**
+1. **Create PR-6 (< 10 min):**
    - Write `docs/oidc-setup.md` with provider walkthroughs
    - Update `README.md` auth section
    - Commit and merge to main
 
-3. **Test end-to-end:**
-   - Local: `docker-compose up`, create provider in Settings, sign in
+2. **Test end-to-end:**
+   - Local: `docker-compose up`, test OIDC endpoints via API client
    - Or: GKE staging with real Keycloak container
 
 4. **Deploy to GKE:**
@@ -245,12 +192,6 @@ All tests use mocked `httpx.AsyncClient` (no real network calls). Coverage: happ
 - `backend/app/api/routes/auth_providers.py` — New provider CRUD (296 lines)
 - `backend/app/api/routes/oidc_auth.py` — New login/callback routes (370 lines)
 - `alembic/versions/005_add_oidc_auth_providers.py` — New migration (64 lines)
-
-### Frontend
-- `ui/src/features/settings/SettingsPage.tsx` — Import + render OIDCProvidersSection
-- `ui/src/features/settings/components/OIDCProvidersSection.tsx` — New settings tab (300+ lines)
-- `ui/src/components/auth/LoginComponent.tsx` — Add OIDC provider buttons
-- `ui/src/components/auth/OIDCCallbackHandler.tsx` — New callback handler (43 lines)
 
 ### Tests
 - `tests/test_auth_providers.py` — New (326 lines)

@@ -1,13 +1,11 @@
 # ---------------------------------------------------------------------------#
-# FinOps Orchestrator API — Multi-stage Dockerfile (Monolithic: FE + BE)
+# FinOps Orchestrator API — Multi-stage Dockerfile (Backend only)
 #
 # Build:  docker build -f Dockerfile.api -t finops-api .
-# Run:    docker run --rm -p 80:80 -e PG_DSN=... -e JWT_SECRET=... finops-api
+# Run:    docker run --rm -p 8000:8000 -e PG_DSN=... -e JWT_SECRET=... finops-api
 #
 # This image includes:
 # - FastAPI backend (port 8000)
-# - React frontend (served by nginx on port 80)
-# - Nginx reverse proxy (proxies /api/ to FastAPI)
 # ---------------------------------------------------------------------------#
 
 # ---- Stage 1: Builder (Python dependencies) ----
@@ -20,25 +18,13 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY pyproject.toml .
 RUN uv pip install --system --no-cache -r pyproject.toml
 
-# ---- Stage 2: Frontend builder ----
-FROM node:22-alpine AS frontend-builder
-
-WORKDIR /build-ui
-
-COPY ui/package*.json ./ui/
-RUN cd ui && npm ci --if-present --legacy-peer-deps
-
-COPY ui/ ./ui/
-RUN cd ui && npm run build
-
-# ---- Stage 3: Runtime ----
+# ---- Stage 2: Runtime ----
 FROM python:3.12-slim
 
 RUN groupadd --gid 1000 appuser && \
     useradd --uid 1000 --gid appuser --shell /bin/bash --create-home appuser && \
     apt-get update && apt-get install -y --no-install-recommends \
         curl \
-        nginx \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -55,80 +41,8 @@ COPY utils/ ./utils/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./alembic.ini
 
-# Copy frontend build output
-COPY --from=frontend-builder /build-ui/ui/dist/ /app/ui/
-
-# Change ownership of app directory to appuser (nginx needs read access)
+# Change ownership of app directory to appuser
 RUN chown -R appuser:appuser /app
-
-# Create main nginx config that proxies /api/ to FastAPI
-RUN cat > /etc/nginx/nginx.conf << 'NGINX_EOF'
-worker_processes auto;
-error_log /var/log/nginx/error.log warn;
-pid /tmp/nginx.pid;
-
-events {
-    worker_connections 1024;
-}
-
-http {
-    include /etc/nginx/mime.types;
-    default_type application/octet-stream;
-
-    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
-                    '$status $body_bytes_sent "$http_referer" '
-                    '"$http_user_agent" "$http_x_forwarded_for"';
-
-    access_log /var/log/nginx/access.log main;
-
-    sendfile on;
-    keepalive_timeout 65;
-
-    server {
-        listen 80;
-        server_name _;
-
-        # Serve frontend static files
-        location / {
-            root /app/ui;
-            try_files $uri $uri/ /index.html;
-            # Prevent index.html from being cached so new deploys are picked up
-            add_header Cache-Control "no-cache, no-store, must-revalidate";
-            add_header Pragma no-cache;
-            add_header Expires 0;
-        }
-
-        # Long-term cache for hashed assets only
-        location /assets/ {
-            root /app/ui;
-            expires 1y;
-            add_header Cache-Control "public, immutable";
-        }
-
-        # Proxy API requests to FastAPI
-        location /api/ {
-            proxy_pass http://127.0.0.1:8000;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_connect_timeout 30s;
-            proxy_read_timeout 30s;
-        }
-
-        # Health check
-        location /healthz {
-            access_log off;
-            return 200 "OK\n";
-            add_header Content-Type text/plain;
-        }
-    }
-}
-NGINX_EOF
-
-# Create nginx directories with proper permissions (nginx needs these for cache/gaps/logs)
-RUN mkdir -p /var/lib/nginx/{cache,gaps} /var/log/nginx && \
-    chown -R appuser:appuser /var/lib/nginx /var/log/nginx
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
@@ -141,5 +55,4 @@ ENV PORT=8000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD curl --fail http://localhost:8000/healthz || exit 1
 
-# Entrypoint starts nginx, then FastAPI in background, then nginx foreground
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

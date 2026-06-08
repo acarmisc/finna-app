@@ -10,7 +10,6 @@ Finna is a FinOps platform that extracts, normalizes, and visualizes cloud costs
 
 - **API**: http://localhost:8000
 - **Docs**: http://localhost:8000/docs
-- **Frontend**: http://localhost:5173
 
 Default credentials: `admin` / `admin`
 
@@ -21,7 +20,6 @@ finna-app/
 ├── backend/         # FastAPI API (Python 3.12)
 ├── extractors/      # Cloud cost extractors
 ├── models/          # Shared data models
-├── ui/              # React/Vite frontend
 ├── sql/             # Database schema + seed data
 └── docker-compose.yml
 ```
@@ -92,7 +90,7 @@ All costs are normalized to a common schema:
 # Install Python dependencies
 uv sync
 
-# Start the stack (PostgreSQL, API, Frontend)
+# Start the stack (PostgreSQL, API)
 docker compose up -d
 
 # Load demo data (optional)
