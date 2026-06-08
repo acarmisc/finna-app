@@ -82,6 +82,7 @@ async def list_providers() -> list[AuthProviderResponse]:
     for row in rows:
         config = decrypt_config(row["config"])
         masked = _mask_provider_secrets(config)
+        last_test_at_raw = row.get("last_test_at")
         result.append(
             AuthProviderResponse(
                 id=row["id"],
@@ -92,12 +93,9 @@ async def list_providers() -> list[AuthProviderResponse]:
                 created_at=row["created_at"].isoformat() if row["created_at"] else None,
                 updated_at=row["updated_at"].isoformat() if row["updated_at"] else None,
                 created_by=row.get("created_by"),
-                last_test_at=(
-                    _last_test_at.isoformat() if _last_test_at is not None else None
-                ),
+                last_test_at=last_test_at_raw.isoformat() if last_test_at_raw is not None else None,
                 last_test_ok=row.get("last_test_ok"),
             )
-            for row in rows
         )
     return result
 
