@@ -23,7 +23,7 @@ def upgrade() -> None:
             name TEXT NOT NULL,
             kind TEXT NOT NULL,
             enabled BOOLEAN NOT NULL DEFAULT false,
-            config BYTEA NOT NULL,
+            config JSONB NOT NULL,
             created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             created_by TEXT,
