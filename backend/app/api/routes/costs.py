@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from .. import auth as auth_module
+from ..date_utils import resolve_window as _resolve_window
 from ..db import query_all
 from .openapi_extensions import ERROR_RESPONSE_404, ERROR_RESPONSE_422, PaginationHeadersSchema
 
@@ -32,32 +33,6 @@ class CostFilter(BaseModel):
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     granularity: str = "daily"
-
-
-def _resolve_window(
-    window: Optional[str],
-    start_date: Union[str, datetime, None],
-    end_date: datetime,
-) -> tuple[datetime, datetime]:
-    """Resolve window shortcut + CLI aliases into concrete start/end dates."""
-    if window and window not in ("mtd", "7d", "30d", "90d"):
-        window = None
-
-    if window == "mtd":
-        start = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    elif window == "7d":
-        start = end_date - timedelta(days=7)
-    elif window == "30d":
-        start = end_date - timedelta(days=30)
-    elif window == "90d":
-        start = end_date - timedelta(days=90)
-    else:
-        if isinstance(start_date, str):
-            start = datetime.fromisoformat(start_date)
-        else:
-            start = start_date or (end_date - timedelta(days=30))
-
-    return start, end_date
 
 
 @router.get("/costs", dependencies=[Depends(require_auth)])

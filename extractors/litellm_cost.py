@@ -299,21 +299,44 @@ INSERT INTO cost_records (
 ) ON CONFLICT (record_id) DO NOTHING
 """
 
+_INSERT_SQL_BATCH = """
+INSERT INTO cost_records (
+    record_id, provider, usage_start, usage_end, ingestion_ts,
+    account_id, project_id, team, service_category, service_name,
+    resource_id, region, charge_type,
+    cost_usd, currency_original, cost_original, discount_usd, net_cost_usd,
+    usage_quantity, usage_unit,
+    model_name, input_tokens, output_tokens, total_tokens, trace_id,
+    tags
+) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+ON CONFLICT (record_id) DO NOTHING
+"""
+
 
 def _insert_batch(conn: psycopg.Connection, records: list[NormalizedCostRecord]) -> int:
     if not records:
         return 0
-    total = 0
+    rows = []
     for rec in records:
         row = rec.model_dump()
         row["provider"] = rec.provider.value
         row["service_category"] = rec.service_category.value
         row["tags"] = json.dumps(row.get("tags", {}))
-        with conn.cursor() as cur:
-            cur.execute(_INSERT_SQL, row)
-        total += 1
+        rows.append((
+            row["record_id"], row["provider"], row["usage_start"], row["usage_end"],
+            row.get("ingestion_ts"), row["account_id"], row["project_id"],
+            row.get("team"), row["service_category"], row["service_name"],
+            row.get("resource_id"), row.get("region"), row.get("charge_type"),
+            row["cost_usd"], row["currency_original"], row["cost_original"],
+            row["discount_usd"], row["net_cost_usd"],
+            row.get("usage_quantity"), row.get("usage_unit"),
+            row.get("model_name"), row.get("input_tokens"), row.get("output_tokens"),
+            row.get("total_tokens"), row.get("trace_id"), row["tags"],
+        ))
+    with conn.cursor() as cur:
+        cur.executemany(_INSERT_SQL_BATCH, rows)
     conn.commit()
-    return total
+    return len(records)
 
 
 def insert_records(

@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional, Union
+from datetime import datetime, timezone
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from utils.encryption import decrypt_config, encrypt_config
 
 from .. import auth as auth_module
+from ..date_utils import resolve_window as _resolve_window
 from ..db import execute, insert_and_return, query_all, query_one
 from ..models import (
     CloudConfigCreate,
@@ -98,32 +99,6 @@ async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
         "created_at": now,
         "updated_at": now,
     }
-
-
-def _resolve_window(
-    window: Optional[str],
-    start_date: Optional[Union[str, datetime]],
-    end_date: datetime,
-) -> tuple[datetime, datetime]:
-    """Resolve window shortcut into concrete start/end dates."""
-    if window and window not in ("mtd", "7d", "30d", "90d"):
-        window = None
-
-    if window == "mtd":
-        start = end_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    elif window == "7d":
-        start = end_date - timedelta(days=7)
-    elif window == "30d":
-        start = end_date - timedelta(days=30)
-    elif window == "90d":
-        start = end_date - timedelta(days=90)
-    else:
-        if isinstance(start_date, str):
-            start = datetime.fromisoformat(start_date)
-        else:
-            start = start_date or (end_date - timedelta(days=30))
-
-    return start, end_date
 
 
 # ─── Projects endpoints ──────────────────────────────────────────────────────

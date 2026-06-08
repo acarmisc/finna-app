@@ -257,21 +257,18 @@ def release_connection(conn: Optional[psycopg.Connection]) -> None:
 
 def close_pools() -> None:
     """Close both async and sync connection pools."""
-    import asyncio
-
     global _async_pool, _sync_pool
 
     # Close async pool
     if _async_pool is not None:
         logger.info("Closing async connection pool")
         try:
-            # Try to close with timeout
-            if asyncio.get_event_loop().is_running():
-                # Create a task and wait for it with timeout
-                loop = asyncio.get_event_loop()
-                task = loop.create_task(_async_pool.close())
-                loop.run_until_complete(asyncio.wait_for(task, timeout=10.0))
-            else:
+            try:
+                loop = asyncio.get_running_loop()
+                # We're inside a running event loop — must not block
+                loop.create_task(_close_async_pool())
+            except RuntimeError:
+                # No running event loop — safe to run synchronously
                 asyncio.run(asyncio.wait_for(_async_pool.close(), timeout=10.0))
         except asyncio.TimeoutError:
             logger.warning("Timeout closing async connection pool")
@@ -289,6 +286,16 @@ def close_pools() -> None:
             logger.exception("Error closing sync connection pool: %s", e)
         finally:
             _sync_pool = None
+
+
+async def _close_async_pool() -> None:
+    """Coroutine to close the async pool without blocking the event loop."""
+    global _async_pool
+    if _async_pool is not None:
+        try:
+            await asyncio.wait_for(_async_pool.close(), timeout=10.0)
+        except asyncio.TimeoutError:
+            logger.warning("Timeout closing async connection pool")
 
 
 def get_pool_stats() -> dict[str, Any]:
