@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -24,8 +24,8 @@ _alert_responses = {
 
 @router.get("/alerts", dependencies=[Depends(require_auth)], responses=_alert_responses)  # type: ignore[arg-type]
 async def list_alerts(
-    status: Optional[str] = Query(None, description="Filter by status: firing, resolved, all"),
-    severity: Optional[str] = Query(None, description="Filter by severity: err, warn, ok"),
+    status: str | None = Query(None, description="Filter by status: firing, resolved, all"),
+    severity: str | None = Query(None, description="Filter by severity: err, warn, ok"),
     limit: int = Query(50, le=100),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=1000),

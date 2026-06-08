@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -42,19 +42,19 @@ class AzureConfigInput(BaseModel):
         default="resourcegroup",
         description="Query scope: subscription or resourcegroup",
     )
-    environment: Optional[str] = Field(None, description="prod / staging / dev")
-    team: Optional[str] = Field(None, description="Owning team")
+    environment: str | None = Field(None, description="prod / staging / dev")
+    team: str | None = Field(None, description="Owning team")
 
 
 class GCPConfigInput(BaseModel):
     """GCP configuration input."""
 
     project_id: str = Field(..., description="GCP project ID")
-    billing_account_id: Optional[str] = Field(None, description="GCP billing account ID")
-    bigquery_dataset: Optional[str] = Field(None, description="BigQuery dataset")
-    bigquery_table: Optional[str] = Field(None, description="BigQuery table name")
-    environment: Optional[str] = Field(None, description="prod / staging / dev")
-    team: Optional[str] = Field(None, description="Owning team")
+    billing_account_id: str | None = Field(None, description="GCP billing account ID")
+    bigquery_dataset: str | None = Field(None, description="BigQuery dataset")
+    bigquery_table: str | None = Field(None, description="BigQuery table name")
+    environment: str | None = Field(None, description="prod / staging / dev")
+    team: str | None = Field(None, description="Owning team")
 
 
 class CloudConfigCreate(BaseModel):
@@ -72,9 +72,9 @@ class CloudConfigCreate(BaseModel):
 class CloudConfigUpdate(BaseModel):
     """Request schema for updating a cloud configuration."""
 
-    name: Optional[str] = None
-    credential_type: Optional[CredentialType] = None
-    config: Optional[dict[str, Any]] = None
+    name: str | None = None
+    credential_type: CredentialType | None = None
+    config: dict[str, Any] | None = None
 
 
 class CloudConfigResponse(BaseModel):
@@ -87,12 +87,12 @@ class CloudConfigResponse(BaseModel):
     config: dict[str, Any]
     created_at: datetime
     updated_at: datetime
-    last_test: Optional[str] = None
-    last_test_at: Optional[datetime] = None
-    tenant_id: Optional[str] = None
-    subscription_id: Optional[str] = None
-    project_id: Optional[str] = None
-    err: Optional[str] = None
+    last_test: str | None = None
+    last_test_at: datetime | None = None
+    tenant_id: str | None = None
+    subscription_id: str | None = None
+    project_id: str | None = None
+    err: str | None = None
 
 
 # ============================================================================
@@ -104,11 +104,11 @@ class ExtractorRunRequest(BaseModel):
     """Request schema for starting an extractor run."""
 
     provider: Provider = Field(..., description="Cloud provider")
-    config_id: Optional[str] = Field(
+    config_id: str | None = Field(
         None,
         description="Specific config ID to use (defaults to first config for provider)",
     )
-    extractor_type: Optional[str] = Field(
+    extractor_type: str | None = Field(
         None,
         description="Extractor type (defaults to provider-specific)",
     )
@@ -129,14 +129,14 @@ class ExtractorStatusResponse(BaseModel):
     """Response schema for extractor status."""
 
     id: str
-    config_id: Optional[str] = None
+    config_id: str | None = None
     provider: str
     extractor_type: str
     status: str
     started_at: datetime
-    finished_at: Optional[datetime] = None
+    finished_at: datetime | None = None
     records_extracted: int = 0
-    error_message: Optional[str] = None
+    error_message: str | None = None
 
 
 # ============================================================================
@@ -148,7 +148,7 @@ class DeviceCodeStartRequest(BaseModel):
     """Request schema for starting device code flow."""
 
     tenant_id: str = Field(default="organizations", description="Azure AD tenant ID")
-    client_id: Optional[str] = Field(None, description="Client ID (defaults to known public client)")
+    client_id: str | None = Field(None, description="Client ID (defaults to known public client)")
 
 
 class DeviceCodeStartResponse(BaseModel):
@@ -173,7 +173,7 @@ class DeviceCodePollResponse(BaseModel):
     """Response schema for device code poll."""
 
     status: str  # "pending" | "completed" | "expired" | "failed"
-    config_id: Optional[str] = None  # Only when completed
+    config_id: str | None = None  # Only when completed
 
 
 # ============================================================================
@@ -221,17 +221,17 @@ class ExtractorCreate(BaseModel):
     provider: str = Field(..., description="Cloud provider")
     extractor_type: str = Field(..., description="Extractor type (e.g., azure_cost, gcp_billing)")
     enabled: bool = Field(default=True, description="Whether the extractor is enabled")
-    schedule: Optional[str] = Field(None, description="Cron expression for scheduled runs")
-    config_id: Optional[str] = Field(None, description="Cloud config ID to use")
+    schedule: str | None = Field(None, description="Cron expression for scheduled runs")
+    config_id: str | None = Field(None, description="Cloud config ID to use")
 
 
 class ExtractorUpdate(BaseModel):
     """Request schema for updating an extractor."""
 
-    name: Optional[str] = None
-    enabled: Optional[bool] = None
-    schedule: Optional[str] = None
-    config_id: Optional[str] = None
+    name: str | None = None
+    enabled: bool | None = None
+    schedule: str | None = None
+    config_id: str | None = None
 
 
 class ExtractorResponse(BaseModel):
@@ -242,11 +242,11 @@ class ExtractorResponse(BaseModel):
     provider: str
     extractor_type: str
     enabled: bool
-    schedule: Optional[str]
-    config_id: Optional[str]
+    schedule: str | None
+    config_id: str | None
     status: str
-    last_run_id: Optional[str]
-    last_run_at: Optional[datetime]
+    last_run_id: str | None
+    last_run_at: datetime | None
     created_at: datetime
     updated_at: datetime
 
@@ -261,7 +261,7 @@ class ExtractorListResponse(BaseModel):
 class ExtractorRunTriggerRequest(BaseModel):
     """Request schema for triggering an extractor run."""
 
-    config_id: Optional[str] = Field(
+    config_id: str | None = Field(
         None,
         description="Specific config ID to use (defaults to the extractor's config_id)"
     )
@@ -299,16 +299,16 @@ class AlertRecord(BaseModel):
     status: AlertStatus
     severity: AlertSeverity
     description: str
-    rule: Optional[str] = None
-    project: Optional[str] = None
-    triggered_at: Optional[str] = None
+    rule: str | None = None
+    project: str | None = None
+    triggered_at: str | None = None
     cost_impact: float = 0.0
     resource: str = ""
     service: str = ""
     provider: str = ""
     is_acknowledged: bool = False
-    first_seen: Optional[str] = None
-    last_seen: Optional[str] = None
+    first_seen: str | None = None
+    last_seen: str | None = None
 
 
 class AlertStatsResponse(BaseModel):
@@ -332,25 +332,25 @@ class ProjectResponse(BaseModel):
     slug: str
     owner: str
     cost_center: str
-    budget_cap: Optional[float] = None
+    budget_cap: float | None = None
     mtd: float = 0.0
     tags: dict[str, Any] = {}
     note: str = ""
-    provider: Optional[str] = None
-    created: Optional[str] = None
+    provider: str | None = None
+    created: str | None = None
 
 
 class ProjectCreate(BaseModel):
     """Request schema for creating a project."""
 
     name: str
-    slug: Optional[str] = None
-    owner: Optional[str] = None
-    cost_center: Optional[str] = None
-    budget_cap: Optional[float] = None
+    slug: str | None = None
+    owner: str | None = None
+    cost_center: str | None = None
+    budget_cap: float | None = None
     tags: dict[str, Any] = {}
     note: str = ""
-    provider: Optional[str] = None
+    provider: str | None = None
 
 
 # ============================================================================
@@ -379,8 +379,8 @@ class WastageFindingResponse(BaseModel):
     finding_id: str
     provider: str
     account_id: str
-    resource_group: Optional[str] = None
-    region: Optional[str] = None
+    resource_group: str | None = None
+    region: str | None = None
     resource_id: str
     resource_type: str
     rule_id: str
@@ -389,8 +389,8 @@ class WastageFindingResponse(BaseModel):
     estimated_monthly_usd: float = 0.0
     currency: str = "USD"
     evidence: dict[str, Any] = {}
-    first_seen_at: Optional[str] = None
-    last_seen_at: Optional[str] = None
+    first_seen_at: str | None = None
+    last_seen_at: str | None = None
     status: str = "open"
     tags: dict[str, str] = {}
 
@@ -425,11 +425,11 @@ class WastageScanRunResponse(BaseModel):
 
     id: str
     provider: str
-    started_at: Optional[str] = None
-    finished_at: Optional[str] = None
+    started_at: str | None = None
+    finished_at: str | None = None
     status: str
-    findings_count: Optional[int] = None
-    error: Optional[str] = None
+    findings_count: int | None = None
+    error: str | None = None
 
 
 class IgnoreRequest(BaseModel):

@@ -22,7 +22,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -184,7 +184,7 @@ def normalize_aws_cost_records(
                 continue
 
             usage_start = datetime.strptime(date_str, "%Y-%m-%d").replace(
-                tzinfo=timezone.utc
+                tzinfo=UTC
             )
             usage_end = usage_start + timedelta(days=1)
 
@@ -481,13 +481,13 @@ def main() -> None:
 
     if date_from_raw and date_to_raw:
         date_from = datetime.strptime(date_from_raw, "%Y-%m-%d").replace(
-            tzinfo=timezone.utc
+            tzinfo=UTC
         )
         date_to = datetime.strptime(date_to_raw, "%Y-%m-%d").replace(
-            tzinfo=timezone.utc
+            tzinfo=UTC
         )
     else:
-        to_dt = datetime.now(timezone.utc)
+        to_dt = datetime.now(UTC)
         from_dt = to_dt - timedelta(days=30)
         date_to = to_dt.replace(hour=0, minute=0, second=0, microsecond=0)
         date_from = from_dt.replace(hour=0, minute=0, second=0, microsecond=0)

@@ -34,9 +34,10 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, Callable, NamedTuple, Optional
+from typing import Any, NamedTuple, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +64,8 @@ class Finding:
     remediation: str
 
     # Optional location fields
-    resource_group: Optional[str] = None
-    region: Optional[str] = None
+    resource_group: str | None = None
+    region: str | None = None
 
     # Cost estimate (Decimal so callers can sum without float rounding)
     estimated_monthly_usd: Decimal = field(default_factory=lambda: Decimal("0"))
@@ -113,7 +114,7 @@ def _derive_finding_id(provider: str, resource_id: str, rule_id: str) -> str:
 # Registry
 # ---------------------------------------------------------------------------
 
-RuleFn = Callable[[dict, Any], Optional[Finding]]
+RuleFn = Callable[[dict, Any], Finding | None]
 
 
 class Rule(NamedTuple):

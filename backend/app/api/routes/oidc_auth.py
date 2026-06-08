@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+from threading import Lock
 from typing import Any
 from uuid import UUID
 
@@ -20,39 +21,33 @@ logger = logging.getLogger("api.oidc_auth")
 
 router = APIRouter()
 
-# Rate limiting: IP -> (attempt_count, window_start_time)
-_login_attempts: dict[str, tuple[int, float]] = {}
-_callback_attempts: dict[str, tuple[int, float]] = {}
-RATE_LIMIT_WINDOW = 60  # seconds
-RATE_LIMIT_MAX = 10  # max attempts per window
+_lock = Lock()
+_login_attempts: dict[str, list[float]] = {}
+_callback_attempts: dict[str, list[float]] = {}
 
 
 def _get_client_ip(request: Request) -> str:
-    """Extract client IP from request."""
-    if request.client:
-        return request.client.host
-    return "unknown"
+    """Resolve client IP respecting reverse-proxy headers."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip.strip()
+    return request.client.host if request.client else "unknown"
 
 
-def _check_rate_limit(attempts_dict: dict[str, tuple[int, float]], ip: str, max_attempts: int = RATE_LIMIT_MAX) -> bool:
-    """Check rate limit for IP. Returns True if allowed, False if rate-limited."""
-    now = time.time()
-    if ip in attempts_dict:
-        count, window_start = attempts_dict[ip]
-        # Reset if window expired
-        if now - window_start > RATE_LIMIT_WINDOW:
-            attempts_dict[ip] = (1, now)
+def _check_rate_limit(ip: str, store: dict[str, list[float]], max_attempts: int, window: int) -> bool:
+    """Check if ip has exceeded rate limit. Returns True if rate limited."""
+    now = time.monotonic()
+    with _lock:
+        if ip not in store:
+            store[ip] = []
+        store[ip] = [t for t in store[ip] if now - t < window]
+        if len(store[ip]) >= max_attempts:
             return True
-        # Check limit
-        if count >= max_attempts:
-            return False
-        # Increment
-        attempts_dict[ip] = (count + 1, window_start)
-        return True
-    else:
-        # First attempt in window
-        attempts_dict[ip] = (1, now)
-        return True
+        store[ip].append(now)
+    return False
 
 
 def _apply_claim_mappings(claims: dict[str, Any], mappings: dict[str, Any]) -> dict[str, Any]:
@@ -148,8 +143,7 @@ async def oidc_login(request_data: OIDCLoginRequest, request: Request) -> OIDCLo
     """Initiate OIDC login — return authorization URL with PKCE."""
     ip = _get_client_ip(request)
 
-    # Rate limit
-    if not _check_rate_limit(_login_attempts, ip):
+    if _check_rate_limit(ip, _login_attempts, 5, 60):
         raise HTTPException(status_code=429, detail="Too many login attempts. Try again later.")
 
     # Get provider
@@ -202,8 +196,7 @@ async def oidc_callback(req: OIDCCallbackRequest, request: Request) -> OIDCCallb
     """Handle OIDC callback — exchange code for token and provision user."""
     ip = _get_client_ip(request)
 
-    # Rate limit
-    if not _check_rate_limit(_callback_attempts, ip):
+    if _check_rate_limit(ip, _callback_attempts, 5, 60):
         raise HTTPException(status_code=429, detail="Too many callback attempts. Try again later.")
 
     # Get provider

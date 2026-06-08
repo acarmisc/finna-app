@@ -27,7 +27,7 @@ import json
 import logging
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any, cast
 
@@ -136,11 +136,11 @@ def _parse_dt(value: Any) -> datetime | None:
     if not value:
         return None
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     try:
         s = str(value).replace("Z", "+00:00")
         dt = datetime.fromisoformat(s)
-        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
     except ValueError:
         logger.warning("Unparseable timestamp %r", value)
         return None
@@ -518,10 +518,10 @@ def main() -> None:
     date_to_raw = os.getenv("DATE_TO")
 
     if date_from_raw and date_to_raw:
-        date_from = datetime.strptime(date_from_raw, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        date_to = datetime.strptime(date_to_raw, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        date_from = datetime.strptime(date_from_raw, "%Y-%m-%d").replace(tzinfo=UTC)
+        date_to = datetime.strptime(date_to_raw, "%Y-%m-%d").replace(tzinfo=UTC)
     else:
-        to_dt = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+        to_dt = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
         from_dt = to_dt - timedelta(days=30)
         date_to = to_dt
         date_from = from_dt

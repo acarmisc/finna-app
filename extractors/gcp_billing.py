@@ -20,10 +20,12 @@ import logging
 import os
 import re
 import sys
+from collections.abc import Sequence
 from decimal import Decimal
-from typing import Any, Sequence
+from typing import Any
 
 import psycopg
+from google.api_core.exceptions import ServerError, ServiceUnavailable, TooManyRequests
 from google.cloud import bigquery
 from google.cloud.bigquery import QueryJobConfig
 from psycopg.rows import dict_row
@@ -372,7 +374,7 @@ def _mark_health_failure(
 
 
 @retry(
-    retry=retry_if_exception_type((Exception,)),
+    retry=retry_if_exception_type((ServerError, ServiceUnavailable, TooManyRequests)),
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=2, min=4, max=60),
     before_sleep=before_sleep_log(logger, logging.WARNING),

@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from .. import auth as auth_module
 
-require_auth = auth_module.require_auth  # noqa: E402
+require_auth = auth_module.require_auth
 from ..db import execute, insert_and_return, query_all, query_one  # noqa: E402
 from ..runner import cancel_run, get_run_status, list_runs, start_extractor  # noqa: E402
 
@@ -21,7 +21,7 @@ router = APIRouter()
 
 @router.get("/extractors", dependencies=[Depends(require_auth)])
 async def list_extractors(
-    provider: Optional[str] = None,
+    provider: str | None = None,
     limit: int = 50,
     page: int = 1,
     page_size: int = 50,
@@ -80,7 +80,7 @@ async def create_extractor(data: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="name and provider are required")
 
     eid = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     sql = """
     INSERT INTO extractors_registry (id, name, provider, config_id, enabled, schedule, created_at, updated_at)
@@ -105,7 +105,7 @@ async def create_extractor(data: dict[str, Any]) -> dict[str, Any]:
 
 @router.get("/extractors/runs", dependencies=[Depends(require_auth)])
 async def list_extractor_runs(
-    limit: int = 50, provider: Optional[str] = None
+    limit: int = 50, provider: str | None = None
 ) -> dict[str, Any]:
     """List extractor runs."""
     runs = list_runs(limit=limit, provider=provider)

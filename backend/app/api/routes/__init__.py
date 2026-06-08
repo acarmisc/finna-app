@@ -1,6 +1,6 @@
 """Route exports."""
 
-from . import alerts, auth, config, costs, extractors_registry  # noqa: E402
+from . import alerts, auth, config, costs, extractors_registry
 
 __all__ = [
     "auth",

@@ -8,7 +8,7 @@ stale-extractor detection.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import psycopg
@@ -203,7 +203,7 @@ def detect_stale_extractors(
     }
 
     stale: list[tuple[str, str]] = []
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     for name, interval in expected_intervals.items():
         threshold = interval * 2  # 2x the expected interval
@@ -222,7 +222,7 @@ def detect_stale_extractors(
 
         # Ensure timezone-aware comparison
         if last_activity.tzinfo is None:
-            last_activity = last_activity.replace(tzinfo=timezone.utc)
+            last_activity = last_activity.replace(tzinfo=UTC)
 
         elapsed = now - last_activity
         if elapsed > threshold:

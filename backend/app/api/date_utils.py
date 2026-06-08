@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Optional, Union
 
 
 def resolve_window(
-    window: Optional[str],
-    start_date: Optional[Union[str, datetime]],
+    window: str | None,
+    start_date: str | datetime | None,
     end_date: datetime,
 ) -> tuple[datetime, datetime]:
     """Resolve window shortcut + CLI aliases into concrete start/end dates."""

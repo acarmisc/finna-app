@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import os
 import secrets
-from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import bcrypt
 from fastapi import Depends, HTTPException, status
@@ -40,13 +40,13 @@ def get_password_hash(password: str) -> str:
     return str(bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode())
 
 
-def create_access_token(data: dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
     """Create a JWT access token."""
     if not JWT_SECRET:
         raise ValueError("JWT_SECRET environment variable is not set")
 
     to_encode = data.copy()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if expires_delta:
         expire = now + expires_delta
     else:

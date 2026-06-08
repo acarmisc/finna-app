@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Optional
@@ -38,23 +38,23 @@ class NormalizedCostRecord(BaseModel):
     # Time
     usage_start: datetime
     usage_end: datetime
-    ingestion_ts: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    ingestion_ts: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Organization
     account_id: str
-    account_name: Optional[str] = None
+    account_name: str | None = None
     project_id: str
-    project_name: Optional[str] = None
-    environment: Optional[str] = None  # "prod" | "staging" | "dev"
-    team: Optional[str] = None
+    project_name: str | None = None
+    environment: str | None = None  # "prod" | "staging" | "dev"
+    team: str | None = None
 
     # Service
     service_category: ServiceCategory
     service_name: str
-    resource_id: Optional[str] = None
-    resource_type: Optional[str] = None   # e.g. "microsoft.compute/virtualmachines"
-    region: Optional[str] = None          # e.g. "westeurope", "us-central1"
-    charge_type: Optional[str] = None     # "Usage" | "Tax" | "Credit" | "Adjustment"
+    resource_id: str | None = None
+    resource_type: str | None = None   # e.g. "microsoft.compute/virtualmachines"
+    region: str | None = None          # e.g. "westeurope", "us-central1"
+    charge_type: str | None = None     # "Usage" | "Tax" | "Credit" | "Adjustment"
 
     # Cost
     cost_usd: Decimal = Decimal("0")
@@ -64,16 +64,16 @@ class NormalizedCostRecord(BaseModel):
     net_cost_usd: Decimal = Decimal("0")
 
     # Usage
-    usage_quantity: Optional[Decimal] = None
-    usage_unit: Optional[str] = None
+    usage_quantity: Decimal | None = None
+    usage_unit: str | None = None
 
     # LLM-specific
-    model_name: Optional[str] = None
-    input_tokens: Optional[int] = None
-    output_tokens: Optional[int] = None
-    total_tokens: Optional[int] = None
-    latency_ms: Optional[float] = None
-    trace_id: Optional[str] = None
+    model_name: str | None = None
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+    latency_ms: float | None = None
+    trace_id: str | None = None
 
     # Tags
     tags: dict[str, str] = Field(default_factory=dict)

@@ -38,9 +38,10 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any, Iterable
+from typing import Any
 
 import psycopg
 
@@ -156,7 +157,7 @@ def run_scan(
     _ensure_azure_rules_loaded()
 
     run_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     try:
         with conn.cursor() as cur:
@@ -265,7 +266,7 @@ def _close_scan_run(
     error: str | None,
 ) -> None:
     """Update the scan-run record to finished state."""
-    finished_at = datetime.now(timezone.utc)
+    finished_at = datetime.now(UTC)
     try:
         with conn.cursor() as cur:
             cur.execute(

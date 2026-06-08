@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any, Optional, Union
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -28,22 +28,22 @@ _cost_responses = {
 
 class CostFilter(BaseModel):
     """Filter parameters for cost queries."""
-    provider: Optional[str] = None
-    project: Optional[str] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
+    provider: str | None = None
+    project: str | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
     granularity: str = "daily"
 
 
 @router.get("/costs", dependencies=[Depends(require_auth)])
 async def list_costs(
-    provider: Optional[str] = Query(None, description="Filter by provider: gcp, azure, llm"),
-    project: Optional[str] = Query(None, description="Filter by project name"),
-    start_date: Union[str, datetime, None] = Query(None, description="Start date in ISO format"),
-    end_date: Union[str, datetime, None] = Query(None, description="End date in ISO format"),
-    start: Optional[str] = Query(None, alias="start", include_in_schema=False),
-    end: Optional[str] = Query(None, alias="end", include_in_schema=False),
-    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
+    provider: str | None = Query(None, description="Filter by provider: gcp, azure, llm"),
+    project: str | None = Query(None, description="Filter by project name"),
+    start_date: str | datetime | None = Query(None, description="Start date in ISO format"),
+    end_date: str | datetime | None = Query(None, description="End date in ISO format"),
+    start: str | None = Query(None, alias="start", include_in_schema=False),
+    end: str | None = Query(None, alias="end", include_in_schema=False),
+    window: str | None = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=1000),
 ) -> dict[str, Any]:
@@ -135,11 +135,11 @@ async def list_costs(
 
 @router.get("/costs/export", dependencies=[Depends(require_auth)])
 async def export_costs(
-    provider: Optional[str] = Query(None),
-    project: Optional[str] = Query(None),
-    start_date: Union[str, datetime, None] = Query(None),
-    end_date: Union[str, datetime, None] = Query(None),
-    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
+    provider: str | None = Query(None),
+    project: str | None = Query(None),
+    start_date: str | datetime | None = Query(None),
+    end_date: str | datetime | None = Query(None),
+    window: str | None = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
 ) -> StreamingResponse:
     """Export cost data as CSV."""
     end_date_val: datetime
@@ -190,9 +190,9 @@ async def export_costs(
 
 @router.get("/costs/totals", dependencies=[Depends(require_auth)])
 async def get_cost_totals(
-    start_date: Union[str, datetime, None] = Query(None),
-    end_date: Union[str, datetime, None] = Query(None),
-    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
+    start_date: str | datetime | None = Query(None),
+    end_date: str | datetime | None = Query(None),
+    window: str | None = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
 ) -> dict[str, Any]:
     """Get aggregated cost totals per provider with mtd/prev/delta structure."""
     end_date = end_date or datetime.now()
@@ -261,8 +261,8 @@ async def get_cost_totals(
 
 @router.get("/costs/by-sku", dependencies=[Depends(require_auth)])
 async def get_costs_by_sku(
-    provider: Optional[str] = Query(None),
-    project: Optional[str] = Query(None, description="Filter by project name"),
+    provider: str | None = Query(None),
+    project: str | None = Query(None, description="Filter by project name"),
     limit: int = Query(50, le=100),
 ) -> dict[str, Any]:
     """Get costs aggregated by SKU."""
@@ -316,12 +316,12 @@ async def get_costs_by_sku(
 
 @router.get("/costs/daily", dependencies=[Depends(require_auth)])
 async def get_daily_costs(
-    start_date: Union[str, datetime, None] = Query(None),
-    end_date: Union[str, datetime, None] = Query(None),
-    start: Optional[str] = Query(None, alias="start", include_in_schema=False),
-    end: Optional[str] = Query(None, alias="end", include_in_schema=False),
-    provider: Optional[str] = Query(None),
-    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
+    start_date: str | datetime | None = Query(None),
+    end_date: str | datetime | None = Query(None),
+    start: str | None = Query(None, alias="start", include_in_schema=False),
+    end: str | None = Query(None, alias="end", include_in_schema=False),
+    provider: str | None = Query(None),
+    window: str | None = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
 ) -> dict[str, Any]:
     """Get daily cost breakdown for chart visualization."""
     if end and not end_date:
@@ -381,11 +381,11 @@ async def get_daily_costs(
 
 @router.get("/costs/summary", dependencies=[Depends(require_auth)])
 async def cost_summary(
-    start_date: Union[str, datetime, None] = Query(None),
-    end_date: Union[str, datetime, None] = Query(None),
-    start: Optional[str] = Query(None, alias="start", include_in_schema=False),
-    end: Optional[str] = Query(None, alias="end", include_in_schema=False),
-    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
+    start_date: str | datetime | None = Query(None),
+    end_date: str | datetime | None = Query(None),
+    start: str | None = Query(None, alias="start", include_in_schema=False),
+    end: str | None = Query(None, alias="end", include_in_schema=False),
+    window: str | None = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
 ) -> dict[str, Any]:
     """CLI-compatible cost summary endpoint."""
     if end and not end_date:
@@ -432,11 +432,11 @@ async def cost_summary(
 
 @router.get("/costs/breakdown", dependencies=[Depends(require_auth)])
 async def cost_breakdown(
-    start_date: Union[str, datetime, None] = Query(None),
-    end_date: Union[str, datetime, None] = Query(None),
-    start: Optional[str] = Query(None, alias="start", include_in_schema=False),
-    end: Optional[str] = Query(None, alias="end", include_in_schema=False),
-    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
+    start_date: str | datetime | None = Query(None),
+    end_date: str | datetime | None = Query(None),
+    start: str | None = Query(None, alias="start", include_in_schema=False),
+    end: str | None = Query(None, alias="end", include_in_schema=False),
+    window: str | None = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
     limit: int = Query(50, le=100),
 ) -> dict[str, Any]:
     """CLI-compatible cost breakdown by SKU endpoint."""
@@ -492,7 +492,7 @@ async def get_skus_by_provider(
 
 @router.get("/dashboard/stats", dependencies=[Depends(require_auth)])
 async def dashboard_stats(
-    range: Optional[str] = Query(None, description="Time range: mtd, 7d, 30d, 90d"),
+    range: str | None = Query(None, description="Time range: mtd, 7d, 30d, 90d"),
 ) -> dict[str, Any]:
     """Aggregate cost totals + daily series + alert stats for the dashboard."""
     window = range or "mtd"

@@ -10,7 +10,7 @@ import hashlib
 import logging
 import secrets
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, cast
 from uuid import UUID
 
@@ -311,7 +311,7 @@ async def verify_id_token(
         raise OIDCError(f"Signature verification failed: {e}")
 
     # Validate claims
-    now = datetime.now(timezone.utc).timestamp()
+    now = datetime.now(UTC).timestamp()
 
     # exp check
     exp = claims.get("exp")

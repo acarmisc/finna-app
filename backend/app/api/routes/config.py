@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -71,7 +71,7 @@ async def list_configs() -> list[dict[str, Any]]:
 )
 async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
     config_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     sql = """
         INSERT INTO cloud_config (id, provider, name, credential_type, config, created_at, updated_at)
@@ -109,9 +109,9 @@ async def create_config(data: CloudConfigCreate) -> dict[str, Any]:
     dependencies=[Depends(require_auth)],
 )
 async def list_projects(
-    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
-    start_date: Optional[str] = Query(None, description="Start date in ISO format"),
-    end_date: Optional[str] = Query(None, description="End date in ISO format"),
+    window: str | None = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
+    start_date: str | None = Query(None, description="Start date in ISO format"),
+    end_date: str | None = Query(None, description="End date in ISO format"),
 ) -> list[dict[str, Any]]:
     """List all projects with MTD calculated from cost_records for the given window."""
     end_dt = datetime.now()
@@ -156,7 +156,7 @@ async def create_project(data: dict[str, Any]) -> dict[str, Any]:
     """Create a new project."""
     from ..db import insert_and_return
     config_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     name = data.get("name", "Untitled")
     sql = """
         INSERT INTO fin_projects (id, name, slug, owner, cost_center, budget_cap, mtd, tags, created_at, note, provider)
@@ -201,9 +201,9 @@ async def create_project(data: dict[str, Any]) -> dict[str, Any]:
 )
 async def get_project(
     slug: str,
-    window: Optional[str] = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
-    start_date: Optional[str] = Query(None, description="Start date in ISO format"),
-    end_date: Optional[str] = Query(None, description="End date in ISO format"),
+    window: str | None = Query(None, description="Time window: mtd, 7d, 30d, 90d"),
+    start_date: str | None = Query(None, description="Start date in ISO format"),
+    end_date: str | None = Query(None, description="End date in ISO format"),
 ) -> dict[str, Any]:
     """Get a single project by slug with MTD calculated from cost_records."""
     end_dt = datetime.now()
@@ -297,7 +297,6 @@ async def test_config(config_id: str) -> dict[str, Any]:
             subscription_id = config.get("subscription_id")
             if subscription_id:
                 from datetime import datetime, timedelta
-                from datetime import timezone as tz
 
                 from azure.mgmt.costmanagement import CostManagementClient
                 from azure.mgmt.costmanagement.models import (
@@ -322,7 +321,7 @@ async def test_config(config_id: str) -> dict[str, Any]:
                     checks["scope"] = scope
 
                 # Minimal 1-day query — just validates permissions, discards rows
-                now = datetime.now(tz.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+                now = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
                 date_from = now - timedelta(days=1)
                 try:
                     result = cm_client.query.usage(
@@ -436,7 +435,7 @@ async def update_config(config_id: str, data: CloudConfigUpdate) -> dict[str, An
         raise HTTPException(status_code=400, detail="No fields to update")
 
     updates.append("updated_at = %s")
-    params.append(datetime.now(timezone.utc))
+    params.append(datetime.now(UTC))
     params.append(config_id)
 
     # Build parameterized SET clause — each column = %s
@@ -537,11 +536,10 @@ async def cli_config_get(config_id: str) -> dict[str, Any]:
     }
 
 
-# ─── CLI-compatibility /configs CUD wrappers ────────────────────────────────  # noqa: E402
+# ─── CLI-compatibility /configs CUD wrappers ────────────────────────────────
 
 import uuid as _uuid  # noqa: E402
 from datetime import datetime as __dt  # noqa: E402
-from datetime import timezone as __tz  # noqa: E402
 
 from pydantic import BaseModel as _BM  # noqa: E402
 
@@ -556,7 +554,7 @@ class _ConfigCreate(_BM):
 async def cli_configs_create(data: _ConfigCreate) -> dict[str, Any]:
     """CLI-compatible config create."""
     cfg_id = str(_uuid.uuid4())
-    now = __dt.now(__tz.utc)
+    now = __dt.now(UTC)
     cfg_dict: dict[str, Any] = {"provider": data.provider}
     if data.region:
         cfg_dict["region"] = data.region
@@ -594,7 +592,7 @@ async def cli_configs_update(config_id: str, data: _ConfigCreate) -> dict[str, A
     existing = query_one("SELECT id FROM cloud_config WHERE id = %s", (config_id,))
     if not existing:
         raise HTTPException(status_code=404, detail="Configuration not found")
-    now = __dt.now(__tz.utc)
+    now = __dt.now(UTC)
     # Fetch existing config blob
     row = query_one("SELECT config FROM cloud_config WHERE id = %s", (config_id,))
     cfg = decrypt_config(row["config"]) if row and row.get("config") else {}

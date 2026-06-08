@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
@@ -49,11 +49,11 @@ class AuthProviderResponse(BaseModel):
     kind: str
     enabled: bool
     config: dict[str, Any]
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
-    created_by: Optional[str] = None
-    last_test_at: Optional[str] = None
-    last_test_ok: Optional[bool] = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    created_by: str | None = None
+    last_test_at: str | None = None
+    last_test_ok: bool | None = None
 
 
 def _mask_provider_secrets(config: dict[str, Any]) -> dict[str, Any]:
@@ -139,7 +139,7 @@ async def create_provider(
 ) -> AuthProviderResponse:
     """Create new OIDC provider."""
     provider_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Check for duplicate name
     existing = query_one("SELECT id FROM auth_providers WHERE lower(name) = lower(%s)", (request.name,))
@@ -187,7 +187,7 @@ async def update_provider(provider_id: str, request: AuthProviderInput) -> AuthP
         if existing:
             raise HTTPException(status_code=409, detail="Provider name already exists")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     config_dict = request.config.model_dump()
     encrypted_config = encrypt_config(config_dict)
 
@@ -277,7 +277,7 @@ async def test_provider(provider_id: str) -> dict[str, Any]:
                 )
 
             # Update last_test
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             execute(
                 "UPDATE auth_providers SET last_test_at = %s, last_test_ok = %s WHERE id = %s",
                 (now, True, provider_id),
@@ -298,6 +298,6 @@ async def test_provider(provider_id: str) -> dict[str, Any]:
     except httpx.RequestError as e:
         execute(
             "UPDATE auth_providers SET last_test_at = %s, last_test_ok = %s WHERE id = %s",
-            (datetime.now(timezone.utc), False, provider_id),
+            (datetime.now(UTC), False, provider_id),
         )
         raise HTTPException(status_code=400, detail=f"Discovery error: {str(e)}")

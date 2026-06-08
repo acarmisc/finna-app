@@ -10,8 +10,8 @@ import sys
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from psycopg.rows import dict_row
 
@@ -115,8 +115,8 @@ def _build_env_from_config(config: dict[str, Any], provider: str, cred_type: str
         if config.get("bigquery_table"):
             env["BQ_TABLE"] = config["bigquery_table"]
         if not env.get("DATE_FROM"):
-            from datetime import datetime, timedelta, timezone
-            today = datetime.now(timezone.utc).date()
+            from datetime import datetime, timedelta
+            today = datetime.now(UTC).date()
             env["DATE_FROM"] = str(today - timedelta(days=30))
             env["DATE_TO"] = str(today)
     elif provider in ("llm", "litellm"):
@@ -129,8 +129,8 @@ def _build_env_from_config(config: dict[str, Any], provider: str, cred_type: str
         if config.get("task_tag_prefix"):
             env["LITELLM_TASK_TAG_PREFIX"] = str(config["task_tag_prefix"])
         if not env.get("DATE_FROM"):
-            from datetime import datetime, timedelta, timezone
-            today = datetime.now(timezone.utc).date()
+            from datetime import datetime, timedelta
+            today = datetime.now(UTC).date()
             env["DATE_FROM"] = str(today - timedelta(days=30))
             env["DATE_TO"] = str(today)
 
@@ -143,8 +143,8 @@ def _update_run_status(
     run_id: str,
     status: str,
     records_extracted: int = 0,
-    error_message: Optional[str] = None,
-    log_output: Optional[str] = None,
+    error_message: str | None = None,
+    log_output: str | None = None,
 ) -> None:
     """Update extractor_runs table."""
     from .db import get_connection
@@ -164,7 +164,7 @@ def _update_run_status(
                 """,
                 (
                     status,
-                    datetime.now(timezone.utc),
+                    datetime.now(UTC),
                     records_extracted,
                     error_message,
                     log_output,
@@ -181,8 +181,8 @@ def _update_run_status(
 def start_extractor(
     config_id: str,
     provider: str,
-    extractor_type: Optional[str] = None,
-    pg_dsn: Optional[str] = None,
+    extractor_type: str | None = None,
+    pg_dsn: str | None = None,
 ) -> str:
     """Start an extractor as a subprocess.
 
@@ -209,7 +209,7 @@ def start_extractor(
     config["credential_type"] = row["credential_type"]
 
     run_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     sql = """
         INSERT INTO extractor_runs (id, config_id, provider, extractor_type, status, started_at)
@@ -324,7 +324,7 @@ def shutdown_all() -> None:
     _running_processes.clear()
 
 
-def get_run_status(run_id: str) -> Optional[dict[str, Any]]:
+def get_run_status(run_id: str) -> dict[str, Any] | None:
     """Get status of a run."""
     from .db import query_one
 
@@ -337,7 +337,7 @@ def get_run_status(run_id: str) -> Optional[dict[str, Any]]:
     return query_one(sql, (run_id,))
 
 
-def list_runs(limit: int = 50, provider: Optional[str] = None) -> list[dict[str, Any]]:
+def list_runs(limit: int = 50, provider: str | None = None) -> list[dict[str, Any]]:
     """List recent runs."""
     from .db import query_all
 

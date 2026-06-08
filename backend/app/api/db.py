@@ -6,8 +6,9 @@ import asyncio
 import logging
 import os
 import time
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator, Optional
+from typing import Any
 
 import psycopg
 from psycopg import AsyncConnection
@@ -22,8 +23,8 @@ POOL_MAX_CONNS = int(os.getenv("POOL_MAX_CONNS", "10"))
 POOL_RECYCLE = int(os.getenv("POOL_RECYCLE", "3600"))
 
 # Global connection pools
-_async_pool: Optional[AsyncConnectionPool] = None
-_sync_pool: Optional[ConnectionPool] = None
+_async_pool: AsyncConnectionPool | None = None
+_sync_pool: ConnectionPool | None = None
 
 
 def get_pg_dsn() -> str:
@@ -240,7 +241,7 @@ def get_connection() -> psycopg.Connection:
     raise RuntimeError("unreachable: get_connection retry loop exited without return")
 
 
-def release_connection(conn: Optional[psycopg.Connection]) -> None:
+def release_connection(conn: psycopg.Connection | None) -> None:
     """Return a connection to the pool."""
     global _sync_pool
     if _sync_pool is not None and conn is not None:
@@ -270,7 +271,7 @@ def close_pools() -> None:
             except RuntimeError:
                 # No running event loop — safe to run synchronously
                 asyncio.run(asyncio.wait_for(_async_pool.close(), timeout=10.0))
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("Timeout closing async connection pool")
         except Exception as e:
             logger.exception("Error closing async connection pool: %s", e)
@@ -294,7 +295,7 @@ async def _close_async_pool() -> None:
     if _async_pool is not None:
         try:
             await asyncio.wait_for(_async_pool.close(), timeout=10.0)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("Timeout closing async connection pool")
 
 

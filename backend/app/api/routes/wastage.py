@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -77,11 +77,11 @@ def _serialize_finding(row: dict[str, Any]) -> dict[str, Any]:
 )
 async def list_findings(
     request: Request,
-    provider: Optional[str] = Query(None, description="Filter by cloud provider"),
-    severity: Optional[str] = Query(None, description="critical | high | medium | low | info"),
-    rule_id: Optional[str] = Query(None, description="Filter by rule ID"),
-    status: Optional[str] = Query(None, description="open | acked | resolved | ignored"),
-    account_id: Optional[str] = Query(None, description="Filter by cloud account/subscription ID"),
+    provider: str | None = Query(None, description="Filter by cloud provider"),
+    severity: str | None = Query(None, description="critical | high | medium | low | info"),
+    rule_id: str | None = Query(None, description="Filter by rule ID"),
+    status: str | None = Query(None, description="open | acked | resolved | ignored"),
+    account_id: str | None = Query(None, description="Filter by cloud account/subscription ID"),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:

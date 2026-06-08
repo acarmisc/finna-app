@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -104,7 +104,7 @@ async def github_callback(request: Request, req: GitHubCallbackRequest) -> dict[
 
     if not row:
         user_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         execute(
             "INSERT INTO auth_users (id, username, email, github_id, is_active, created_at, updated_at) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s)",
@@ -121,14 +121,14 @@ async def github_callback(request: Request, req: GitHubCallbackRequest) -> dict[
 
 class GCPRegisterRequest(BaseModel):
     project_id: str
-    key_file_content: Optional[str] = None
+    key_file_content: str | None = None
 
 
 @router.post("/auth/gcp/register", dependencies=[Depends(require_auth)])
 async def register_gcp(request: GCPRegisterRequest) -> dict[str, Any]:
     """Register GCP credentials."""
     config_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     config: dict[str, Any] = {"project_id": request.project_id}
     if request.key_file_content:
         config = encrypt_config({"project_id": request.project_id, "key_file_content": request.key_file_content})
@@ -144,15 +144,15 @@ async def register_gcp(request: GCPRegisterRequest) -> dict[str, Any]:
 class AzureServiceAccountRegisterRequest(BaseModel):
     tenant_id: str
     client_id: str
-    client_secret: Optional[str] = None
-    subscription_id: Optional[str] = None
+    client_secret: str | None = None
+    subscription_id: str | None = None
 
 
 @router.post("/auth/azure/service-account", dependencies=[Depends(require_auth)])
 async def register_azure_service_account(request: AzureServiceAccountRegisterRequest) -> dict[str, Any]:
     """Register Azure service principal credentials."""
     config_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     config: dict[str, Any] = {
         "tenant_id": request.tenant_id,
         "client_id": request.client_id,

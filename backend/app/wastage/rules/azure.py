@@ -11,9 +11,8 @@ Each function signature: (inventory_row: dict, pricing_module) -> Optional[Findi
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Optional
 
 from backend.app.wastage.rules import Finding, rule
 
@@ -29,25 +28,25 @@ def _is_nonprod_rg(resource_group: str) -> bool:
     return bool(_NONPROD_RE.search(resource_group))
 
 
-def _parse_iso(ts: str) -> Optional[datetime]:
+def _parse_iso(ts: str) -> datetime | None:
     """Best-effort parse of an ISO-8601 timestamp string. Returns None on failure."""
     if not ts:
         return None
     ts = ts.rstrip("Z")
     for fmt in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
         try:
-            return datetime.strptime(ts, fmt).replace(tzinfo=timezone.utc)
+            return datetime.strptime(ts, fmt).replace(tzinfo=UTC)
         except ValueError:
             continue
     return None
 
 
-def _age_days(ts: str) -> Optional[float]:
+def _age_days(ts: str) -> float | None:
     """Return age in days from an ISO timestamp to now, or None if unparseable."""
     dt = _parse_iso(ts)
     if dt is None:
         return None
-    return (datetime.now(timezone.utc) - dt).total_seconds() / 86400
+    return (datetime.now(UTC) - dt).total_seconds() / 86400
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +60,7 @@ def _age_days(ts: str) -> Optional[float]:
     category="storage",
     description="Managed disk has no VM attachment (managedBy is empty).",
 )
-def azure_disk_orphan(row: dict, pricing) -> Optional[Finding]:
+def azure_disk_orphan(row: dict, pricing) -> Finding | None:
     """Flag unattached managed disks."""
     if row.get("resource_type", "").lower() != "microsoft.compute/disks":
         return None
@@ -107,7 +106,7 @@ def azure_disk_orphan(row: dict, pricing) -> Optional[Finding]:
     category="network",
     description="Standard-SKU public IP has no associated IP configuration (unattached).",
 )
-def azure_public_ip_unattached(row: dict, pricing) -> Optional[Finding]:
+def azure_public_ip_unattached(row: dict, pricing) -> Finding | None:
     """Flag Standard-SKU public IPs with no IP configuration (unattached)."""
     if row.get("resource_type", "").lower() != "microsoft.network/publicipaddresses":
         return None
@@ -149,7 +148,7 @@ def azure_public_ip_unattached(row: dict, pricing) -> Optional[Finding]:
     category="network",
     description="Public IP uses deprecated Basic SKU; migrate to Standard.",
 )
-def azure_public_ip_basic_sku(row: dict, pricing) -> Optional[Finding]:
+def azure_public_ip_basic_sku(row: dict, pricing) -> Finding | None:
     """Flag Basic-SKU public IPs (deprecated, limited SLA, security posture)."""
     if row.get("resource_type", "").lower() != "microsoft.network/publicipaddresses":
         return None
@@ -189,7 +188,7 @@ def azure_public_ip_basic_sku(row: dict, pricing) -> Optional[Finding]:
     category="network",
     description="Network interface has no virtual machine association.",
 )
-def azure_nic_orphan(row: dict, pricing) -> Optional[Finding]:
+def azure_nic_orphan(row: dict, pricing) -> Finding | None:
     """Flag NICs not attached to any virtual machine."""
     if row.get("resource_type", "").lower() != "microsoft.network/networkinterfaces":
         return None
@@ -226,7 +225,7 @@ def azure_nic_orphan(row: dict, pricing) -> Optional[Finding]:
     category="storage",
     description="Managed disk snapshot older than 180 days.",
 )
-def azure_snapshot_old(row: dict, pricing) -> Optional[Finding]:
+def azure_snapshot_old(row: dict, pricing) -> Finding | None:
     """Flag snapshots more than 180 days old."""
     if row.get("resource_type", "").lower() != "microsoft.compute/snapshots":
         return None
@@ -274,7 +273,7 @@ def azure_snapshot_old(row: dict, pricing) -> Optional[Finding]:
     category="compute",
     description="VM is deallocated but still incurring managed-disk costs.",
 )
-def azure_vm_stopped_with_disks(row: dict, pricing) -> Optional[Finding]:
+def azure_vm_stopped_with_disks(row: dict, pricing) -> Finding | None:
     """Flag deallocated VMs that still have attached managed disks."""
     if row.get("resource_type", "").lower() != "microsoft.compute/virtualmachines":
         return None
@@ -323,7 +322,7 @@ def azure_vm_stopped_with_disks(row: dict, pricing) -> Optional[Finding]:
     category="compute",
     description="AKS cluster has an agent pool with zero nodes.",
 )
-def azure_aks_idle_nodepool(row: dict, pricing) -> Optional[Finding]:
+def azure_aks_idle_nodepool(row: dict, pricing) -> Finding | None:
     """Flag AKS clusters that have at least one node pool scaled to 0."""
     if (
         row.get("resource_type", "").lower()
@@ -369,7 +368,7 @@ def azure_aks_idle_nodepool(row: dict, pricing) -> Optional[Finding]:
     category="compute",
     description="App Service Plan in non-prod RG uses an expensive production-grade SKU.",
 )
-def azure_asp_oversized_nonprod(row: dict, pricing) -> Optional[Finding]:
+def azure_asp_oversized_nonprod(row: dict, pricing) -> Finding | None:
     """Flag Premium/Standard App Service Plans in dev/test/stage resource groups."""
     if row.get("resource_type", "").lower() != "microsoft.web/serverfarms":
         return None
@@ -420,7 +419,7 @@ def azure_asp_oversized_nonprod(row: dict, pricing) -> Optional[Finding]:
     category="storage",
     description="Storage account uses legacy 'Storage' kind; migrate to StorageV2.",
 )
-def azure_storage_legacy_kind(row: dict, pricing) -> Optional[Finding]:
+def azure_storage_legacy_kind(row: dict, pricing) -> Finding | None:
     """Flag storage accounts with kind=='Storage' (legacy BlobStorage and Storage)."""
     if row.get("resource_type", "").lower() != "microsoft.storage/storageaccounts":
         return None
@@ -459,7 +458,7 @@ def azure_storage_legacy_kind(row: dict, pricing) -> Optional[Finding]:
     category="storage",
     description="Storage account uses RA-GRS or GRS replication in a non-prod RG.",
 )
-def azure_storage_ragrs_nonprod(row: dict, pricing) -> Optional[Finding]:
+def azure_storage_ragrs_nonprod(row: dict, pricing) -> Finding | None:
     """Flag RA-GRS/GRS storage accounts in dev/test/stage resource groups."""
     if row.get("resource_type", "").lower() != "microsoft.storage/storageaccounts":
         return None

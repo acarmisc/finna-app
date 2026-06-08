@@ -39,6 +39,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import psycopg
+from azure.core.exceptions import ServiceRequestError
 from azure.mgmt.costmanagement import CostManagementClient
 from azure.mgmt.costmanagement.models import (
     QueryAggregation,
@@ -668,7 +669,7 @@ def mark_extractor_unhealthy(
 
 
 @retry(
-    retry=retry_if_exception_type(Exception),
+    retry=retry_if_exception_type(ServiceRequestError),
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=2, min=4, max=60),
     before_sleep=before_sleep_log(logger, logging.WARNING),

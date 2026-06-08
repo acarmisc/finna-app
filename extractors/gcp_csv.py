@@ -19,8 +19,8 @@ import csv
 import logging
 import os
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 import psycopg
 from psycopg.rows import dict_row
@@ -191,7 +191,7 @@ def _mark_health_failure(conn: psycopg.Connection, error_message: str) -> None:
 
 def _detect_delimiter(file_path: Path) -> str:
     """Detect CSV delimiter by inspecting the first line."""
-    with open(file_path, "r", encoding="utf-8-sig") as fh:
+    with open(file_path, encoding="utf-8-sig") as fh:
         first_line = fh.readline()
     if "\t" in first_line:
         return "\t"
@@ -236,7 +236,7 @@ def extract(
     total_rows = 0
 
     try:
-        with open(file_path, "r", encoding="utf-8-sig") as fh:
+        with open(file_path, encoding="utf-8-sig") as fh:
             reader = csv.DictReader(fh, delimiter=delimiter)
 
             for row in reader:
