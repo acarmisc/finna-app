@@ -17,10 +17,12 @@ jobs:
       - run: pip install uv
       - run: uv sync --extra dev
       - run: uv run pip install pip-audit
-      # --no-deps: skip auditing transitive dependencies of the local venv
-      # to avoid flagging system pip (e.g. PYSEC-2026-196 in pip 26.1.1)
-      # which is a transient tooling concern, not an application vuln.
-      - run: uv run pip-audit --no-deps
+      # Audit the project's declared dependencies (from pyproject.toml) only.
+      # --skip-editable avoids double-auditing the local package; using `uv run`
+      # ensures we audit the venv's installed tree, not the system pip
+      # (which may have a known vulnerability unrelated to our app, e.g.
+      # PYSEC-2026-196 in pip 26.1.1).
+      - run: uv run pip-audit --skip-editable
       - run: uv run ruff check .
 
   js-security:
