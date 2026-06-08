@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -10,6 +9,8 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
+
+from utils.encryption import encrypt_config
 
 from .. import auth as api_auth
 from ..db import execute, insert_and_return, query_one
@@ -130,7 +131,7 @@ async def register_gcp(request: GCPRegisterRequest) -> dict[str, Any]:
     now = datetime.now(timezone.utc)
     config: dict[str, Any] = {"project_id": request.project_id}
     if request.key_file_content:
-        config["key_file_base64"] = base64.b64encode(request.key_file_content.encode()).decode()
+        config = encrypt_config({"project_id": request.project_id, "key_file_content": request.key_file_content})
 
     insert_and_return(
         "INSERT INTO cloud_config (id, provider, name, credential_type, config, created_at, updated_at) "

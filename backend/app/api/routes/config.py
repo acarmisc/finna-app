@@ -595,7 +595,15 @@ async def cli_configs_create(data: _ConfigCreate) -> dict[str, Any]:
             "(id, provider, name, credential_type, config, created_at, updated_at) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id"
         ),
-        (cfg_id, data.provider, f"{data.provider} config", data.service_category or "unknown", cfg_dict, now, now),
+        (
+            cfg_id,
+            data.provider,
+            f"{data.provider} config",
+            data.service_category or "unknown",
+            encrypt_config(cfg_dict),
+            now,
+            now,
+        ),
     )
     return {
         "id": cfg_id,
@@ -614,13 +622,7 @@ async def cli_configs_update(config_id: str, data: _ConfigCreate) -> dict[str, A
     now = __dt.now(__tz.utc)
     # Fetch existing config blob
     row = query_one("SELECT config FROM cloud_config WHERE id = %s", (config_id,))
-    cfg = row["config"] if row and row.get("config") else {}
-    if isinstance(cfg, str):
-        try:
-            import json as __json
-            cfg = __json.loads(cfg)
-        except Exception:
-            cfg = {}
+    cfg = decrypt_config(row["config"]) if row and row.get("config") else {}
     if data.region:
         cfg["region"] = data.region
     if data.service_category:
@@ -629,7 +631,7 @@ async def cli_configs_update(config_id: str, data: _ConfigCreate) -> dict[str, A
         cfg["cloud_config"] = data.cloud_config
     execute(
         "UPDATE cloud_config SET provider = %s, config = %s, updated_at = %s WHERE id = %s",
-        (data.provider, cfg, now, config_id),
+        (data.provider, encrypt_config(cfg), now, config_id),
     )
     return {
         "id": config_id,
