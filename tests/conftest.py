@@ -12,7 +12,16 @@ if str(backend_path) not in sys.path:
     sys.path.insert(0, str(backend_path))
 
 os.environ["TESTING"] = "1"
-os.environ["PG_DSN"] = "postgresql://test:***@localhost/testdb"
+os.environ.setdefault(
+    "PG_DSN",
+    "postgresql://{user}:{pw}@{host}:{port}/{db}".format(
+        user=os.getenv("PGUSER", "finna"),
+        pw=os.getenv("PGPASSWORD", "finna"),
+        host=os.getenv("PGHOST", "localhost"),
+        port=os.getenv("PGPORT", "5432"),
+        db=os.getenv("PGDATABASE", "finna"),
+    ),
+)
 os.environ["POOL_MIN_CONNS"] = "1"
 os.environ["POOL_MAX_CONNS"] = "5"
 os.environ["ENCRYPTION_KEY"] = secrets.token_urlsafe(32)
