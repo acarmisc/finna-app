@@ -92,9 +92,12 @@ async def list_providers() -> list[AuthProviderResponse]:
                 created_at=row["created_at"].isoformat() if row["created_at"] else None,
                 updated_at=row["updated_at"].isoformat() if row["updated_at"] else None,
                 created_by=row.get("created_by"),
-                last_test_at=row.get("last_test_at").isoformat() if row.get("last_test_at") else None,
+                last_test_at=(
+                    _last_test_at.isoformat() if _last_test_at is not None else None
+                ),
                 last_test_ok=row.get("last_test_ok"),
             )
+            for row in rows
         )
     return result
 
@@ -125,7 +128,7 @@ async def get_provider(provider_id: str) -> AuthProviderResponse:
         created_at=row["created_at"].isoformat() if row["created_at"] else None,
         updated_at=row["updated_at"].isoformat() if row["updated_at"] else None,
         created_by=row.get("created_by"),
-        last_test_at=row.get("last_test_at").isoformat() if row.get("last_test_at") else None,
+        last_test_at=_lat.isoformat() if (_lat := row.get("last_test_at")) is not None else None,
         last_test_ok=row.get("last_test_ok"),
     )
 

@@ -82,6 +82,11 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Initialize database
         run: PGPASSWORD=finna psql -h localhost -U finna -d finna -f sql/init.sql
+        continue-on-error: true
+      - name: Run migrations
+        run: alembic upgrade head
+        env:
+          DATABASE_URL: postgresql://finna:finna@localhost:5432/finna
       - name: Run pytest
         run: pytest
         env:
