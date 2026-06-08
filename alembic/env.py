@@ -19,9 +19,12 @@ target_metadata = None
 
 def get_url() -> str:
     """Get database URL from PG_DSN env var."""
-    dsn = os.getenv("PG_DSN") or os.getenv(
-        "DATABASE_URL", "postgresql://finna_user:finna_pass@localhost:5432/finna_db"
-    )
+    dsn = os.getenv("PG_DSN") or os.getenv("DATABASE_URL")
+    if not dsn:
+        raise RuntimeError(
+            "PG_DSN environment variable is not set. "
+            "Set PG_DSN to a valid PostgreSQL connection string."
+        )
     # SQLAlchemy 2.x dropped the legacy "postgres://" scheme; normalize it.
     if dsn.startswith("postgres://"):
         dsn = "postgresql://" + dsn[len("postgres://") :]

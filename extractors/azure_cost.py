@@ -30,10 +30,11 @@ Multi-subscription configuration (takes priority over single-sub vars):
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -137,7 +138,7 @@ def _env(key: str, default: str | None = None) -> str:
     """Read an env var, raising if missing and no default."""
     val = os.environ.get(key, default)
     if val is None:
-        raise EnvironmentError(f"Required env var {key} is not set")
+        raise OSError(f"Required env var {key} is not set")
     return val
 
 
@@ -174,13 +175,13 @@ def discover_azure_subscriptions_from_env() -> dict[str, dict[str, str]]:
 
 
 def _parse_date(val: str) -> datetime:
-    return datetime.strptime(val, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    return datetime.strptime(val, "%Y-%m-%d").replace(tzinfo=UTC)
 
 
 def _default_date_range() -> tuple[datetime, datetime]:
     """Return (from, to) defaulting to last LOOKBACK_DAYS days (env var, default 30)."""
     days = int(_env_optional("LOOKBACK_DAYS", "30") or "30")
-    to_dt = datetime.now(timezone.utc).replace(
+    to_dt = datetime.now(UTC).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
     from_dt = to_dt - timedelta(days=days)
@@ -214,13 +215,13 @@ def _azure_date_to_datetime(usage_date_val: Any) -> datetime:
     """Convert Azure UsageDate (int like 20240115 or ISO string) to datetime."""
     if isinstance(usage_date_val, int):
         return datetime.strptime(str(usage_date_val), "%Y%m%d").replace(
-            tzinfo=timezone.utc
+            tzinfo=UTC
         )
     if isinstance(usage_date_val, str):
         for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%Y%m%d"):
             try:
                 return datetime.strptime(usage_date_val, fmt).replace(
-                    tzinfo=timezone.utc
+                    tzinfo=UTC
                 )
             except ValueError:
                 continue
@@ -235,8 +236,6 @@ def _parse_tags(tags_value: Any) -> dict[str, str]:
     if isinstance(tags_value, dict):
         return {str(k): str(v) for k, v in tags_value.items()}
     if isinstance(tags_value, str):
-        import json
-
         try:
             parsed = json.loads(tags_value)
             if isinstance(parsed, dict):
@@ -357,8 +356,8 @@ def _retry_after_wait(retry_state: Any) -> float:
         ra = headers.get("Retry-After") or headers.get("x-ms-ratelimit-microsoft.costmanagement-clienttype-retry-after")
         if ra:
             retry_after = float(ra)
-    except Exception:
-        pass
+    except (ValueError, KeyError):
+        logger.debug("Could not parse Retry-After header", exc_info=True)
 
     if retry_after:
         logger.warning("Azure Retry-After: %.0fs", retry_after)
@@ -416,7 +415,7 @@ def fetch_cost_rows(
         )
 
         for row in result.rows:
-            row_dict = dict(zip(columns, row))
+            row_dict = dict(zip(columns, row, strict=False))
             all_rows.append(row_dict)
 
         # Pagination
@@ -541,6 +540,21 @@ INSERT INTO cost_records (
 ) ON CONFLICT (record_id) DO NOTHING
 """
 
+_INSERT_SQL_BATCH = """
+INSERT INTO cost_records (
+    record_id, provider, usage_start, usage_end, ingestion_ts,
+    account_id, account_name, project_id, project_name, environment, team,
+    service_category, service_name, resource_id, resource_type, region, charge_type,
+    cost_usd, currency_original, cost_original, discount_usd, net_cost_usd,
+    usage_quantity, usage_unit,
+    model_name, input_tokens, output_tokens, total_tokens, latency_ms, trace_id,
+    tags
+) VALUES (
+    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+) ON CONFLICT (record_id) DO NOTHING
+"""
+
 
 @retry(
     retry=retry_if_exception_type(psycopg.OperationalError),
@@ -550,25 +564,29 @@ INSERT INTO cost_records (
     reraise=True,
 )
 def _insert_batch(conn: psycopg.Connection, records: list[NormalizedCostRecord]) -> int:
-    """Insert a batch of records, returning the count actually inserted."""
     if not records:
         return 0
-
-    import json
-
-    for r in records:
-        row = r.model_dump()
-        row["provider"] = (
-            r.provider.value if hasattr(r.provider, "value") else str(r.provider)
-        )
-        row["service_category"] = (
-            r.service_category.value
-            if hasattr(r.service_category, "value")
-            else str(r.service_category)
-        )
+    rows = []
+    for rec in records:
+        row = rec.model_dump()
+        row["provider"] = rec.provider.value
+        row["service_category"] = rec.service_category.value
         row["tags"] = json.dumps(row.get("tags", {}))
-        with conn.cursor() as cur:
-            cur.execute(INSERT_SQL, row)
+        rows.append((
+            row["record_id"], row["provider"], row["usage_start"], row["usage_end"],
+            row.get("ingestion_ts"), row["account_id"], row.get("account_name"),
+            row["project_id"], row.get("project_name"), row.get("environment"),
+            row.get("team"), row["service_category"], row.get("service_name"),
+            row.get("resource_id"), row.get("resource_type"), row.get("region"),
+            row.get("charge_type"), row["cost_usd"], row["currency_original"],
+            row["cost_original"], row["discount_usd"], row["net_cost_usd"],
+            row.get("usage_quantity"), row.get("usage_unit"),
+            row.get("model_name"), row.get("input_tokens"), row.get("output_tokens"),
+            row.get("total_tokens"), row.get("latency_ms"), row.get("trace_id"),
+            row["tags"],
+        ))
+    with conn.cursor() as cur:
+        cur.executemany(_INSERT_SQL_BATCH, rows)
     conn.commit()
     return len(records)
 
@@ -601,7 +619,7 @@ def mark_extractor_healthy(
     rows_extracted: int = 0,
 ) -> None:
     """Mark a successful extractor run in the extractor_health table."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with conn.cursor() as cur:
         cur.execute(
             """
@@ -624,7 +642,7 @@ def mark_extractor_unhealthy(
     error_message: str = "",
 ) -> None:
     """Mark a failed extractor run in the extractor_health table."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     try:
         with conn.cursor() as cur:
             cur.execute(

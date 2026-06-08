@@ -48,22 +48,27 @@ CREATE INDEX IF NOT EXISTS idx_cost_records_project_id ON cost_records(project_i
 -- ─── Alerts ─────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS alerts (
-    id TEXT PRIMARY KEY,
-    type TEXT NOT NULL DEFAULT '',
-    severity TEXT NOT NULL,
-    title TEXT NOT NULL,
-    body TEXT NOT NULL,
-    rule TEXT,
-    firing TEXT,
-    channels TEXT[] DEFAULT '{}',
-    status TEXT NOT NULL DEFAULT 'firing',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    resolved_at TIMESTAMPTZ,
-    acknowledged_at TIMESTAMPTZ,
-    acknowledged_by TEXT,
-    project TEXT,
-    triggered_at TIMESTAMPTZ
+    id              TEXT PRIMARY KEY,
+    status          TEXT NOT NULL DEFAULT 'firing',
+    severity        TEXT NOT NULL DEFAULT 'warning',
+    rule            TEXT DEFAULT NULL,
+    project         TEXT DEFAULT NULL,
+    triggered_at    TIMESTAMPTZ DEFAULT NULL,
+    description     TEXT NOT NULL DEFAULT '',
+    cost_impact     NUMERIC(18,6) DEFAULT 0,
+    resource        TEXT DEFAULT '',
+    service         TEXT DEFAULT '',
+    provider        TEXT DEFAULT '',
+    acknowledged_at TIMESTAMPTZ DEFAULT NULL,
+    acknowledged_by TEXT DEFAULT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX IF NOT EXISTS idx_alerts_status ON alerts (status);
+CREATE INDEX IF NOT EXISTS idx_alerts_severity ON alerts (severity);
+CREATE INDEX IF NOT EXISTS idx_alerts_project ON alerts (project);
+CREATE INDEX IF NOT EXISTS idx_alerts_triggered ON alerts (triggered_at);
 
 -- ─── Extractor runs ─────────────────────────────────────────────────────────
 

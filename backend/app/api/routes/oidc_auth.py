@@ -191,10 +191,10 @@ async def oidc_login(request_data: OIDCLoginRequest, request: Request) -> OIDCLo
 
     except oidc.OIDCError as e:
         logger.error(f"OIDC login error: {e}")
-        raise HTTPException(status_code=400, detail=f"Login setup failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Login setup failed: {str(e)}") from e
     except Exception as e:
         logger.exception(f"Unexpected error during login: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
 
 @router.post("/auth/oidc/callback")
@@ -274,20 +274,17 @@ async def oidc_callback(req: OIDCCallbackRequest, request: Request) -> OIDCCallb
             if not config.get("auto_provision", False):
                 raise HTTPException(status_code=403, detail="User not provisioned. Contact admin.")
 
-            # Create new user
-            import uuid
-            user_id = str(uuid.uuid4())
-
-            insert_and_return(
+            # Create new user — let SERIAL generate the id
+            db_id = insert_and_return(
                 """
                 INSERT INTO auth_users
-                    (id, username, email, oidc_provider_id, oidc_subject, oidc_claims, is_admin, is_active)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, true)
+                    (username, email, oidc_provider_id, oidc_subject, oidc_claims, is_admin, is_active)
+                VALUES (%s, %s, %s, %s, %s, %s, true)
                 RETURNING id
                 """,
-                (user_id, username, email, provider["id"], oidc_subject, claims, is_admin),
+                (username, email, provider["id"], oidc_subject, claims, is_admin),
             )
-            user = {"id": user_id, "username": username, "is_admin": is_admin}
+            user = {"id": int(db_id), "username": username, "is_admin": is_admin}
         else:
             # Update is_admin based on current claim mapping (group changes propagate)
             execute(
@@ -303,16 +300,16 @@ async def oidc_callback(req: OIDCCallbackRequest, request: Request) -> OIDCCallb
 
         return OIDCCallbackResponse(
             token=token,
-            user_id=int(user["id"]) if isinstance(user["id"], str) and user["id"].isdigit() else user["id"],
+            user_id=user["id"],
             username=user["username"],
         )
 
     except oidc.OIDCError as e:
         logger.error(f"OIDC callback error: {e}")
-        raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Authentication failed: {str(e)}") from e
     except HTTPException:
         raise
     except Exception as e:
         logger.exception(f"Unexpected error during callback: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") from e
 
