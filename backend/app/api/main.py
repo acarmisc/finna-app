@@ -32,6 +32,15 @@ async def lifespan(app: FastAPI) -> Any:
     # Startup
     if not os.environ.get("TESTING"):
         await db.init_async_pool()
+    if os.environ.get("REPLICAS", "1") not in ("1", ""):
+        logger.warning(
+            "Multi-replica deployment detected (REPLICAS=%s). "
+            "OIDC login uses in-memory state storage and will break "
+            "under load-balanced multi-replica setups. "
+            "Set DEPLOY_MODE=single for single-replica, or configure "
+            "a shared Redis store for OIDC state.",
+            os.environ["REPLICAS"],
+        )
     yield
     # Shutdown
     if not os.environ.get("TESTING"):

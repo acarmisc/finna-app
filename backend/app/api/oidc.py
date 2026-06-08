@@ -26,7 +26,9 @@ _jwks_cache: dict[str, tuple[dict[str, Any], float]] = {}
 DISCOVERY_CACHE_TTL = 3600  # 1 hour
 JWKS_CACHE_TTL = 300  # 5 minutes
 
-# In-memory state/nonce storage (single-replica only; see OIDC-PLAN.md for multi-replica path)
+# In-memory state/nonce storage (single-replica only; multi-replica
+# will see OIDC login failures unless Redis-backed storage is added).
+# The app startup lifecycle logs a warning when REPLICAS > 1.
 _state_store: dict[str, dict[str, Any]] = {}
 STATE_EXPIRY = 600  # 10 minutes
 
