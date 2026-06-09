@@ -195,28 +195,23 @@ ON CONFLICT (id) DO NOTHING;
 -- cost_records seed data removed — populated via extractors
 
 -- Seeded alerts
-INSERT INTO alerts (id, type, severity, title, body, rule, firing, channels, status, created_at, project, triggered_at)
+INSERT INTO alerts (id, status, severity, description, cost_impact, resource, service, provider, rule, project, triggered_at, created_at, updated_at)
 VALUES
-    ('a1', 'budget', 'critical', 'rg-analytics over budget',
-     '$8,200 of $10,000 used. Forecast exceeds cap by Nov 28.',
-     'cost_mtd rg-analytics > 0.8 * budget',
-     now() - interval '12 minutes', ARRAY['finops-slack', 'oncall@acme.co'], 'firing', now() - interval '12 minutes', 'analytics', now() - interval '12 minutes'),
-    ('a2', 'anomaly', 'warning', 'LLM cost anomaly claude-sonnet-4',
-     '+120% vs 7d average. 3 traces flagged for review.',
-     'zscore cost_1d claude-sonnet-4 window=7 > 2.0',
-     now() - interval '2 hours', ARRAY['finops-slack'], 'firing', now() - interval '2 hours', 'ml-ai', now() - interval '2 hours'),
-    ('a3', 'sla', 'info', 'Nightly extraction SLA',
-     'All 4 extractors completed within 15 min window.',
-     'extractor_health.last_success < 6h',
-     NULL, ARRAY['oncall@acme.co'], 'resolved', now() - interval '1 hour', 'platform', now() - interval '1 hour'),
-    ('a4', 'freshness', 'info', 'Exchange rates freshness',
-     'ECB rates updated at 16:05 UTC within 24h threshold.',
-     'max exchange_rates.fetched_at < 24h',
-     NULL, ARRAY['finops-slack'], 'resolved', now() - interval '1 hour', NULL, now() - interval '1 hour'),
-    ('a5', 'spike', 'warning', 'BigQuery scan cost spike prod-platform',
-     '$412 in the last 6 hours across 18 queries. Dashboard auto-refresh suspected.',
-     'sum cost_1h prod-platform sku=BigQuery > 60 for 3h',
-     now() - interval '42 minutes', ARRAY['finops-slack'], 'firing', now() - interval '42 minutes', 'platform', now() - interval '42 minutes')
+    ('a1', 'firing', 'critical', 'rg-analytics over budget: $8,200 of $10,000 used. Forecast exceeds cap by Nov 28.',
+     8200.00, 'rg-analytics', 'compute', 'azure',
+     'cost_mtd rg-analytics > 0.8 * budget', 'analytics', now() - interval '12 minutes', now() - interval '12 minutes', now() - interval '12 minutes'),
+    ('a2', 'firing', 'warning', 'LLM cost anomaly claude-sonnet-4: +120% vs 7d average. 3 traces flagged for review.',
+     156.42, 'claude-sonnet-4', 'llm-gateway', 'llm',
+     'zscore cost_1d claude-sonnet-4 window=7 > 2.0', 'ml-ai', now() - interval '2 hours', now() - interval '2 hours', now() - interval '2 hours'),
+    ('a3', 'resolved', 'info', 'Nightly extraction SLA: All 4 extractors completed within 15 min window.',
+     0.00, 'extractors', 'platform', 'azure',
+     'extractor_health.last_success < 6h', 'platform', now() - interval '1 hour', now() - interval '1 hour', now() - interval '1 hour'),
+    ('a4', 'resolved', 'info', 'Exchange rates freshness: ECB rates updated at 16:05 UTC within 24h threshold.',
+     0.00, 'exchange-rates', 'platform', 'azure',
+     'max exchange_rates.fetched_at < 24h', NULL, now() - interval '1 hour', now() - interval '1 hour', now() - interval '1 hour'),
+    ('a5', 'firing', 'warning', 'BigQuery scan cost spike prod-platform: $412 in the last 6 hours across 18 queries.',
+     412.00, 'bigquery-prod-platform', 'database', 'gcp',
+     'sum cost_1h prod-platform sku=BigQuery > 60 for 3h', 'platform', now() - interval '42 minutes', now() - interval '42 minutes', now() - interval '42 minutes')
 ON CONFLICT (id) DO NOTHING;
 
 -- Seeded extractor runs
