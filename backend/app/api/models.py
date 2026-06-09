@@ -210,9 +210,9 @@ class OIDCDevicePollResponse(BaseModel):
     """Response from polling a device code."""
 
     status: str = Field(..., description="pending | completed | expired | denied")
-    token: str | None = Field(None, description="Finna JWT (only when completed)")
-    user_id: int | None = Field(None, description="User ID (only when completed)")
-    username: str | None = Field(None, description="Username (only when completed)")
+    token: str | None = Field(default=None, description="Finna JWT (only when completed)")
+    user_id: int | None = Field(default=None, description="User ID (only when completed)")
+    username: str | None = Field(default=None, description="Username (only when completed)")
 
 
 # ============================================================================
