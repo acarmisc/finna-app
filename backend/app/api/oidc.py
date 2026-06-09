@@ -32,6 +32,10 @@ JWKS_CACHE_TTL = 300  # 5 minutes
 _state_store: dict[str, dict[str, Any]] = {}
 STATE_EXPIRY = 600  # 10 minutes
 
+# Device code flow storage (device_code -> metadata)
+_device_code_store: dict[str, dict[str, Any]] = {}
+DEVICE_CODE_EXPIRY = 600  # 10 minutes
+
 
 class OIDCError(Exception):
     """Base OIDC error."""
@@ -345,6 +349,110 @@ async def verify_id_token(
     return claims
 
 
+async def verify_id_token_no_nonce(
+    id_token: str,
+    provider_metadata: ProviderMetadata,
+    client_id: str,
+) -> dict[str, Any]:
+    """
+    Verify ID token without nonce binding (for device code flow).
+
+    Same security checks as verify_id_token except nonce is skipped,
+    since RFC 8628 device code flow does not provide a nonce.
+
+    Args:
+        id_token: Signed JWT from token_endpoint
+        provider_metadata: From discover_provider()
+        client_id: OIDC client ID
+
+    Returns:
+        Decoded and validated claims dict.
+
+    Raises:
+        OIDCError: If validation fails.
+    """
+    issuer = provider_metadata.get("issuer", "")
+
+    if not issuer:
+        raise OIDCError("Provider metadata missing issuer")
+
+    # Get JWKS
+    jwks = await get_jwks(issuer)
+    keys = jwks.get("keys", [])
+
+    if not keys:
+        raise OIDCError("JWKS has no keys")
+
+    # Decode header to get kid
+    try:
+        header = jwt.get_unverified_header(id_token)
+    except JWTError as e:
+        raise OIDCError(f"Invalid token format: {e}") from e
+
+    kid = header.get("kid")
+    alg = header.get("alg", "")
+
+    # Reject alg:none and HS*
+    if alg == "none" or alg.startswith("HS"):
+        raise OIDCError(f"Insecure algorithm not allowed: {alg}")
+
+    # Find the key
+    key = None
+    for k in keys:
+        if k.get("kid") == kid:
+            key = k
+            break
+
+    if not key:
+        if kid:
+            logger.warning(f"JWKS kid {kid} not found, trying all keys (kid rotation?)")
+        if not keys:
+            raise OIDCError("No keys in JWKS to verify with")
+        for k in keys:
+            k_alg = k.get("alg", "")
+            if k_alg.startswith("RS") or k_alg.startswith("ES"):
+                key = k
+                break
+
+    if not key:
+        raise OIDCError("No suitable key found in JWKS")
+
+    # Verify signature (disable jose's built-in aud check — we do it ourselves below)
+    try:
+        claims = cast(dict[str, Any], jwt.decode(
+            id_token, key, algorithms=[alg],
+            options={"verify_signature": True, "verify_aud": False},
+        ))
+    except JWTError as e:
+        raise OIDCError(f"Signature verification failed: {e}") from e
+
+    # Validate claims
+    now = datetime.now(UTC).timestamp()
+
+    exp = claims.get("exp")
+    if not exp or exp < now:
+        raise OIDCError("ID token expired")
+
+    iat = claims.get("iat")
+    if iat and iat > now + 300:
+        raise OIDCError("ID token iat in future (clock skew > 5 min?)")
+
+    token_iss = claims.get("iss", "")
+    if token_iss != issuer:
+        raise OIDCError(f"Issuer mismatch: {token_iss} != {issuer}")
+
+    aud = claims.get("aud")
+    if isinstance(aud, list):
+        if client_id not in aud:
+            raise OIDCError(f"Client ID {client_id} not in aud: {aud}")
+    else:
+        if aud != client_id:
+            raise OIDCError(f"Audience mismatch: {aud} != {client_id}")
+
+    # No nonce check for device code flow
+    return claims
+
+
 def generate_pkce_pair() -> tuple[str, str]:
     """
     Generate PKCE code_verifier and code_challenge (S256).
@@ -421,3 +529,165 @@ def clear_expired_states() -> None:
         _state_store.pop(s, None)
     if expired:
         logger.info(f"Cleared {len(expired)} expired OIDC states")
+
+
+async def request_device_code(
+    provider_metadata: ProviderMetadata,
+    client_id: str,
+    scopes: list[str] | None = None,
+) -> dict[str, Any]:
+    """
+    Request device authorization from OIDC provider (RFC 8628).
+
+    Args:
+        provider_metadata: From discover_provider()
+        client_id: OIDC client ID
+        scopes: Optional scope list
+
+    Returns:
+        Dict with device_code, user_code, verification_uri, etc.
+
+    Raises:
+        OIDCError: If device authorization endpoint is not supported or request fails.
+    """
+    device_auth_url = provider_metadata.get("device_authorization_endpoint", "")
+
+    if not device_auth_url:
+        raise OIDCError(
+            "Provider does not support device authorization flow "
+            "(device_authorization_endpoint missing from metadata)"
+        )
+
+    payload: dict[str, Any] = {"client_id": client_id}
+    if scopes:
+        payload["scope"] = " ".join(scopes)
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.post(device_auth_url, data=payload)
+            response.raise_for_status()
+            data = cast(dict[str, Any], response.json())
+    except httpx.RequestError as e:
+        raise OIDCError(f"Device authorization request failed: {e}") from e
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Device authorization HTTP error: {e.response.status_code} {e.response.text}")
+        raise OIDCError(f"Device authorization failed: {e.response.status_code}") from e
+
+    # Validate required fields
+    required = {"device_code", "user_code", "verification_uri"}
+    missing = required - set(data.keys())
+    if missing:
+        raise OIDCError(f"Device authorization response missing: {missing}")
+
+    return data
+
+
+async def exchange_device_code(
+    provider_metadata: ProviderMetadata,
+    client_id: str,
+    client_secret: str,
+    device_code: str,
+    interval: int = 5,
+) -> dict[str, Any]:
+    """
+    Exchange device code for tokens (or poll for authorization status).
+
+    Per RFC 8628 §6.1, the response will be:
+    - 200 with tokens (access_token, id_token) when authorization completes
+    - 400 with error: "authorization_pending" if user hasn't completed auth yet
+    - 400 with error: "slow_down" if polling too frequently
+    - 400 with error: "expired_token" if device_code expired
+    - 400 with error: "access_denied" if user denied
+
+    Args:
+        provider_metadata: From discover_provider()
+        client_id: OIDC client ID
+        client_secret: OIDC client secret (may be empty for public clients)
+        device_code: The device code to exchange
+        interval: Minimum seconds between polls
+
+    Returns:
+        Dict with tokens on success, or {"error": "...", "error_description": "..."} on failure.
+
+    Raises:
+        OIDCError: If the token request itself fails (network error, etc.)
+    """
+    token_url = provider_metadata.get("token_endpoint", "")
+
+    if not token_url:
+        raise OIDCError("No token_endpoint in provider metadata")
+
+    payload = {
+        "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+        "client_id": client_id,
+        "device_code": device_code,
+    }
+    if client_secret:
+        payload["client_secret"] = client_secret
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.post(token_url, data=payload)
+
+            # RFC 8628: pending/denied/expired return 400 with error field
+            if response.status_code == 400:
+                data = cast(dict[str, Any], response.json())
+                return data
+
+            response.raise_for_status()
+            return cast(dict[str, Any], response.json())
+    except httpx.RequestError as e:
+        raise OIDCError(f"Device code token exchange request failed: {e}") from e
+
+
+def store_device_code(
+    device_code: str,
+    provider_id: str,
+    client_id: str,
+    client_secret: str,
+    interval: int,
+    expires_in: int,
+) -> None:
+    """
+    Store device code metadata for later token exchange.
+
+    Args:
+        device_code: The device code from the provider
+        provider_id: OIDC provider UUID
+        client_id: OIDC client ID
+        client_secret: OIDC client secret
+        interval: Polling interval from provider
+        expires_in: Seconds until device code expires
+    """
+    _device_code_store[device_code] = {
+        "provider_id": provider_id,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "interval": interval,
+        "expires_at": time.time() + expires_in,
+    }
+
+
+def get_and_consume_device_code(device_code: str) -> dict[str, Any] | None:
+    """
+    Retrieve and consume device code metadata (one-time use for token exchange).
+
+    Returns:
+        Stored metadata dict, or None if not found/expired.
+    """
+    stored = _device_code_store.pop(device_code, None)
+    if stored is None:
+        return None
+    if time.time() > stored.get("expires_at", 0):
+        return None
+    return stored
+
+
+def clear_expired_device_codes() -> None:
+    """Remove expired device code entries."""
+    now = time.time()
+    expired = [dc for dc, v in _device_code_store.items() if v.get("expires_at", 0) < now]
+    for dc in expired:
+        _device_code_store.pop(dc, None)
+    if expired:
+        logger.info(f"Cleared {len(expired)} expired device codes")

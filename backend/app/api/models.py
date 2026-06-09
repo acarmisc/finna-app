@@ -177,6 +177,45 @@ class DeviceCodePollResponse(BaseModel):
 
 
 # ============================================================================
+# OIDC Device Authorization Grant schemas (RFC 8628)
+# ============================================================================
+
+
+class OIDCDeviceStartRequest(BaseModel):
+    """Request to initiate OIDC device authorization flow."""
+
+    provider_id: str = Field(..., description="OIDC provider UUID")
+
+
+class OIDCDeviceStartResponse(BaseModel):
+    """Response from initiating OIDC device authorization flow."""
+
+    device_code: str = Field(..., description="Device code to exchange for tokens")
+    user_code: str = Field(..., description="User-facing code to enter in browser")
+    verification_uri: str = Field(..., description="URL the user should open")
+    verification_uri_complete: str | None = Field(
+        None, description="URL with user_code pre-filled (if supported)"
+    )
+    expires_in: int = Field(..., description="Seconds until device code expires")
+    interval: int = Field(default=5, description="Seconds between polling attempts")
+
+
+class OIDCDevicePollRequest(BaseModel):
+    """Request to poll/exchange a device code for tokens."""
+
+    device_code: str = Field(..., description="Device code from start response")
+
+
+class OIDCDevicePollResponse(BaseModel):
+    """Response from polling a device code."""
+
+    status: str = Field(..., description="pending | completed | expired | denied")
+    token: str | None = Field(default=None, description="Finna JWT (only when completed)")
+    user_id: int | None = Field(default=None, description="User ID (only when completed)")
+    username: str | None = Field(default=None, description="Username (only when completed)")
+
+
+# ============================================================================
 # Token schemas
 # ============================================================================
 
