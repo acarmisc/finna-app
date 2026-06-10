@@ -249,15 +249,18 @@ def test_delete_provider_with_linked_users(client, admin_token):
     provider_id = create_resp.json()["id"]
 
     # Manually insert a user linked to this provider
-    from backend.app.api.db import get_connection
+    from backend.app.api.db import get_connection, release_connection
     conn = get_connection()
-    with conn.cursor() as cur:
-        cur.execute(
-            "INSERT INTO auth_users (username, email, hashed_password, oidc_provider_id, oidc_subject) "
-            "VALUES (%s, %s, %s, %s, %s)",
-            ("oidc_user", "oidc@example.com", "hash", provider_id, "sub_12345")
-        )
-    conn.commit()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO auth_users (username, email, hashed_password, oidc_provider_id, oidc_subject) "
+                "VALUES (%s, %s, %s, %s, %s)",
+                ("oidc_user", "oidc@example.com", "hash", provider_id, "sub_12345")
+            )
+        conn.commit()
+    finally:
+        release_connection(conn)
 
     response = client.delete(
         f"/api/v1/auth/providers/{provider_id}",

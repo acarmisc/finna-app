@@ -50,8 +50,8 @@ async def init_async_pool() -> AsyncConnectionPool:
         return _async_pool
 
     if os.environ.get("TESTING"):
-        # In testing, initialize a minimal pool to avoid None returns
-        config = {"min_size": 1, "max_size": 1}
+        # In testing, respect env vars (set by conftest.py) so pool size is configurable
+        config = get_pool_config()
         dsn = get_pg_dsn()
 
         logger.info(
@@ -105,8 +105,8 @@ def init_sync_pool() -> ConnectionPool:
         return _sync_pool
 
     if os.environ.get("TESTING"):
-        # In testing, initialize a minimal pool to avoid None returns
-        config = {"min_size": 1, "max_size": 1}
+        # In testing, respect env vars (set by conftest.py) so pool size is configurable
+        config = get_pool_config()
         dsn = get_pg_dsn()
 
         logger.info(

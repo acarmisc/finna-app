@@ -259,15 +259,19 @@ async def test_oidc_callback_happy_path_existing_user_is_admin(client, setup_oid
     oidc._state_store.clear()
 
     # Pre-create user linked to provider
+    from backend.app.api.db import release_connection
     provider_id = setup_oidc_provider["id"]
     conn = get_connection()
-    with conn.cursor() as cur:
-        cur.execute(
-            "INSERT INTO auth_users (username, email, hashed_password, oidc_provider_id, oidc_subject, is_admin, is_active) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s)",
-            ("existinguser", "existing@example.com", "hash", provider_id, "user_existing_id", False, True),
-        )
-    conn.commit()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO auth_users (username, email, hashed_password, oidc_provider_id, oidc_subject, is_admin, is_active) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                ("existinguser", "existing@example.com", "hash", provider_id, "user_existing_id", False, True),
+            )
+        conn.commit()
+    finally:
+        release_connection(conn)
 
     # Step 1: Login
     metadata = {
