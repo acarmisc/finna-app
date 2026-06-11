@@ -20,7 +20,7 @@
           "query": "SELECT DISTINCT provider FROM cost_records ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,
@@ -37,7 +37,7 @@
           "query": "SELECT DISTINCT project_name FROM cost_records WHERE project_name IS NOT NULL AND project_name != '' ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,
@@ -54,7 +54,7 @@
           "query": "SELECT DISTINCT region FROM cost_records WHERE region IS NOT NULL AND region != '' ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,
@@ -71,7 +71,7 @@
           "query": "SELECT DISTINCT service_name FROM cost_records ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,
@@ -88,7 +88,7 @@
           "query": "SELECT DISTINCT resource_type FROM cost_records WHERE resource_type IS NOT NULL AND resource_type != '' ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,
@@ -102,10 +102,10 @@
           "name": "environment",
           "type": "query",
           "label": "Environment",
-          "query": "SELECT DISTINCT environment FROM cost_records WHERE environment IS NOT NULL AND environment != '' ORDER BY 1",
+          "query": "SELECT DISTINCT COALESCE(environment, '(none)') FROM cost_records ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,
@@ -119,10 +119,10 @@
           "name": "team",
           "type": "query",
           "label": "Team",
-          "query": "SELECT DISTINCT team FROM cost_records WHERE team IS NOT NULL AND team != '' ORDER BY 1",
+          "query": "SELECT DISTINCT COALESCE(team, '(none)') FROM cost_records ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,
@@ -217,7 +217,7 @@
             },
             "format": "time_series",
             "rawQuery": true,
-            "rawSql": "SELECT\n  DATE(usage_start) as time,\n  provider || ' / ' || COALESCE(service_name, 'unknown') as metric,\n  SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as value\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1, 2\nORDER BY 1, 2",
+            "rawSql": "SELECT\n  DATE(usage_start) as time,\n  provider || ' / ' || COALESCE(service_name, 'unknown') as metric,\n  SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as value\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (COALESCE(environment, '(none)') IN ($environment))\n  AND (COALESCE(team, '(none)') IN ($team))\nGROUP BY 1, 2\nORDER BY 1, 2",
             "refId": "A"
           }
         ]
@@ -285,7 +285,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "SELECT ROUND(SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd))::numeric, 2) as mtd\nFROM cost_records\nWHERE\n  usage_start >= date_trunc('month', current_date)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)",
+            "rawSql": "SELECT ROUND(SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd))::numeric, 2) as mtd\nFROM cost_records\nWHERE\n  usage_start >= date_trunc('month', current_date)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (COALESCE(environment, '(none)') IN ($environment))\n  AND (COALESCE(team, '(none)') IN ($team))",
             "refId": "A"
           }
         ]
@@ -345,7 +345,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "SELECT ROUND(SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd))::numeric, 2) as prev\nFROM cost_records\nWHERE\n  usage_start >= date_trunc('month', current_date - INTERVAL '1 month')\n  AND usage_start < date_trunc('month', current_date)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)",
+            "rawSql": "SELECT ROUND(SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd))::numeric, 2) as prev\nFROM cost_records\nWHERE\n  usage_start >= date_trunc('month', current_date - INTERVAL '1 month')\n  AND usage_start < date_trunc('month', current_date)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (COALESCE(environment, '(none)') IN ($environment))\n  AND (COALESCE(team, '(none)') IN ($team))",
             "refId": "A"
           }
         ]
@@ -413,7 +413,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "WITH days_elapsed AS (\n  SELECT EXTRACT(DAY FROM current_date)::int AS n\n),\nmtd AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records, days_elapsed\n  WHERE usage_start >= date_trunc('month', current_date)\n    AND usage_start < date_trunc('month', current_date) + (n || ' days')::interval\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (environment IN ($environment) OR environment IS NULL)\n    AND (team IN ($team) OR team IS NULL)\n),\nprev AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records, days_elapsed\n  WHERE usage_start >= date_trunc('month', current_date - INTERVAL '1 month')\n    AND usage_start < date_trunc('month', current_date - INTERVAL '1 month') + (n || ' days')::interval\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (environment IN ($environment) OR environment IS NULL)\n    AND (team IN ($team) OR team IS NULL)\n)\nSELECT ROUND(((mtd.val - prev.val) / NULLIF(prev.val, 0)) * 100, 2) as growth\nFROM mtd, prev",
+            "rawSql": "WITH days_elapsed AS (\n  SELECT EXTRACT(DAY FROM current_date)::int AS n\n),\nmtd AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records, days_elapsed\n  WHERE usage_start >= date_trunc('month', current_date)\n    AND usage_start < date_trunc('month', current_date) + (n || ' days')::interval\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (COALESCE(environment, '(none)') IN ($environment))\n    AND (COALESCE(team, '(none)') IN ($team))\n),\nprev AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records, days_elapsed\n  WHERE usage_start >= date_trunc('month', current_date - INTERVAL '1 month')\n    AND usage_start < date_trunc('month', current_date - INTERVAL '1 month') + (n || ' days')::interval\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (COALESCE(environment, '(none)') IN ($environment))\n    AND (COALESCE(team, '(none)') IN ($team))\n)\nSELECT ROUND(((mtd.val - prev.val) / NULLIF(prev.val, 0)) * 100, 2) as growth\nFROM mtd, prev",
             "refId": "A"
           }
         ]
@@ -474,7 +474,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "SELECT COUNT(DISTINCT project_id) as count FROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)",
+            "rawSql": "SELECT COUNT(DISTINCT project_id) as count FROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (COALESCE(environment, '(none)') IN ($environment))\n  AND (COALESCE(team, '(none)') IN ($team))",
             "refId": "A"
           }
         ]
@@ -564,7 +564,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "SELECT\n  service_name,\n  SUM(cost_usd) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 15",
+            "rawSql": "SELECT\n  service_name,\n  SUM(cost_usd) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (COALESCE(environment, '(none)') IN ($environment))\n  AND (COALESCE(team, '(none)') IN ($team))\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 15",
             "refId": "A"
           }
         ]
@@ -654,7 +654,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "SELECT\n  region,\n  provider,\n  SUM(cost_usd) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND region IS NOT NULL AND region != ''\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1, 2\nORDER BY 3 DESC",
+            "rawSql": "SELECT\n  region,\n  provider,\n  SUM(cost_usd) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND region IS NOT NULL AND region != ''\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (COALESCE(environment, '(none)') IN ($environment))\n  AND (COALESCE(team, '(none)') IN ($team))\nGROUP BY 1, 2\nORDER BY 3 DESC",
             "refId": "A"
           }
         ]
@@ -744,7 +744,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "SELECT\n  resource_type,\n  SUM(cost_usd) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND resource_type IS NOT NULL AND resource_type != ''\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 15",
+            "rawSql": "SELECT\n  resource_type,\n  SUM(cost_usd) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND resource_type IS NOT NULL AND resource_type != ''\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (COALESCE(environment, '(none)') IN ($environment))\n  AND (COALESCE(team, '(none)') IN ($team))\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 15",
             "refId": "A"
           }
         ]
@@ -816,7 +816,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "SELECT\n  charge_type,\n  SUM(cost_usd) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND charge_type IS NOT NULL AND charge_type != ''\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1\nORDER BY 2 DESC",
+            "rawSql": "SELECT\n  charge_type,\n  SUM(cost_usd) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND charge_type IS NOT NULL AND charge_type != ''\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (COALESCE(environment, '(none)') IN ($environment))\n  AND (COALESCE(team, '(none)') IN ($team))\nGROUP BY 1\nORDER BY 2 DESC",
             "refId": "A"
           }
         ]
@@ -924,7 +924,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "SELECT\n  service_name,\n  region,\n  resource_type,\n  charge_type,\n  COUNT(*) as records,\n  ROUND(SUM(cost_usd)::numeric, 2) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1, 2, 3, 4\nORDER BY 6 DESC\nLIMIT 20",
+            "rawSql": "SELECT\n  service_name,\n  region,\n  resource_type,\n  charge_type,\n  COUNT(*) as records,\n  ROUND(SUM(cost_usd)::numeric, 2) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (COALESCE(environment, '(none)') IN ($environment))\n  AND (COALESCE(team, '(none)') IN ($team))\nGROUP BY 1, 2, 3, 4\nORDER BY 6 DESC\nLIMIT 20",
             "refId": "A"
           }
         ]
@@ -995,7 +995,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "SELECT\n  COALESCE(project_name, '(no project)') as project,\n  provider,\n  COUNT(*) as records,\n  ROUND(SUM(cost_usd)::numeric, 2) as mtd_cost\nFROM cost_records\nWHERE\n  usage_start >= date_trunc('month', current_date)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1, 2\nORDER BY 4 DESC",
+            "rawSql": "SELECT\n  COALESCE(project_name, '(no project)') as project,\n  provider,\n  COUNT(*) as records,\n  ROUND(SUM(cost_usd)::numeric, 2) as mtd_cost\nFROM cost_records\nWHERE\n  usage_start >= date_trunc('month', current_date)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (COALESCE(environment, '(none)') IN ($environment))\n  AND (COALESCE(team, '(none)') IN ($team))\nGROUP BY 1, 2\nORDER BY 4 DESC",
             "refId": "A"
           }
         ]
@@ -1071,7 +1071,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "SELECT\n  provider,\n  service_name,\n  region,\n  ROUND(SUM(cost_usd)::numeric, 2) as total_cost,\n  COUNT(*) as records\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1, 2, 3\nORDER BY 4 DESC",
+            "rawSql": "SELECT\n  provider,\n  service_name,\n  region,\n  ROUND(SUM(cost_usd)::numeric, 2) as total_cost,\n  COUNT(*) as records\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (COALESCE(environment, '(none)') IN ($environment))\n  AND (COALESCE(team, '(none)') IN ($team))\nGROUP BY 1, 2, 3\nORDER BY 4 DESC",
             "refId": "A"
           }
         ]
@@ -1167,7 +1167,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "SELECT\n  model_name,\n  ROUND(AVG(latency_ms)::numeric, 0) as avg_latency_ms,\n  SUM(input_tokens) as total_input_tokens,\n  SUM(output_tokens) as total_output_tokens,\n  SUM(total_tokens) as total_tokens,\n  ROUND(SUM(cost_usd)::numeric, 2) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider = 'llm'\n  AND model_name IS NOT NULL\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1\nORDER BY 6 DESC",
+            "rawSql": "SELECT\n  model_name,\n  ROUND(AVG(latency_ms)::numeric, 0) as avg_latency_ms,\n  SUM(input_tokens) as total_input_tokens,\n  SUM(output_tokens) as total_output_tokens,\n  SUM(total_tokens) as total_tokens,\n  ROUND(SUM(cost_usd)::numeric, 2) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider = 'llm'\n  AND model_name IS NOT NULL\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (COALESCE(environment, '(none)') IN ($environment))\n  AND (COALESCE(team, '(none)') IN ($team))\nGROUP BY 1\nORDER BY 6 DESC",
             "refId": "A"
           }
         ]
@@ -1235,7 +1235,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "WITH mtd AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records\n  WHERE usage_start >= date_trunc('month', current_date)\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (environment IN ($environment) OR environment IS NULL)\n    AND (team IN ($team) OR team IS NULL)\n),\ndays AS (\n  SELECT EXTRACT(DAY FROM current_date)::int AS elapsed,\n         EXTRACT(DAY FROM date_trunc('month', current_date) + INTERVAL '1 month' - INTERVAL '1 day')::int AS total\n)\nSELECT ROUND((mtd.val / NULLIF(days.elapsed, 0) * days.total)::numeric, 2) as forecast\nFROM mtd, days",
+            "rawSql": "WITH mtd AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records\n  WHERE usage_start >= date_trunc('month', current_date)\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (COALESCE(environment, '(none)') IN ($environment))\n    AND (COALESCE(team, '(none)') IN ($team))\n),\ndays AS (\n  SELECT EXTRACT(DAY FROM current_date)::int AS elapsed,\n         EXTRACT(DAY FROM date_trunc('month', current_date) + INTERVAL '1 month' - INTERVAL '1 day')::int AS total\n)\nSELECT ROUND((mtd.val / NULLIF(days.elapsed, 0) * days.total)::numeric, 2) as forecast\nFROM mtd, days",
             "refId": "A"
           }
         ]
@@ -1303,7 +1303,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "WITH daily AS (\n  SELECT DATE(usage_start) as day, SUM(cost_usd) as cost_usd\n  FROM cost_records\n  WHERE usage_start >= now() - INTERVAL '60 days'\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (environment IN ($environment) OR environment IS NULL)\n    AND (team IN ($team) OR team IS NULL)\n  GROUP BY 1\n),\nstats AS (\n  SELECT AVG(cost_usd) as mean, STDDEV(cost_usd) as stddev FROM daily\n)\nSELECT COUNT(*) as value\nFROM daily, stats\nWHERE cost_usd > mean + 2 * stddev\n  AND day >= date_trunc('month', current_date)",
+            "rawSql": "WITH daily AS (\n  SELECT DATE(usage_start) as day, SUM(cost_usd) as cost_usd\n  FROM cost_records\n  WHERE usage_start >= now() - INTERVAL '60 days'\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (COALESCE(environment, '(none)') IN ($environment))\n    AND (COALESCE(team, '(none)') IN ($team))\n  GROUP BY 1\n),\nstats AS (\n  SELECT AVG(cost_usd) as mean, STDDEV(cost_usd) as stddev FROM daily\n)\nSELECT COUNT(*) as value\nFROM daily, stats\nWHERE cost_usd > mean + 2 * stddev\n  AND day >= date_trunc('month', current_date)",
             "refId": "A"
           }
         ]
@@ -1371,7 +1371,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "WITH today AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records\n  WHERE DATE(usage_start) = current_date\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (environment IN ($environment) OR environment IS NULL)\n    AND (team IN ($team) OR team IS NULL)\n),\nsame_day_last_month AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records\n  WHERE DATE(usage_start) = current_date - INTERVAL '1 month'\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (environment IN ($environment) OR environment IS NULL)\n    AND (team IN ($team) OR team IS NULL)\n)\nSELECT ROUND(((today.val - same_day_last_month.val) / NULLIF(same_day_last_month.val, 0)) * 100, 2) as change_pct\nFROM today, same_day_last_month",
+            "rawSql": "WITH today AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records\n  WHERE DATE(usage_start) = current_date\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (COALESCE(environment, '(none)') IN ($environment))\n    AND (COALESCE(team, '(none)') IN ($team))\n),\nsame_day_last_month AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records\n  WHERE DATE(usage_start) = current_date - INTERVAL '1 month'\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (COALESCE(environment, '(none)') IN ($environment))\n    AND (COALESCE(team, '(none)') IN ($team))\n)\nSELECT ROUND(((today.val - same_day_last_month.val) / NULLIF(same_day_last_month.val, 0)) * 100, 2) as change_pct\nFROM today, same_day_last_month",
             "refId": "A"
           }
         ]
@@ -1475,7 +1475,7 @@
             },
             "format": "table",
             "rawQuery": true,
-            "rawSql": "SELECT\n  service_name,\n  usage_unit,\n  ROUND(SUM(cost_usd)::numeric, 2) as total_cost,\n  ROUND(SUM(usage_quantity)::numeric, 2) as total_quantity,\n  ROUND((SUM(cost_usd) / NULLIF(SUM(usage_quantity), 0))::numeric, 6) as cost_per_unit\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND usage_quantity IS NOT NULL\n  AND usage_unit IS NOT NULL\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY service_name, usage_unit\nORDER BY total_cost DESC\nLIMIT 20",
+            "rawSql": "SELECT\n  service_name,\n  usage_unit,\n  ROUND(SUM(cost_usd)::numeric, 2) as total_cost,\n  ROUND(SUM(usage_quantity)::numeric, 2) as total_quantity,\n  ROUND((SUM(cost_usd) / NULLIF(SUM(usage_quantity), 0))::numeric, 6) as cost_per_unit\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND usage_quantity IS NOT NULL\n  AND usage_unit IS NOT NULL\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (COALESCE(environment, '(none)') IN ($environment))\n  AND (COALESCE(team, '(none)') IN ($team))\nGROUP BY service_name, usage_unit\nORDER BY total_cost DESC\nLIMIT 20",
             "refId": "A"
           }
         ]
@@ -1562,7 +1562,7 @@
             },
             "format": "time_series",
             "rawQuery": true,
-            "rawSql": "SELECT\n  DATE(usage_start) as time,\n  ROUND(SUM(cost_usd)::numeric, 2) as value\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1\nORDER BY 1",
+            "rawSql": "SELECT\n  DATE(usage_start) as time,\n  ROUND(SUM(cost_usd)::numeric, 2) as value\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (COALESCE(environment, '(none)') IN ($environment))\n  AND (COALESCE(team, '(none)') IN ($team))\nGROUP BY 1\nORDER BY 1",
             "refId": "daily_cost"
           },
           {
@@ -1572,7 +1572,7 @@
             },
             "format": "time_series",
             "rawQuery": true,
-            "rawSql": "SELECT\n  null as time,\n  ROUND((AVG(daily_cost) + 2 * STDDEV(daily_cost))::numeric, 2) as value\nFROM (\n  SELECT SUM(cost_usd) as daily_cost\n  FROM cost_records\n  WHERE usage_start >= now() - INTERVAL '60 days'\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (environment IN ($environment) OR environment IS NULL)\n    AND (team IN ($team) OR team IS NULL)\n  GROUP BY DATE(usage_start)\n) sub",
+            "rawSql": "SELECT\n  null as time,\n  ROUND((AVG(daily_cost) + 2 * STDDEV(daily_cost))::numeric, 2) as value\nFROM (\n  SELECT SUM(cost_usd) as daily_cost\n  FROM cost_records\n  WHERE usage_start >= now() - INTERVAL '60 days'\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (COALESCE(environment, '(none)') IN ($environment))\n    AND (COALESCE(team, '(none)') IN ($team))\n  GROUP BY DATE(usage_start)\n) sub",
             "refId": "threshold"
           }
         ],
