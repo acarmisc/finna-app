@@ -1,0 +1,1320 @@
+{
+  "dashboard": {
+    "uid": "finops-llm-cost",
+    "title": "FinOps - LLM Cost",
+    "tags": [
+      "finops",
+      "llm",
+      "cost-management"
+    ],
+    "timezone": "browser",
+    "schemaVersion": 39,
+    "version": 0,
+    "refresh": "30m",
+    "templating": {
+      "list": [
+        {
+          "name": "model",
+          "type": "query",
+          "label": "Model",
+          "query": "SELECT DISTINCT model_name FROM cost_records WHERE provider = 'llm' AND model_name IS NOT NULL ORDER BY 1",
+          "datasource": {
+            "type": "postgres",
+            "uid": "efothkw3y68sgb"
+          },
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "hide": 0,
+          "sort": 1,
+          "current": {},
+          "options": []
+        },
+        {
+          "name": "project",
+          "type": "query",
+          "label": "Project",
+          "query": "SELECT DISTINCT COALESCE(project_name, '(no project)') FROM cost_records WHERE provider = 'llm' ORDER BY 1",
+          "datasource": {
+            "type": "postgres",
+            "uid": "efothkw3y68sgb"
+          },
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "hide": 0,
+          "sort": 1,
+          "current": {},
+          "options": []
+        }
+      ]
+    },
+    "time": {
+      "from": "now-30d",
+      "to": "now"
+    },
+    "timepicker": {
+      "refresh_intervals": [
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "1d"
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "MTD Cost",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 0,
+          "y": 0
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "efothkw3y68sgb"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 500
+                },
+                {
+                  "color": "red",
+                  "value": 1000
+                }
+              ]
+            },
+            "unit": "USD",
+            "decimals": 2
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "last"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT ROUND(SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd))::numeric, 2) as mtd\nFROM cost_records\nWHERE provider = 'llm'\n  AND usage_start >= date_trunc('month', current_date)\n  AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Previous Month",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 4,
+          "y": 0
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "efothkw3y68sgb"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 500
+                },
+                {
+                  "color": "red",
+                  "value": 1000
+                }
+              ]
+            },
+            "unit": "USD",
+            "decimals": 2
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "last"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT ROUND(SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd))::numeric, 2) as prev\nFROM cost_records\nWHERE provider = 'llm'\n  AND usage_start >= date_trunc('month', current_date - INTERVAL '1 month')\n  AND usage_start < date_trunc('month', current_date)\n  AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "MoM Growth",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 8,
+          "y": 0
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "efothkw3y68sgb"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 10
+                },
+                {
+                  "color": "red",
+                  "value": 20
+                }
+              ]
+            },
+            "unit": "percent",
+            "decimals": 2
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "last"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "WITH days_elapsed AS (\n  SELECT EXTRACT(DAY FROM current_date)::int AS n\n),\nmtd AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records, days_elapsed\n  WHERE provider = 'llm'\n    AND usage_start >= date_trunc('month', current_date)\n    AND usage_start < date_trunc('month', current_date) + (n || ' days')::interval\n    AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))\n),\nprev AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records, days_elapsed\n  WHERE provider = 'llm'\n    AND usage_start >= date_trunc('month', current_date - INTERVAL '1 month')\n    AND usage_start < date_trunc('month', current_date - INTERVAL '1 month') + (n || ' days')::interval\n    AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))\n)\nSELECT ROUND(((mtd.val - prev.val) / NULLIF(prev.val, 0)) * 100, 2) as growth\nFROM mtd, prev",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Total Tokens MTD",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 12,
+          "y": 0
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "efothkw3y68sgb"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "short",
+            "decimals": 1
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "last"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT SUM(total_tokens) as tokens\nFROM cost_records\nWHERE provider = 'llm'\n  AND usage_start >= date_trunc('month', current_date)\n  AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Cost / 1M Tokens",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 16,
+          "y": 0
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "efothkw3y68sgb"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 5
+                },
+                {
+                  "color": "red",
+                  "value": 15
+                }
+              ]
+            },
+            "unit": "USD",
+            "decimals": 2
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "last"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "WITH totals AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as total_cost,\n         SUM(total_tokens) as total_tokens\n  FROM cost_records\n  WHERE provider = 'llm'\n    AND usage_start >= date_trunc('month', current_date)\n    AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))\n)\nSELECT ROUND((total_cost / NULLIF(total_tokens, 0) * 1000000)::numeric, 2) as cost_per_1m\nFROM totals",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Avg Latency",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 20,
+          "y": 0
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "efothkw3y68sgb"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 2000
+                },
+                {
+                  "color": "red",
+                  "value": 5000
+                }
+              ]
+            },
+            "unit": "ms",
+            "decimals": 0
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "last"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT ROUND(AVG(latency_ms)::numeric, 0) as avg_latency\nFROM cost_records\nWHERE provider = 'llm'\n  AND usage_start >= date_trunc('month', current_date)\n  AND latency_ms IS NOT NULL\n  AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Daily Cost by Model",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 4
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "efothkw3y68sgb"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "fillOpacity": 80,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": true,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "time_series",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  DATE(usage_start) as time,\n  model_name as metric,\n  ROUND(SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd))::numeric, 2) as value\nFROM cost_records\nWHERE provider = 'llm'\n  AND $__timeFilter(usage_start)\n  AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))\nGROUP BY 1, 2\nORDER BY 1, 2",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Daily Token Volume by Model",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 4
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "efothkw3y68sgb"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "fillOpacity": 80,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": true,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "time_series",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  DATE(usage_start) as time,\n  model_name as metric,\n  SUM(total_tokens) as value\nFROM cost_records\nWHERE provider = 'llm'\n  AND $__timeFilter(usage_start)\n  AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))\nGROUP BY 1, 2\nORDER BY 1, 2",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Cost by Model",
+        "type": "barchart",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 12
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "efothkw3y68sgb"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "fillOpacity": 80,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "groupWidth": 0.7,
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": false
+          },
+          "orientation": "horizontal",
+          "showValue": "auto",
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          },
+          "xTickLabelRotation": 0
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  model_name,\n  ROUND(SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd))::numeric, 2) as total_cost\nFROM cost_records\nWHERE provider = 'llm'\n  AND $__timeFilter(usage_start)\n  AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))\nGROUP BY 1\nORDER BY 2 DESC",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Token Ratio by Model (Input vs Output)",
+        "type": "barchart",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 8,
+          "y": 12
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "efothkw3y68sgb"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "fillOpacity": 80,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "normal"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "options": {
+          "groupWidth": 0.7,
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": false
+          },
+          "orientation": "auto",
+          "showValue": "auto",
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          },
+          "xTickLabelRotation": 0
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  model_name,\n  SUM(input_tokens) as input_tokens,\n  SUM(output_tokens) as output_tokens\nFROM cost_records\nWHERE provider = 'llm'\n  AND $__timeFilter(usage_start)\n  AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))\nGROUP BY 1\nORDER BY 2 DESC",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Cost Share by Model",
+        "type": "piechart",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 16,
+          "y": 12
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "efothkw3y68sgb"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              }
+            },
+            "mappings": [],
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "displayLabels": [
+            "name",
+            "value",
+            "percent"
+          ],
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "showLegend": true,
+            "values": [
+              "value",
+              "percent"
+            ]
+          },
+          "pieType": "pie",
+          "reduceOptions": {
+            "calcs": [
+              "sum"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  model_name,\n  ROUND(SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd))::numeric, 2) as total_cost\nFROM cost_records\nWHERE provider = 'llm'\n  AND $__timeFilter(usage_start)\n  AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))\nGROUP BY 1\nORDER BY 2 DESC",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Model Performance Detail",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 20
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "efothkw3y68sgb"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "total_tokens"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "short"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "input_tokens"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "short"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "output_tokens"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "short"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "avg_latency_ms"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "ms"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "cost_per_1m_tokens"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "USD"
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "mode": "basic",
+                    "type": "color-background"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "total_requests"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "short"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "frameIndex": 0,
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": true,
+              "displayName": "total_cost"
+            }
+          ]
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  model_name,\n  ROUND(SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd))::numeric, 2) as total_cost,\n  SUM(total_tokens) as total_tokens,\n  SUM(input_tokens) as input_tokens,\n  SUM(output_tokens) as output_tokens,\n  ROUND(AVG(latency_ms)::numeric, 0) as avg_latency_ms,\n  ROUND((SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) / NULLIF(SUM(total_tokens), 0) * 1000000)::numeric, 4) as cost_per_1m_tokens,\n  COUNT(*) as total_requests\nFROM cost_records\nWHERE provider = 'llm'\n  AND $__timeFilter(usage_start)\n  AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))\nGROUP BY 1\nORDER BY total_cost DESC",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "Latency Trend by Model",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 28
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "efothkw3y68sgb"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "fillOpacity": 40,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": true,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "ms"
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "time_series",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  DATE(usage_start) as time,\n  model_name as metric,\n  ROUND(AVG(latency_ms)::numeric, 0) as value\nFROM cost_records\nWHERE provider = 'llm'\n  AND $__timeFilter(usage_start)\n  AND latency_ms IS NOT NULL\n  AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))\nGROUP BY 1, 2\nORDER BY 1, 2",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "title": "Daily Cost per 1M Tokens",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 28
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "efothkw3y68sgb"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "fillOpacity": 40,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": true,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "time_series",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  DATE(usage_start) as time,\n  model_name as metric,\n  ROUND((SUM(cost_usd) / NULLIF(SUM(total_tokens), 0) * 1000000)::numeric, 4) as value\nFROM cost_records\nWHERE provider = 'llm'\n  AND $__timeFilter(usage_start)\n  AND total_tokens > 0\n  AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))\nGROUP BY 1, 2\nORDER BY 1, 2",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "title": "Daily Cost Anomaly Detection",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 36
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "efothkw3y68sgb"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "fillOpacity": 60,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": true,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "time_series",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  DATE(usage_start) as time,\n  ROUND(SUM(cost_usd)::numeric, 2) as value\nFROM cost_records\nWHERE provider = 'llm'\n  AND $__timeFilter(usage_start)\n  AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))\nGROUP BY 1\nORDER BY 1",
+            "refId": "A"
+          },
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "efothkw3y68sgb"
+            },
+            "format": "time_series",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  null as time,\n  ROUND((AVG(daily_cost) + 2 * STDDEV(daily_cost))::numeric, 2) as value\nFROM (\n  SELECT SUM(cost_usd) as daily_cost\n  FROM cost_records\n  WHERE provider = 'llm'\n    AND usage_start >= now() - INTERVAL '60 days'\n    AND (model_name IN ($model) OR model_name IS NULL)\n  AND (COALESCE(project_name, '(no project)') IN ($project))\n  GROUP BY DATE(usage_start)\n) sub",
+            "refId": "threshold"
+          }
+        ]
+      }
+    ]
+  },
+  "overwrite": true,
+  "message": "Imported from finna-app Grafana dashboards"
+}
