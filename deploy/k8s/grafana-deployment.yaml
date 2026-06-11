@@ -22,7 +22,8 @@ data:
     [server]
     protocol = http
     http_port = 3000
-    domain = localhost
+    domain = grafana-finna-staging.ces.abssrv.it
+    root_url = https://grafana-finna-staging.ces.abssrv.it/
     
     [security]
     admin_user = admin

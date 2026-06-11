@@ -20,7 +20,7 @@
           "query": "SELECT DISTINCT provider FROM resource_wastage ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,
@@ -37,7 +37,7 @@
           "query": "SELECT DISTINCT severity FROM resource_wastage ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,
@@ -54,7 +54,7 @@
           "query": "SELECT DISTINCT category FROM resource_wastage ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,
@@ -71,7 +71,7 @@
           "query": "SELECT DISTINCT status FROM resource_wastage ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,

@@ -20,7 +20,7 @@
           "query": "SELECT DISTINCT provider FROM extractor_runs ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,
@@ -37,7 +37,7 @@
           "query": "SELECT DISTINCT status FROM extractor_runs WHERE status IS NOT NULL ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,
@@ -54,7 +54,7 @@
           "query": "SELECT DISTINCT extractor_type FROM extractors ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,

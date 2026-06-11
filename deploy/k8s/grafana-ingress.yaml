@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-finna-app-staging
+  namespace: finna-app-staging
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  labels:
+    app: grafana
+    environment: staging
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: grafana-finna-staging.ces.abssrv.it
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+  tls:
+  - hosts:
+    - grafana-finna-staging.ces.abssrv.it
+    secretName: grafana-finna-app-staging-tls

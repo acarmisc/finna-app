@@ -20,7 +20,7 @@
           "query": "SELECT DISTINCT severity FROM alerts WHERE severity IS NOT NULL ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,
@@ -37,7 +37,7 @@
           "query": "SELECT DISTINCT status FROM alerts WHERE status IS NOT NULL ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,

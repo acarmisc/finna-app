@@ -20,7 +20,7 @@
           "query": "SELECT DISTINCT provider FROM cloud_config ORDER BY 1",
           "datasource": {
             "type": "postgres",
-            "uid": "${DS_POSTGRES}"
+            "uid": "efothkw3y68sgb"
           },
           "refresh": 2,
           "includeAll": true,
