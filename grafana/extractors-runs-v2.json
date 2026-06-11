@@ -14,16 +14,6 @@
     "templating": {
       "list": [
         {
-          "name": "DS_POSTGRES",
-          "type": "datasource",
-          "label": "Datasource",
-          "query": "postgres",
-          "refresh": 1,
-          "hide": 0,
-          "current": {},
-          "options": []
-        },
-        {
           "name": "provider",
           "type": "query",
           "label": "Provider",
@@ -89,7 +79,7 @@
         },
         "datasource": {
           "type": "postgres",
-          "uid": "${DS_POSTGRES}"
+          "uid": "dfon7cdkmcs8wa"
         },
         "fieldConfig": {
           "defaults": {
@@ -128,7 +118,7 @@
           {
             "datasource": {
               "type": "postgres",
-              "uid": "${DS_POSTGRES}"
+              "uid": "dfon7cdkmcs8wa"
             },
             "format": "table",
             "rawQuery": true,
@@ -149,7 +139,7 @@
         },
         "datasource": {
           "type": "postgres",
-          "uid": "${DS_POSTGRES}"
+          "uid": "dfon7cdkmcs8wa"
         },
         "fieldConfig": {
           "defaults": {
@@ -188,7 +178,7 @@
           {
             "datasource": {
               "type": "postgres",
-              "uid": "${DS_POSTGRES}"
+              "uid": "dfon7cdkmcs8wa"
             },
             "format": "table",
             "rawQuery": true,
@@ -209,7 +199,7 @@
         },
         "datasource": {
           "type": "postgres",
-          "uid": "${DS_POSTGRES}"
+          "uid": "dfon7cdkmcs8wa"
         },
         "fieldConfig": {
           "defaults": {
@@ -256,7 +246,7 @@
           {
             "datasource": {
               "type": "postgres",
-              "uid": "${DS_POSTGRES}"
+              "uid": "dfon7cdkmcs8wa"
             },
             "format": "table",
             "rawQuery": true,
@@ -277,7 +267,7 @@
         },
         "datasource": {
           "type": "postgres",
-          "uid": "${DS_POSTGRES}"
+          "uid": "dfon7cdkmcs8wa"
         },
         "pluginVersion": "11.2.0",
         "fieldConfig": {
@@ -343,7 +333,7 @@
           {
             "datasource": {
               "type": "postgres",
-              "uid": "${DS_POSTGRES}"
+              "uid": "dfon7cdkmcs8wa"
             },
             "format": "time_series",
             "rawQuery": true,
@@ -364,7 +354,7 @@
         },
         "datasource": {
           "type": "postgres",
-          "uid": "${DS_POSTGRES}"
+          "uid": "dfon7cdkmcs8wa"
         },
         "pluginVersion": "11.2.0",
         "fieldConfig": {
@@ -430,7 +420,7 @@
           {
             "datasource": {
               "type": "postgres",
-              "uid": "${DS_POSTGRES}"
+              "uid": "dfon7cdkmcs8wa"
             },
             "format": "time_series",
             "rawQuery": true,
@@ -451,7 +441,7 @@
         },
         "datasource": {
           "type": "postgres",
-          "uid": "${DS_POSTGRES}"
+          "uid": "dfon7cdkmcs8wa"
         },
         "fieldConfig": {
           "defaults": {
@@ -549,7 +539,7 @@
           {
             "datasource": {
               "type": "postgres",
-              "uid": "${DS_POSTGRES}"
+              "uid": "dfon7cdkmcs8wa"
             },
             "format": "table",
             "rawQuery": true,
@@ -570,7 +560,7 @@
         },
         "datasource": {
           "type": "postgres",
-          "uid": "${DS_POSTGRES}"
+          "uid": "dfon7cdkmcs8wa"
         },
         "fieldConfig": {
           "defaults": {
@@ -658,7 +648,7 @@
           {
             "datasource": {
               "type": "postgres",
-              "uid": "${DS_POSTGRES}"
+              "uid": "dfon7cdkmcs8wa"
             },
             "format": "table",
             "rawQuery": true,
@@ -679,7 +669,7 @@
         },
         "datasource": {
           "type": "postgres",
-          "uid": "${DS_POSTGRES}"
+          "uid": "dfon7cdkmcs8wa"
         },
         "fieldConfig": {
           "defaults": {
@@ -769,7 +759,7 @@
           {
             "datasource": {
               "type": "postgres",
-              "uid": "${DS_POSTGRES}"
+              "uid": "dfon7cdkmcs8wa"
             },
             "format": "table",
             "rawQuery": true,
@@ -790,7 +780,7 @@
         },
         "datasource": {
           "type": "postgres",
-          "uid": "${DS_POSTGRES}"
+          "uid": "dfon7cdkmcs8wa"
         },
         "pluginVersion": "11.2.0",
         "fieldConfig": {
@@ -856,7 +846,7 @@
           {
             "datasource": {
               "type": "postgres",
-              "uid": "${DS_POSTGRES}"
+              "uid": "dfon7cdkmcs8wa"
             },
             "format": "time_series",
             "rawQuery": true,
@@ -867,10 +857,19 @@
       }
     ],
     "time": {
-      "from": "now-90d",
+      "from": "now-30d",
       "to": "now"
     },
-    "timepicker": {}
+    "timepicker": {
+      "refresh_intervals": [
+        "5m",
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "1d"
+      ]
+    }
   },
   "overwrite": true
 }
