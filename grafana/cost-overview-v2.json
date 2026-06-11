@@ -1,0 +1,1594 @@
+{
+  "dashboard": {
+    "uid": "finops-cost-overview",
+    "title": "FinOps - Cost Overview",
+    "tags": [
+      "finops",
+      "cost-management",
+      "multi-cloud"
+    ],
+    "timezone": "browser",
+    "schemaVersion": 39,
+    "version": 0,
+    "refresh": "30m",
+    "templating": {
+      "list": [
+        {
+          "name": "DS_POSTGRES",
+          "type": "datasource",
+          "label": "Datasource",
+          "query": "postgres",
+          "refresh": 1,
+          "hide": 0,
+          "current": {},
+          "options": []
+        },
+        {
+          "name": "provider",
+          "type": "query",
+          "label": "Provider",
+          "query": "SELECT DISTINCT provider FROM cost_records ORDER BY 1",
+          "datasource": {
+            "type": "postgres",
+            "uid": "${DS_POSTGRES}"
+          },
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "hide": 0,
+          "sort": 1,
+          "current": {},
+          "options": []
+        },
+        {
+          "name": "project",
+          "type": "query",
+          "label": "Project",
+          "query": "SELECT DISTINCT project_name FROM cost_records WHERE project_name IS NOT NULL AND project_name != '' ORDER BY 1",
+          "datasource": {
+            "type": "postgres",
+            "uid": "${DS_POSTGRES}"
+          },
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "hide": 0,
+          "sort": 1,
+          "current": {},
+          "options": []
+        },
+        {
+          "name": "region",
+          "type": "query",
+          "label": "Region",
+          "query": "SELECT DISTINCT region FROM cost_records WHERE region IS NOT NULL AND region != '' ORDER BY 1",
+          "datasource": {
+            "type": "postgres",
+            "uid": "${DS_POSTGRES}"
+          },
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "hide": 0,
+          "sort": 1,
+          "current": {},
+          "options": []
+        },
+        {
+          "name": "service",
+          "type": "query",
+          "label": "Service",
+          "query": "SELECT DISTINCT service_name FROM cost_records ORDER BY 1",
+          "datasource": {
+            "type": "postgres",
+            "uid": "${DS_POSTGRES}"
+          },
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "hide": 0,
+          "sort": 1,
+          "current": {},
+          "options": []
+        },
+        {
+          "name": "resource_type",
+          "type": "query",
+          "label": "Resource Type",
+          "query": "SELECT DISTINCT resource_type FROM cost_records WHERE resource_type IS NOT NULL AND resource_type != '' ORDER BY 1",
+          "datasource": {
+            "type": "postgres",
+            "uid": "${DS_POSTGRES}"
+          },
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "hide": 0,
+          "sort": 1,
+          "current": {},
+          "options": []
+        },
+        {
+          "name": "environment",
+          "type": "query",
+          "label": "Environment",
+          "query": "SELECT DISTINCT environment FROM cost_records WHERE environment IS NOT NULL AND environment != '' ORDER BY 1",
+          "datasource": {
+            "type": "postgres",
+            "uid": "${DS_POSTGRES}"
+          },
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "hide": 0,
+          "sort": 1,
+          "current": {},
+          "options": []
+        },
+        {
+          "name": "team",
+          "type": "query",
+          "label": "Team",
+          "query": "SELECT DISTINCT team FROM cost_records WHERE team IS NOT NULL AND team != '' ORDER BY 1",
+          "datasource": {
+            "type": "postgres",
+            "uid": "${DS_POSTGRES}"
+          },
+          "refresh": 2,
+          "includeAll": true,
+          "multi": true,
+          "hide": 0,
+          "sort": 1,
+          "current": {},
+          "options": []
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Daily Cost Trend",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "pluginVersion": "11.2.0",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "fillOpacity": 80,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": true,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "time_series",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  DATE(usage_start) as time,\n  provider || ' / ' || COALESCE(service_name, 'unknown') as metric,\n  SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as value\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1, 2\nORDER BY 1, 2",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "MTD Cost",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 0,
+          "y": 8
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 500
+                },
+                {
+                  "color": "red",
+                  "value": 1000
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "last"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT ROUND(SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd))::numeric, 2) as mtd\nFROM cost_records\nWHERE\n  usage_start >= date_trunc('month', current_date)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Previous Month",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 4,
+          "y": 8
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "last"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT ROUND(SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd))::numeric, 2) as prev\nFROM cost_records\nWHERE\n  usage_start >= date_trunc('month', current_date - INTERVAL '1 month')\n  AND usage_start < date_trunc('month', current_date)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "MoM Growth %",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 4,
+          "x": 8,
+          "y": 8
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 10
+                },
+                {
+                  "color": "red",
+                  "value": 20
+                }
+              ]
+            },
+            "unit": "percent"
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "last"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "WITH days_elapsed AS (\n  SELECT EXTRACT(DAY FROM current_date)::int AS n\n),\nmtd AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records, days_elapsed\n  WHERE usage_start >= date_trunc('month', current_date)\n    AND usage_start < date_trunc('month', current_date) + (n || ' days')::interval\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (environment IN ($environment) OR environment IS NULL)\n    AND (team IN ($team) OR team IS NULL)\n),\nprev AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records, days_elapsed\n  WHERE usage_start >= date_trunc('month', current_date - INTERVAL '1 month')\n    AND usage_start < date_trunc('month', current_date - INTERVAL '1 month') + (n || ' days')::interval\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (environment IN ($environment) OR environment IS NULL)\n    AND (team IN ($team) OR team IS NULL)\n)\nSELECT ROUND(((mtd.val - prev.val) / NULLIF(prev.val, 0)) * 100, 2) as growth\nFROM mtd, prev",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Total Projects",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 3,
+          "x": 12,
+          "y": 8
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "fixed",
+              "fixedColor": "blue"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "none"
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "last"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT COUNT(DISTINCT project_id) as count FROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Cost by Service - Top 15",
+        "type": "barchart",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 12
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "fillOpacity": 80,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "normal"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "orientation": "horizontal",
+          "xTickLabelRotation": 0,
+          "groupWidth": 0.7,
+          "showValue": "auto",
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": false
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  service_name,\n  SUM(cost_usd) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 15",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Cost by Region",
+        "type": "barchart",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 8,
+          "y": 12
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "fillOpacity": 80,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "percent"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "orientation": "auto",
+          "xTickLabelRotation": 0,
+          "groupWidth": 0.7,
+          "showValue": "auto",
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  region,\n  provider,\n  SUM(cost_usd) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND region IS NOT NULL AND region != ''\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1, 2\nORDER BY 3 DESC",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Cost by Resource Type",
+        "type": "barchart",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 16,
+          "y": 12
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "fillOpacity": 80,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "normal"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "orientation": "horizontal",
+          "xTickLabelRotation": 0,
+          "groupWidth": 0.7,
+          "showValue": "auto",
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": false
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  resource_type,\n  SUM(cost_usd) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND resource_type IS NOT NULL AND resource_type != ''\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 15",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Cost by Charge Type",
+        "type": "piechart",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 0,
+          "y": 20
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              }
+            },
+            "mappings": [],
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "displayLabels": [
+            "name",
+            "value",
+            "percent"
+          ],
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "showLegend": true,
+            "values": [
+              "value",
+              "percent"
+            ]
+          },
+          "pieType": "pie",
+          "reduceOptions": {
+            "calcs": [
+              "sum"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "tooltip": {
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  charge_type,\n  SUM(cost_usd) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND charge_type IS NOT NULL AND charge_type != ''\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1\nORDER BY 2 DESC",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Top 10 SKUs by Cost",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 8,
+          "y": 20
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "service_name"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 300
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "region"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 100
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "resource_type"
+              },
+              "properties": [
+                {
+                  "id": "custom.width",
+                  "value": 200
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "sortBy": [
+            {
+              "desc": true,
+              "displayName": "total_cost"
+            }
+          ],
+          "frameIndex": 0,
+          "showHeader": true
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  service_name,\n  region,\n  resource_type,\n  charge_type,\n  COUNT(*) as records,\n  ROUND(SUM(cost_usd)::numeric, 2) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1, 2, 3, 4\nORDER BY 6 DESC\nLIMIT 20",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Projects by MTD Cost",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 8,
+          "x": 16,
+          "y": 20
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "sortBy": [
+            {
+              "desc": true,
+              "displayName": "mtd_cost"
+            }
+          ],
+          "frameIndex": 0,
+          "showHeader": true
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  COALESCE(project_name, '(no project)') as project,\n  provider,\n  COUNT(*) as records,\n  ROUND(SUM(cost_usd)::numeric, 2) as mtd_cost\nFROM cost_records\nWHERE\n  usage_start >= date_trunc('month', current_date)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1, 2\nORDER BY 4 DESC",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Cost Heatmap (Provider \u00d7 Service)",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 28
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "color-background",
+                "mode": "basic"
+              },
+              "inspect": false,
+              "minWidth": 100
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "rgba(0,128,0,0.1)",
+                  "value": null
+                },
+                {
+                  "color": "rgba(255,255,0,0.5)",
+                  "value": 100
+                },
+                {
+                  "color": "rgba(255,0,0,0.7)",
+                  "value": 500
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "sortBy": [],
+          "frameIndex": 0,
+          "showHeader": true
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  provider,\n  service_name,\n  region,\n  ROUND(SUM(cost_usd)::numeric, 2) as total_cost,\n  COUNT(*) as records\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1, 2, 3\nORDER BY 4 DESC",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "LLM Cost Detail (Tokens & Models)",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 28
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "total_tokens"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "none"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "latency_ms"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "ms"
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "sortBy": [
+            {
+              "desc": true,
+              "displayName": "total_cost"
+            }
+          ],
+          "frameIndex": 0,
+          "showHeader": true
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  model_name,\n  ROUND(AVG(latency_ms)::numeric, 0) as avg_latency_ms,\n  SUM(input_tokens) as total_input_tokens,\n  SUM(output_tokens) as total_output_tokens,\n  SUM(total_tokens) as total_tokens,\n  ROUND(SUM(cost_usd)::numeric, 2) as total_cost\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider = 'llm'\n  AND model_name IS NOT NULL\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1\nORDER BY 6 DESC",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "title": "Run Rate Forecast",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 0,
+          "y": 36
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 10000
+                },
+                {
+                  "color": "red",
+                  "value": 20000
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "last"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "WITH mtd AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records\n  WHERE usage_start >= date_trunc('month', current_date)\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (environment IN ($environment) OR environment IS NULL)\n    AND (team IN ($team) OR team IS NULL)\n),\ndays AS (\n  SELECT EXTRACT(DAY FROM current_date)::int AS elapsed,\n         EXTRACT(DAY FROM date_trunc('month', current_date) + INTERVAL '1 month' - INTERVAL '1 day')::int AS total\n)\nSELECT ROUND((mtd.val / NULLIF(days.elapsed, 0) * days.total)::numeric, 2) as forecast\nFROM mtd, days",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "title": "Anomalous Days (MTD)",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 8,
+          "y": 36
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 1
+                },
+                {
+                  "color": "red",
+                  "value": 3
+                }
+              ]
+            },
+            "unit": "none"
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "last"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "WITH daily AS (\n  SELECT DATE(usage_start) as day, SUM(cost_usd) as cost_usd\n  FROM cost_records\n  WHERE usage_start >= now() - INTERVAL '60 days'\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (environment IN ($environment) OR environment IS NULL)\n    AND (team IN ($team) OR team IS NULL)\n  GROUP BY 1\n),\nstats AS (\n  SELECT AVG(cost_usd) as mean, STDDEV(cost_usd) as stddev FROM daily\n)\nSELECT COUNT(*) as value\nFROM daily, stats\nWHERE cost_usd > mean + 2 * stddev\n  AND day >= date_trunc('month', current_date)",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 16,
+        "title": "Today vs Same Day Last Month",
+        "type": "stat",
+        "gridPos": {
+          "h": 4,
+          "w": 8,
+          "x": 16,
+          "y": 36
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "orange",
+                  "value": 10
+                },
+                {
+                  "color": "red",
+                  "value": 20
+                }
+              ]
+            },
+            "unit": "percent"
+          },
+          "overrides": []
+        },
+        "options": {
+          "colorMode": "value",
+          "graphMode": "none",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "reduceOptions": {
+            "calcs": [
+              "last"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "textMode": "auto"
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "WITH today AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records\n  WHERE DATE(usage_start) = current_date\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (environment IN ($environment) OR environment IS NULL)\n    AND (team IN ($team) OR team IS NULL)\n),\nsame_day_last_month AS (\n  SELECT SUM(COALESCE(NULLIF(net_cost_usd, 0), cost_usd)) as val\n  FROM cost_records\n  WHERE DATE(usage_start) = current_date - INTERVAL '1 month'\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (environment IN ($environment) OR environment IS NULL)\n    AND (team IN ($team) OR team IS NULL)\n)\nSELECT ROUND(((today.val - same_day_last_month.val) / NULLIF(same_day_last_month.val, 0)) * 100, 2) as change_pct\nFROM today, same_day_last_month",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 17,
+        "title": "Unit Economics ($ / Unit)",
+        "type": "table",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 40
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            }
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "total_cost"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "currency"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "cost_per_unit"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "currency"
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "color-background",
+                    "mode": "basic"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "options": {
+          "cellHeight": "sm",
+          "footer": {
+            "countRows": false,
+            "enable_pagination": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "frameIndex": 0,
+          "showHeader": true,
+          "sortBy": [
+            {
+              "desc": true,
+              "displayName": "total_cost"
+            }
+          ]
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "table",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  service_name,\n  usage_unit,\n  ROUND(SUM(cost_usd)::numeric, 2) as total_cost,\n  ROUND(SUM(usage_quantity)::numeric, 2) as total_quantity,\n  ROUND((SUM(cost_usd) / NULLIF(SUM(usage_quantity), 0))::numeric, 6) as cost_per_unit\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND usage_quantity IS NOT NULL\n  AND usage_unit IS NOT NULL\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY service_name, usage_unit\nORDER BY total_cost DESC\nLIMIT 20",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 18,
+        "title": "Daily Cost Anomaly Detection",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 48
+        },
+        "datasource": {
+          "type": "postgres",
+          "uid": "${DS_POSTGRES}"
+        },
+        "pluginVersion": "11.2.0",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "fillOpacity": 80,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "never",
+              "spanNulls": true,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "dashed"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            },
+            "unit": "USD"
+          },
+          "overrides": []
+        },
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "table",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "mode": "multi",
+            "sort": "desc"
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "time_series",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  DATE(usage_start) as time,\n  ROUND(SUM(cost_usd)::numeric, 2) as value\nFROM cost_records\nWHERE\n  $__timeFilter(usage_start)\n  AND provider IN ($provider)\n  AND (project_name IN ($project) OR project_name IS NULL)\n  AND (region IN ($region) OR region IS NULL)\n  AND (service_name IN ($service) OR service_name IS NULL)\n  AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n  AND (environment IN ($environment) OR environment IS NULL)\n  AND (team IN ($team) OR team IS NULL)\nGROUP BY 1\nORDER BY 1",
+            "refId": "daily_cost"
+          },
+          {
+            "datasource": {
+              "type": "postgres",
+              "uid": "${DS_POSTGRES}"
+            },
+            "format": "time_series",
+            "rawQuery": true,
+            "rawSql": "SELECT\n  null as time,\n  ROUND((AVG(daily_cost) + 2 * STDDEV(daily_cost))::numeric, 2) as value\nFROM (\n  SELECT SUM(cost_usd) as daily_cost\n  FROM cost_records\n  WHERE usage_start >= now() - INTERVAL '60 days'\n    AND provider IN ($provider)\n    AND (project_name IN ($project) OR project_name IS NULL)\n    AND (region IN ($region) OR region IS NULL)\n    AND (service_name IN ($service) OR service_name IS NULL)\n    AND (resource_type IN ($resource_type) OR resource_type IS NULL)\n    AND (environment IN ($environment) OR environment IS NULL)\n    AND (team IN ($team) OR team IS NULL)\n  GROUP BY DATE(usage_start)\n) sub",
+            "refId": "threshold"
+          }
+        ],
+        "description": "Daily cost (bars) with mean + 2\u03c3 threshold line (dashed). Days above the line are statistical anomalies."
+      }
+    ]
+  },
+  "overwrite": true
+}
