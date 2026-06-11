@@ -49,23 +49,28 @@ for dashboard_file in "${dashboards[@]}"; do
         continue
     fi
     
-    # Create import payload
-    payload=$(cat "$dashboard_file" | jq -c '{
-        dashboard: .,
-        overwrite: true,
-        message: "Imported from finna-app Grafana dashboards"
-    }')
+    # Create import payload (files may already be in wrapped {dashboard, overwrite} format)
+    if jq -e '.dashboard' "$dashboard_file" > /dev/null 2>&1; then
+        payload=$(jq -c '.message = "Imported from finna-app Grafana dashboards"' "$dashboard_file")
+    else
+        payload=$(jq -c '{
+            dashboard: .,
+            overwrite: true,
+            message: "Imported from finna-app Grafana dashboards"
+        }' "$dashboard_file")
+    fi
     
     # Make API call with basic auth support
+    # Note: Grafana 13+ uses /api/dashboards/db, not /api/dashboard/import
     if [[ "$AUTH" == *":"* ]]; then
         # Basic auth (username:password)
-        response=$(curl -s -X POST "${GRAFANA_URL}/api/dashboard/import" \
+        response=$(curl -s -X POST "${GRAFANA_URL}/api/dashboards/db" \
             -u "$AUTH" \
             -H "Content-Type: application/json" \
             -d "$payload")
     else
         # Bearer token
-        response=$(curl -s -X POST "${GRAFANA_URL}/api/dashboard/import" \
+        response=$(curl -s -X POST "${GRAFANA_URL}/api/dashboards/db" \
             -H "Authorization: Bearer ${AUTH}" \
             -H "Content-Type: application/json" \
             -d "$payload")
