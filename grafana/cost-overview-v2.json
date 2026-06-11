@@ -1002,7 +1002,7 @@
       },
       {
         "id": 12,
-        "title": "Cost Heatmap (Provider × Service)",
+        "title": "Cost Heatmap (Provider \u00d7 Service)",
         "type": "table",
         "gridPos": {
           "h": 8,
@@ -1131,6 +1131,42 @@
               "matcher": {
                 "id": "byName",
                 "options": "latency_ms"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "ms"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "total_input_tokens"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "none"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "total_output_tokens"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "none"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "avg_latency_ms"
               },
               "properties": [
                 {
@@ -1576,7 +1612,7 @@
             "refId": "threshold"
           }
         ],
-        "description": "Daily cost (bars) with mean + 2σ threshold line (dashed). Days above the line are statistical anomalies."
+        "description": "Daily cost (bars) with mean + 2\u03c3 threshold line (dashed). Days above the line are statistical anomalies."
       }
     ],
     "time": {
