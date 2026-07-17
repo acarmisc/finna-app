@@ -5,7 +5,11 @@ Finna is a FinOps platform that extracts, normalizes, and visualizes cloud costs
 ## Quick Start
 
 ```bash
-./startup.sh
+cp .env.example .env
+# Generate strong secrets and fill in JWT_SECRET / ENCRYPTION_KEY / POSTGRES_PASSWORD in .env:
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+
+docker compose up -d
 ```
 
 - **API**: http://localhost:8000
@@ -228,4 +232,5 @@ docker build -f Dockerfile.extractor -t finna-extractor .
 - [Operational Guide](docs/operational-guide.md) — Deployment and maintenance
 - [Troubleshooting](docs/troubleshooting-runbook.md) — Common issues and fixes
 - [Tagging Strategy](docs/tagging-strategy.md) — Resource labeling conventions
+- [SQL Query Cookbook](docs/queries.md) — Ready-to-run cost/usage/anomaly queries
 - [API Reference](docs/openapi.yaml) — OpenAPI specification

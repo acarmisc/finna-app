@@ -23,21 +23,14 @@ from collections.abc import Sequence
 from pathlib import Path
 
 import psycopg
-from psycopg.rows import dict_row
 from psycopg.sql import SQL
 from psycopg.types.json import Json
-from tenacity import (
-    before_sleep_log,
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
 
 from extractors.gcp_shared import (
     DEFAULT_SERVICE_CATEGORY_MAP,
     normalize_csv_row,
 )
+from extractors.health_check import _get_pg_connection
 from models import NormalizedCostRecord, ServiceCategory
 
 logger = logging.getLogger("extractors.gcp_csv")
@@ -67,18 +60,6 @@ _INSERT_SQL = SQL(
     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
     "ON CONFLICT (record_id) DO NOTHING"
 )
-
-
-@retry(
-    retry=retry_if_exception_type((psycopg.OperationalError, psycopg.InterfaceError)),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=30),
-    before_sleep=before_sleep_log(logger, logging.WARNING),
-    reraise=True,
-)
-def _get_pg_connection(dsn: str) -> psycopg.Connection:
-    """Open a PostgreSQL connection with retry on transient errors."""
-    return psycopg.connect(dsn, row_factory=dict_row, autocommit=False)  # type: ignore[arg-type]
 
 
 def _batch_insert(

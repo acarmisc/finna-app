@@ -1,6 +1,11 @@
 from __future__ import annotations
+
 from typing import Any
-from .base import query_all as _query_all, query_one as _query_one, execute as _execute, insert_and_return as _insert_and_return
+
+from .base import execute as _execute
+from .base import insert_and_return as _insert_and_return
+from .base import query_all as _query_all
+from .base import query_one as _query_one
 
 
 def query_all_configs(sql: str, params: tuple | None = None) -> list[dict[str, Any]]:

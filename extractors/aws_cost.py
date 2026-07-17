@@ -28,7 +28,6 @@ from typing import Any
 
 import psycopg
 from botocore.exceptions import ClientError  # type: ignore[import-untyped]
-from psycopg import sql as psycopg_sql
 from tenacity import (
     before_sleep_log,
     retry,
@@ -37,6 +36,8 @@ from tenacity import (
     wait_fixed,
 )
 
+from extractors.common import convert_to_usd
+from extractors.common import load_exchange_rates as _load_exchange_rates
 from models import NormalizedCostRecord, Provider, ServiceCategory
 
 logger = logging.getLogger(__name__)
@@ -215,44 +216,8 @@ def normalize_aws_cost_records(
 
 
 # ---------------------------------------------------------------------------#
-# Exchange-rate lookup                                                      #
+# Exchange-rate lookup (extractors.common.load_exchange_rates / convert_to_usd)
 # ---------------------------------------------------------------------------#
-
-
-ALLOWED_EXCHANGE_TABLES = {"exchange_rates"}
-
-
-def _load_exchange_rates(
-    conn: psycopg.Connection, table: str = "exchange_rates"
-) -> dict[str, Decimal]:
-    rates: dict[str, Decimal] = {"USD": Decimal("1")}
-    if table not in ALLOWED_EXCHANGE_TABLES:
-        raise ValueError(f"Invalid exchange rate table: {table}")
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                psycopg_sql.SQL("SELECT currency, rate_to_usd FROM {}").format(
-                    psycopg_sql.Identifier(table)
-                )
-            )
-            for row in cur.fetchall():
-                rates[row[0]] = Decimal(str(row[1]))
-    except psycopg.Error:
-        conn.rollback()
-        logger.warning("Failed to load exchange rates; defaulting USD=1")
-    return rates
-
-
-def convert_to_usd(
-    amount: Decimal, currency: str, rates: dict[str, Decimal]
-) -> Decimal:
-    if currency == "USD":
-        return amount
-    rate = rates.get(currency)
-    if rate is None:
-        logger.warning("No rate for %s — treating as USD", currency)
-        return amount
-    return (amount * rate).quantize(Decimal("0.000001"))
 
 
 # ---------------------------------------------------------------------------#

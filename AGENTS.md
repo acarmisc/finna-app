@@ -1,83 +1,77 @@
 # finna-app — Agent Guide
 
-Multi-cloud FinOps platform: Python FastAPI backend (API-only).
+Multi-cloud FinOps platform: Python FastAPI backend (API-only), cloud cost extractors, Grafana dashboards.
 
-## Repository layout
+## Commands
 
-- `backend/` — FastAPI app, routes, services, alembic migrations.
-- `extractors/` — GCP/Azure/AWS/LLM cost-data extractors.
-- `models/` — shared Python data models.
-- `tests/` — pytest suite for backend.
+```bash
+# Install dependencies
+uv sync
 
-## Common commands
+# Start dev server
+uv run uvicorn backend.app.api.main:app --host 0.0.0.0 --port 8000 --reload
 
-### Backend
-- **Install**: `uv sync` (or `uv pip install --system -e ".[dev]"`)
-- **Run dev**: `uv run uvicorn backend.app.api.main:app --host 0.0.0.0 --port 8000 --reload`
-- **Tests**: `uv run pytest -q`
-- **Type check**: `uv run mypy backend/ extractors/ models/`
-- **Lint**: `uv run ruff check .`
+# Run tests
+uv run pytest -q                           # unit tests
+uv run pytest -m integration               # integration tests (need running DB)
+uv run pytest -m "not integration"         # skip integration tests
 
-### Full stack
-- `docker compose up --build` — boots api + postgres together.
+# Lint and typecheck (CI scope)
+uv run ruff check backend/ extractors/ models/
+uv run mypy backend/ extractors/ models/ --ignore-missing-imports --explicit-package-bases
 
-## CI
+# Full stack (API + PostgreSQL)
+docker compose up --build
+```
 
-`.github/workflows/ci.yml` — builds and pushes Docker images to ghcr.io on main/tags:
-1. **Fast**: lint (ruff), typecheck (mypy), tests (pytest)
-2. **Build**: multi-platform Docker image (amd64 + arm64) → ghcr.io/acarmisc/finops-api
+**Required env vars for local dev:** `PG_DSN`, `JWT_SECRET` (>=32 chars), `ENCRYPTION_KEY` (>=32 chars), `ALLOWED_ORIGINS`. Copy `.env.example` to `.env`.
 
-**No deployment steps** — CI only builds and pushes images.
+## Architecture
 
-## Backend
+**Backend entry points:**
+- `backend/app/api/main.py` — FastAPI app factory, lifespan, CORS, rate limiting
+- `backend/app/api/db.py` — async psycopg connection pool (`init_async_pool` at startup)
+- `backend/app/api/auth.py` — JWT auth (`HS256` default), bcrypt passwords, OIDC support
 
-- Type-hint everything; mypy strict on routes and services.
-- Use psycopg async with the connection pool from `backend.app.api.db`.
-- JWT in `Authorization: Bearer ...`; configured via `backend.app.api.auth`.
+**Key directories:**
+- `backend/app/api/routes/` — endpoint modules: `costs.py`, `config.py`, `alerts.py`, `extractors_registry.py`, `wastage.py`, `auth_providers.py`, `oidc_auth.py`
+- `backend/app/api/queries/` — SQL query modules per domain
+- `backend/app/wastage/` — wastage rule engine (`rules/azure.py`, extensible via `@rule` decorator)
+- `extractors/` — standalone cost extractors; dispatched via `EXTRACTOR_TYPE` env var (see `entrypoint.py`)
+- `models/normalized.py` — shared Pydantic/data models
+- `config/auth.py` — auth config helpers
+- `utils/` — shared utilities (`encryption.py`, `log_sanitizer.py`)
+- `sql/` — schema + seed data (`init.sql` for prod, `init_docker.sql` for CI/local)
+- `alembic/` — top-level alembic config (CI uses this for migrations)
+- `tests/` — pytest suite; `conftest.py` sets `TESTING=1` and generates random `JWT_SECRET`/`ENCRYPTION_KEY`
 
-## Known issues / gotchas
+## CI Pipeline
 
-- **Docker build**: Use Python 3.14 paths in COPY commands (not 3.12)
-- **Colima users**: If buildx cache corrupts, run `colima stop && colima start`
+`.github/workflows/ci.yml` runs on push to main/develop and PRs to main:
+1. Lint + typecheck (`ruff check` + `mypy`)
+2. Tests with postgres:16 service container (schema from `init_docker.sql`, then `alembic upgrade head`)
+3. Docker build + push to `ghcr.io/acarmisc/finops-api` (main/tags only)
 
-## Grafana Deployment (staging)
+`.github/workflows/security.yml` — pip-audit, ruff, semgrep (continue-on-error), gitleaks, tests.
 
-Runs in `finna-app-staging` namespace on GKE.
+`.github/workflows/release.yml` — on `v*` tags: builds both `finops-api` and `finops-extractor` images, runs Trivy scan, creates GitHub Release.
 
-- **Deployment**: `/Users/andrea/Projects/personal/finna-app/deploy/k8s/grafana-deployment.yaml`
-- **Image**: `grafana/grafana:latest` (v13.0.2)
-- **Access**: port-forward `kubectl -n finna-app-staging port-forward svc/grafana 3000:3000`
-- **Login**: `admin` / `Grafana2026!`
+## Key conventions
 
-### Dashboards (6 FinOps dashboards, v2)
-Stored in `/Users/andrea/Projects/personal/finna-app/grafana/*-v2.json`
+- **Python 3.11+** (pyproject says `>=3.11`, Dockerfiles use 3.12, CI uses 3.12)
+- **Async psycopg** — always use the pool from `backend.app.api.db`; never raw connections
+- **Tests set `TESTING=1`** — this bypasses pool init so tests don't need a real DB (conftest mocks or creates a small pool)
+- **Integration tests** are marked `@pytest.mark.integration` and require a live PostgreSQL
+- **Migrations**: two paths — `alembic upgrade head` (CI), or `AUTO_MIGRATE=true` env var in Docker (runs on boot)
+- **Alembic DSN**: uses `PG_DSN` or `DATABASE_URL`; normalizes `postgres://` → `postgresql+psycopg://`
+- **Two Dockerfiles**: `Dockerfile.api` (FastAPI backend) and `Dockerfile.extractor` (extractor runner, both Python 3.12-slim)
+- **Extractor entrypoint**: `python -m extractors.entrypoint`, dispatches on `EXTRACTOR_TYPE` env var
+- **Line length**: 120 (ruff.toml)
 
-| Dashboard | UID | Panels | Key SQL patterns |
-|-----------|-----|--------|-----------------|
-| Cost Overview | `finops-cost-overview` | 13 | `$__timeFilter(usage_start)`, `project_name IN ($project) OR project_name IS NULL` |
-| Projects & Budgets | `finops-projects` | 7 | `fin_projects` table, `COALESCE(NULLIF(cost_center,''),'Uncategorized')` |
-| Alerts | `finops-alerts` | 8 | `alert`, `alert_rule`, `alert_notification_state` tables |
-| Configs & Extractors | `finops-configs` | 7 | `cloud_config`, `extractors` tables |
-| Extractors & Runs | `finops-extractors` | 7 | `extractor_runs` table |
-| Wastage | `finops-wastage` | 8 | `resource_wastage` table |
+## Critical gotchas
 
-### Template variables (Cost Overview)
-All use `includeAll: true` + `multi: true` pattern (multi-select with "All"):
-- `$provider` — from `cost_records.provider`
-- `$project` — from `cost_records.project_name`
-- `$region` — from `cost_records.region`
-- `$service` — from `cost_records.service_name`
-- `$resource_type` — from `cost_records.resource_type`
-- `DS_POSTGRES` — datasource selector
-
-### Database (finna-staging)
-- **Host**: `10.1.128.19:5432`, **User**: `finna-staging`, **DB**: `finna-staging`
-- **PG_DSN**: `postgres://finna-staging:abstract.2026.A@10.1.128.19:5432/finna-staging?sslmode=require`
-
-**Key tables**: `cost_records` (12,189 rows, azure+llm), `fin_projects` (22 azure projects, all budget_cap=0, mtd=0)
-
-### Known Grafana issues
-- **Port-forward must restart** after each pod replacement (killed automatically)
-- **LLM NULL columns**: LLM provider records have `project_name IS NULL`, `region IS NULL` — SQL must use `OR column IS NULL` pattern
-- **Multi-value All**: Use `column IN ($var) OR column IS NULL` instead of `($var = '' OR column IN ($var))` to avoid SQL syntax errors with multi-select
-- **`fin_projects.budget_cap`** is `0` for all projects (no budgets configured) — panels show "No data" because budget-based queries filter `WHERE budget_cap > 0`
+- **Two SQL init files**: `init.sql` needs `pg_partman`/`pg_cron` (prod); `init_docker.sql` works with stock postgres (CI/local). Never use `init.sql` in Docker or CI.
+- **Docker image COPY paths** use `python3.12` — if you bump the Python version in Dockerfiles, update the COPY paths too
+- **`JWT_SECRET` and `ENCRYPTION_KEY`** are required at startup (app won't boot without them, >=32 chars each)
+- **`ALLOWED_ORIGINS`** is required; wildcards (`*`) are rejected at startup
+- **OIDC multi-replica warning**: in-memory state storage breaks under load balancers; set `DEPLOY_MODE=single` for single-replica

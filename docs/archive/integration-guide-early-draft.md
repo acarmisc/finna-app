@@ -1,3 +1,8 @@
+> **Archived, historical.** Early draft integration guide, superseded by
+> the root [README.md](../../README.md) (Setup / Configuration / Deployment
+> sections cover the same ground with current commands). Kept for
+> historical context only.
+
 # FinOps Console - Integration Guide
 
 ## Overview

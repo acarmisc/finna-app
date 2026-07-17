@@ -64,12 +64,14 @@ async def init_async_pool() -> AsyncConnectionPool:
             dsn,
             min_size=config["min_size"],
             max_size=config["max_size"],
+            open=False,
             kwargs={
                 "connect_timeout": 10,
                 "row_factory": dict_row,  # type: ignore[arg-type]
             },
         )
 
+        await _async_pool.open()
         await _async_pool.wait(timeout=30)
         logger.info("Async connection pool initialized successfully for testing")
         return _async_pool
@@ -87,12 +89,14 @@ async def init_async_pool() -> AsyncConnectionPool:
         dsn,
         min_size=config["min_size"],
         max_size=config["max_size"],
+        open=False,
         kwargs={
             "connect_timeout": 10,
             "row_factory": dict_row,  # type: ignore[arg-type]
         },
     )
 
+    await _async_pool.open()
     await _async_pool.wait(timeout=30)
     logger.info("Async connection pool initialized successfully")
     return _async_pool
@@ -119,6 +123,7 @@ def init_sync_pool() -> ConnectionPool:
             dsn,
             min_size=config["min_size"],
             max_size=config["max_size"],
+            open=True,
             kwargs={
                 "connect_timeout": 10,
                 "row_factory": dict_row,  # type: ignore[arg-type]
@@ -142,6 +147,7 @@ def init_sync_pool() -> ConnectionPool:
         dsn,
         min_size=config["min_size"],
         max_size=config["max_size"],
+        open=True,
         kwargs={
             "connect_timeout": 10,
             "row_factory": dict_row,  # type: ignore[arg-type]
@@ -299,6 +305,16 @@ async def _close_async_pool() -> None:
             logger.warning("Timeout closing async connection pool")
 
 
+def is_pool_healthy() -> bool:
+    """Cheap, non-blocking liveness signal: is the async pool initialized and open?
+
+    Unlike a real query, this never touches the network, so it's safe to call
+    from a fast liveness probe (e.g. a container HEALTHCHECK) without risking
+    a restart storm if the database is merely slow rather than actually down.
+    """
+    return _async_pool is not None and not _async_pool.closed
+
+
 def get_pool_stats() -> dict[str, Any]:
     """Get pool statistics for monitoring."""
     stats: dict[str, Any] = {"async": None, "sync": None}
@@ -320,28 +336,6 @@ def get_pool_stats() -> dict[str, Any]:
         }
 
     return stats
-
-
-def init_db() -> None:
-    """Initialize database tables if they don't exist."""
-    from pathlib import Path
-
-    conn = get_connection()
-    try:
-        migrations_dir = Path(__file__).parent.parent / "sql" / "migrations"
-        with conn.cursor() as cur:
-            for migration_file in sorted(migrations_dir.glob("*.sql")):
-                logger.info("Running migration: %s", migration_file.name)
-                sql = migration_file.read_text()
-                cur.execute(sql)
-        conn.commit()
-        logger.info("Database initialized successfully")
-    except (psycopg.Error, OSError, ValueError):
-        conn.rollback()
-        logger.exception("Failed to initialize database")
-        raise
-    finally:
-        release_connection(conn)
 
 
 def query_one(sql: str, params: tuple | None = None) -> dict[str, Any] | None:

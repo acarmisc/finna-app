@@ -79,9 +79,9 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY daily_costs;
 
 ## Dashboard Issues
 
-### Superset Connection Problems
+### Grafana Datasource Connection Problems
 
-1. Test datasource in Superset: Data > Databases > Test Connection
+1. Test datasource in Grafana: Connections > Data sources > PostgreSQL > Save & Test
 2. Verify PostgreSQL is accessible
 3. Check SSL settings: add `?sslmode=require` to connection URI
 
@@ -89,11 +89,11 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY daily_costs;
 
 - Open panel editor, click "Query", verify SQL runs directly
 - Check table/column names match database schema
-- Re-run bootstrap script:
+- Re-import dashboards:
 
 ```bash
-export SUPERSET_BASE_URL=http://your-superset:8088
-python3 superset/bootstrap.py
+cd grafana
+./import-dashboards.sh http://localhost:3000 <your-grafana-api-key>
 ```
 
 ## PostgreSQL Issues

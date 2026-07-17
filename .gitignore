@@ -27,7 +27,6 @@ Thumbs.db
 
 # Docker
 pg_data/
-superset_data/
 
 # Environment
 .env

@@ -38,6 +38,11 @@
 --
 -- Returns one row per provider+project when a spike is detected:
 --   provider | project_id | today_cost | baseline_avg | spike_pct | threshold_pct
+--
+-- A statistical (mean + 2 std-dev) alternative lives in
+-- docs/queries.md under "Anomaly Detection" — better for volatile
+-- projects where a fixed percentage over/under-triggers; this fixed-
+-- percentage version is the one wired into the live alert rule.
 -- =============================================================================
 
 WITH params AS (

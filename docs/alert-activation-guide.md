@@ -1,24 +1,30 @@
 # FinOps Alert Activation Guide
 
+> **Partially stale (2026-07):** this guide was written against Superset's
+> **Alerts & Reports** feature. Superset has been removed from this repo
+> (dashboards moved to Grafana, see [`grafana/README.md`](../grafana/README.md))
+> and nothing in the codebase currently evaluates alert SQL or sends
+> notifications — the `alerts` table (see `backend/app/api/routes/alerts.py`)
+> is read/acknowledge-only. Section 1, 3, and 4 below describe the old
+> Superset-specific activation flow and no longer apply as written; they're
+> kept for reference until alert evaluation is re-implemented (e.g. via
+> Grafana alerting rules, or a scheduled job against `sql/alert_queries.sql`).
+> Sections 2 and 5 (SQL threshold tuning) are still accurate — the `params`
+> CTEs they describe live in plain SQL and aren't tool-specific.
+
 This guide covers how to activate and customize the prepared alert rules for a
 new client deployment.  All rules ship in a **disabled** state so nothing fires
 until you explicitly enable it.
 
 ---
 
-## 1. Activating Alerts for a New Client
+## 1. Activating Alerts for a New Client *(Superset-specific — see banner above)*
 
 1. **Configure notification channels** — In Superset, navigate to
    **Alerts & Reports > Alerts** and set up notification integrations:
-   - **Email**: Configure the SMTP settings in `superset/superset_config.py`
-     (add `SMTP_*` variables) or via environment variables.
+   - **Email**: Configure the SMTP settings via environment variables.
    - **Slack**: Add a Slack webhook URL when creating the alert.
    - **Webhook**: Supply a custom endpoint URL when creating the alert.
-
-   Restart the Superset container to pick up config changes:
-   ```bash
-   docker compose restart superset
-   ```
 
 2. **Enable alerts** — In the Superset UI:
    - Navigate to **Alerts & Reports**.
@@ -81,7 +87,7 @@ In the Superset UI: edit the alert, update the SQL, and save.
 
 ---
 
-## 3. Configuring Notification Channels
+## 3. Configuring Notification Channels *(Superset-specific — see banner above)*
 
 Superset alerts deliver notifications via **email**, **Slack**, or a **webhook
 endpoint**.  Configure each channel when creating or editing an alert:
@@ -111,7 +117,7 @@ SMTP_MAIL_FROM = "superset@example.com"
 
 ---
 
-## 4. Testing Alerts
+## 4. Testing Alerts *(Superset-specific — see banner above)*
 
 ### Test a single alert manually
 

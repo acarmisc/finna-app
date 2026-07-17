@@ -23,35 +23,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added — Resource Wastage (Phases 6-8)
+## [1.5.0] — 2026-07-17
 
-**Phase 6 — API** (`backend/app/api/routes/wastage.py`, `backend/app/api/queries/wastage_queries.py`)
-- `GET /api/v1/wastage` — list findings with filters (`provider`, `severity`, `rule_id`, `status`, `account_id`) and offset pagination
-- `GET /api/v1/wastage/summary` — group findings by category, sum `estimated_monthly_usd`
-- `GET /api/v1/wastage/rules` — iterate live `REGISTRY` → rule catalog
-- `GET /api/v1/wastage/scans` — scan run history
-- `GET /api/v1/wastage/{finding_id}` — single finding detail
-- `POST /api/v1/wastage/{finding_id}/ack` — set status `acked`
-- `POST /api/v1/wastage/{finding_id}/resolve` — set status `resolved`
-- `POST /api/v1/wastage/{finding_id}/ignore` — set status `ignored`, store reason in tags
-- `POST /api/v1/wastage/scan` — enqueue runner (returns 503 if Agent B runner not yet merged)
-- Pydantic schemas added to `backend/app/api/models.py` (Wastage* family)
-- Router registered in `backend/app/api/main.py`
-- API tests: `tests/api/test_wastage.py` (happy path, auth checks, filter tests, pagination, 503-stub)
+### Added
+- Grafana LLM Cost dashboard (15 panels) and anomaly detection, MTTA/MTTR, live budget
+  aggregation, data-freshness, and team/env filters across existing dashboards.
+- `extractors/common.py` — shared cross-provider currency conversion and exchange-rate
+  lookup (previously duplicated in `aws_cost.py` and `azure_cost.py`).
+- `scripts/migrate_config_encryption.py` — one-shot, dry-run-by-default migration to
+  re-encrypt any `cloud_config`/`auth_providers` rows still in a legacy (pre-Fernet)
+  format. Not run against production data as part of this release.
+- `db.is_pool_healthy()` — cheap, non-blocking pool-state check used by `/healthz`.
 
-**Phase 7 — UI** (`ui/src/features/wastage/`)
-- `WastagePage` with summary cards, list-price disclaimer banner, filter bar (provider / severity / rule / status), findings table sortable by savings, row-click detail drawer (evidence JSON, ack / resolve / ignore buttons)
-- Types: `ui/src/types/wastage.ts`
-- React Query hooks: `ui/src/api/hooks/useWastage.ts`
-- Sidebar nav entry ("Wastage", `trash-2` icon, `/wastage` route)
-- Route added in `ui/src/main.tsx`
-- Component tests: `ui/src/features/wastage/WastagePage.spec.tsx`
-- Playwright E2E: `ui/e2e/wastage.spec.ts`
+### Changed
+- `/healthz` no longer hardcodes `"database": "ok"`; it now reports a real (but
+  non-blocking) pool-health signal so the container `HEALTHCHECK` can't be fooled.
+  Deliberately still does not open a DB connection, to avoid turning a transient DB
+  blip into a container restart storm — see `/api/v1/health` for a real round-trip check.
+  - Deprecated (not removed) the 5 CLI-compatible `/configs` endpoints in
+  `backend/app/api/routes/config.py`; they now show as deprecated in the generated
+  OpenAPI schema and in `docs/openapi.yaml`.
+- Grafana provisioning/import fixes for Grafana 13 compatibility (datasource UID,
+  default time range, pre-wrapped dashboard JSON handling).
+- Consolidated duplicated extractor helpers (`_get_pg_connection`, `convert_to_usd`,
+  `_load_exchange_rates`) across `aws_cost.py`, `azure_cost.py`, `exchange_rates.py`,
+  `gcp_billing.py`, `gcp_csv.py` into shared code. `azure_cost.py`'s exchange-rate
+  lookup now uses the same `psycopg.sql.Identifier`-based query as `aws_cost.py`
+  instead of an f-string.
+- Removed unused dependencies: `questionary`, `rich`, `keyring`, `pyarrow`, plus
+  redundant direct pins on `msal`/`msal-extensions` (still installed transitively
+  via `azure-identity`).
+- `main.py`'s OpenTelemetry tracing no longer installs a `ConsoleSpanExporter` by
+  default (was printing span JSON to stdout on every request in production). Now
+  gated on `OTEL_EXPORTER_OTLP_ENDPOINT` being set, or `OTEL_DEBUG=1` for local
+  console output.
 
-**Phase 8 — Docs**
-- `README.md` Core Features: added Resource Wastage Detection section
-- `docs/wastage.md`: rule catalog, how-to-add-a-rule guide, price refresh process
-- CHANGELOG entry (this entry)
+### Fixed
+- `extractors/exchange_rates.py`'s `_mark_health_failure` was missing a
+  `conn.rollback()` present in the equivalent code in `aws_cost.py`/`gcp_csv.py`/
+  `gcp_billing.py` — if the extractor's main transaction had failed, the
+  health-failure write itself would silently fail too (aborted-transaction error
+  swallowed), so the real failure never reached `extractor_health`.
+- `backend/app/api/db.py`'s async/sync connection pool construction now passes
+  `open=` explicitly (was relying on a default psycopg-pool is deprecating);
+  `AsyncConnectionPool` uses `open=False` + an awaited `pool.open()`, `ConnectionPool`
+  uses `open=True` — the two need different fixes to avoid the pool library's own
+  deprecation warnings.
+- `backend/app/api/queries/*.py` import-order lint errors (6 files).
+- Dashboard import script updated for the Grafana 13 API endpoint; `daily_costs`
+  materialized view queries use `COALESCE` for `environment`/`team` to avoid an
+  empty-`IN ()` SQL error; UoM override fixed for token columns and `avg_latency_ms`.
+
+### Removed
+- `backend/utils/`, `backend/alembic/` (empty/dead duplicates of top-level `utils/`
+  and `alembic/`), `superset/` (unreferenced since dashboards moved to Grafana),
+  `sql/migrations/*.sql` (superseded by alembic revisions), a dead `init_db()`
+  function in `db.py` that read from the now-removed `sql/migrations/`, and several
+  stale `__pycache__`-only directories from a pre-refactor source layout.
+- `HANDOFF.md` and `INTEGRATION.md` moved to `docs/archive/` (stale, superseded by
+  current docs, kept for historical reference). `queries/QUERIES.md` moved to
+  `docs/queries.md`.
+
+### Known issue (not fixed in this release)
+- `backend/app/api/db.py`'s `close_pools()`, when called from within a running
+  event loop, schedules the pool close via `loop.create_task()` without awaiting
+  it and clears the pool reference before that task runs — so the pool is never
+  actually closed and its connections leak. Not caused by this release (the
+  Phase E pool-construction fix above was verified in isolation not to be the
+  cause); flagged here for a dedicated follow-up.
 
 ## [v1.3.0] - 2026-05-14
 

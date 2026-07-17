@@ -1,3 +1,8 @@
+> **Archived, historical.** In-progress session handoff from 2026-05-16.
+> The work it describes (OIDC backend, docs/oidc-setup.md) has since
+> shipped. Kept for historical context only — do not treat as current
+> status. See docs/oidc-setup.md for the up-to-date OIDC guide.
+
 # OIDC SSO Integration — Handoff Notes
 
 **Date:** 2026-05-16  

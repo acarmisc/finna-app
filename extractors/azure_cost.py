@@ -59,6 +59,8 @@ from tenacity import (
     wait_exponential,
 )
 
+from extractors.common import convert_to_usd
+from extractors.common import load_exchange_rates as _load_exchange_rates
 from models import NormalizedCostRecord, Provider, ServiceCategory
 
 logger = logging.getLogger(__name__)
@@ -247,42 +249,8 @@ def _parse_tags(tags_value: Any) -> dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
-# Exchange-rate lookup
+# Exchange-rate lookup (extractors.common.load_exchange_rates / convert_to_usd)
 # ---------------------------------------------------------------------------
-
-
-ALLOWED_EXCHANGE_TABLES = {"exchange_rates"}
-
-
-def _load_exchange_rates(
-    conn: psycopg.Connection, table: str = "exchange_rates"
-) -> dict[str, Decimal]:
-    """Load exchange rates from the database. Returns {currency_code: rate_to_usd}."""
-    rates: dict[str, Decimal] = {"USD": Decimal("1")}
-    if table not in ALLOWED_EXCHANGE_TABLES:
-        raise ValueError(f"Invalid exchange rate table: {table}")
-    try:
-        with conn.cursor() as cur:
-            cur.execute(f"SELECT currency as currency_code, rate_to_usd FROM {table}")  # noqa: S608 — validated via allowlist
-            for row in cur.fetchall():
-                rates[row[0]] = Decimal(str(row[1]))
-    except psycopg.Error:
-        conn.rollback()
-        logger.warning(
-            "Failed to load exchange rates from %s; assuming USD=1 only", table
-        )
-    return rates
-
-
-def convert_to_usd(cost: Decimal, currency: str, rates: dict[str, Decimal]) -> Decimal:
-    """Convert a cost in *currency* to USD using the provided rates dict."""
-    if currency == "USD":
-        return cost
-    rate = rates.get(currency)
-    if rate is None:
-        logger.warning("No exchange rate for currency %s — treating as USD=1", currency)
-        return cost
-    return (cost * rate).quantize(Decimal("0.000001"))
 
 
 # ---------------------------------------------------------------------------

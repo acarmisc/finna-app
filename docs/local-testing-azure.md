@@ -177,6 +177,5 @@ export PYTHON_KEYRING_BACKEND=keyring.backends.null.Keyring
 
 ## Next Steps
 
-- **Superset dashboards**: Run `uv run python superset/bootstrap.py` to visualize your Azure cost data
-- **Full wizard**: Run `uv run python -m config.wizard` for end-to-end multi-cloud setup
+- **Grafana dashboards**: Run `./grafana/import-dashboards.sh http://localhost:3000 <api-key>` to visualize your cost data (see [grafana/README.md](../grafana/README.md))
 - **GCP**: Run `uv run python -m config.auth gcp` to set up GCP credentials via `gcloud auth login`

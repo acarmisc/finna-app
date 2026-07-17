@@ -435,6 +435,7 @@ paths:
       description: Alias of `GET /config` returning a paginated wrapper object (`data`, `total`, `page`). Intended for the
         Finna CLI tool.
       operationId: cli_config_list_api_v1_configs_get
+      deprecated: true
       responses:
         '200':
           description: Successful Response
@@ -453,6 +454,7 @@ paths:
       description: Simplified config create for the CLI. Accepts `provider`, `service_category`, `region`, and `cloud_config`
         fields.
       operationId: cli_configs_create_api_v1_configs_post
+      deprecated: true
       requestBody:
         content:
           application/json:
@@ -483,6 +485,7 @@ paths:
       summary: CLI-compatible config get
       description: Alias of `GET /config/{config_id}` returning a flat object with `service_category` and `region` fields.
       operationId: cli_config_get_api_v1_configs__config_id__get
+      deprecated: true
       security:
       - OAuth2PasswordBearer: []
       parameters:
@@ -513,6 +516,7 @@ paths:
       summary: CLI-compatible config update
       description: Simplified config update for the CLI.
       operationId: cli_configs_update_api_v1_configs__config_id__put
+      deprecated: true
       security:
       - OAuth2PasswordBearer: []
       parameters:
@@ -549,6 +553,7 @@ paths:
       summary: CLI-compatible config delete
       description: Deletes a config entry. Returns 404 if not found.
       operationId: cli_configs_delete_api_v1_configs__config_id__delete
+      deprecated: true
       security:
       - OAuth2PasswordBearer: []
       parameters:

@@ -20,7 +20,6 @@ from decimal import ROUND_HALF_UP, Decimal
 
 import psycopg
 from defusedxml import ElementTree as ET
-from psycopg.rows import dict_row
 from tenacity import (
     before_sleep_log,
     retry,
@@ -28,6 +27,8 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+
+from extractors.health_check import _get_pg_connection
 
 logger = logging.getLogger("extractors.exchange_rates")
 
@@ -180,17 +181,6 @@ def _convert_to_usd_rates(rates_vs_eur: dict[str, Decimal]) -> dict[str, Decimal
 # Database operations
 # ---------------------------------------------------------------------------
 
-@retry(
-    retry=retry_if_exception_type((psycopg.OperationalError, psycopg.InterfaceError)),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=30),
-    before_sleep=before_sleep_log(logger, logging.WARNING),
-    reraise=True,
-)
-def _get_pg_connection(dsn: str) -> psycopg.Connection:
-    """Open a PostgreSQL connection with retry on transient errors."""
-    return psycopg.connect(dsn, row_factory=dict_row, autocommit=False)  # type: ignore[arg-type]
-
 
 _UPSERT_SQL = """
     INSERT INTO exchange_rates (currency, rate_to_usd, rate_date, source, fetched_at)
@@ -269,6 +259,7 @@ def _mark_health_success(conn: psycopg.Connection, record_count: int) -> None:
 def _mark_health_failure(conn: psycopg.Connection, error_message: str) -> None:
     """Mark the extractor as *failed* in ``extractor_health``."""
     try:
+        conn.rollback()  # clear any aborted transaction before writing
         with conn.cursor() as cur:
             cur.execute(
                 """

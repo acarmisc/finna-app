@@ -273,6 +273,13 @@ ORDER BY avg_latency_ms DESC;
 
 ### Days with abnormally high cost (> mean + 2σ)
 
+> This is a statistical (z-score) detector for ad-hoc analysis. The live
+> alert rule in [`sql/alert_queries.sql`](../sql/alert_queries.sql) uses a
+> simpler fixed-percentage threshold instead (easier to reason about for
+> on-call). Both solve "did costs spike" — pick the z-score version here
+> when you want sensitivity that adapts to a project's normal volatility,
+> the percentage version when you want a predictable, explainable trigger.
+
 ```sql
 WITH daily AS (
     SELECT

@@ -157,10 +157,15 @@ async def health() -> dict[str, str]:
 
 @app.get("/healthz")
 async def healthz() -> dict[str, Any]:
-    """Healthz endpoint returns status, api name, and database health (mocked)."""
-    # Intentionally returning with status ok, api name, and database status
-    # The actual database status is mocked in tests
-    return {"status": "ok", "api": "finops-orchestrator", "database": "ok"}
+    """Liveness probe: process is up, plus a cheap (non-blocking) pool check.
+
+    Deliberately does not open a new database connection — this backs the
+    container HEALTHCHECK, and a slow/degraded DB must not cause Docker to
+    restart an otherwise-healthy API process. For a real DB round-trip, see
+    /api/v1/health.
+    """
+    db_status = "ok" if db.is_pool_healthy() else "unavailable"
+    return {"status": "ok", "api": "finops-orchestrator", "database": db_status}
 
 
 @app.get("/api/v1/health")
@@ -219,17 +224,33 @@ instrumentator = Instrumentator()
 instrumentator.instrument(app)
 instrumentator.expose(app, include_in_schema=False)
 
-# Initialize OpenTelemetry tracing (skip in test/disabled environments)
-if not os.environ.get("TESTING") and os.environ.get("OTEL_SDK_DISABLED", "").lower() != "true":
+# Initialize OpenTelemetry tracing (skip in test/disabled environments).
+# Only wire up a real exporter when an OTLP collector endpoint is configured —
+# otherwise every request would print span JSON to stdout via the console
+# exporter (log noise + I/O cost). OTEL_DEBUG=1 opts into console output
+# explicitly for local debugging without a collector.
+_otel_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+_otel_debug = os.environ.get("OTEL_DEBUG", "").lower() == "1"
+if (
+    not os.environ.get("TESTING")
+    and os.environ.get("OTEL_SDK_DISABLED", "").lower() != "true"
+    and (_otel_endpoint or _otel_debug)
+):
     try:
         from opentelemetry import trace
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
         from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
         provider = TracerProvider()
-        processor = BatchSpanProcessor(ConsoleSpanExporter())
-        provider.add_span_processor(processor)
+        if _otel_endpoint:
+            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+
+            provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=_otel_endpoint)))
+        else:
+            from opentelemetry.sdk.trace.export import ConsoleSpanExporter
+
+            provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
         trace.set_tracer_provider(provider)
 
         FastAPIInstrumentor().instrument()

@@ -28,7 +28,6 @@ import psycopg
 from google.api_core.exceptions import ServerError, ServiceUnavailable, TooManyRequests
 from google.cloud import bigquery
 from google.cloud.bigquery import QueryJobConfig
-from psycopg.rows import dict_row
 from psycopg.sql import SQL
 from psycopg.types.json import Json
 from tenacity import (
@@ -46,6 +45,7 @@ from extractors.gcp_shared import (
     parse_datetime,
     resolve_service_category,
 )
+from extractors.health_check import _get_pg_connection
 from models import NormalizedCostRecord, Provider, ServiceCategory
 
 logger = logging.getLogger("extractors.gcp_billing")
@@ -230,16 +230,6 @@ _INSERT_SQL = SQL(
 )
 
 
-@retry(
-    retry=retry_if_exception_type((psycopg.OperationalError, psycopg.InterfaceError)),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=30),
-    before_sleep=before_sleep_log(logger, logging.WARNING),
-    reraise=True,
-)
-def _get_pg_connection(dsn: str) -> psycopg.Connection:
-    """Open a PostgreSQL connection with retry on transient errors."""
-    return psycopg.connect(dsn, row_factory=dict_row, autocommit=False)  # type: ignore[arg-type]
 
 
 def _batch_insert(

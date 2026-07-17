@@ -483,10 +483,15 @@ async def delete_config(config_id: str) -> None:
 
 
 # ─── CLI-compatible /configs endpoints ───────────────────────────────────────
+# Deprecated aliases of /config (singular) kept for an external CLI client
+# that predates this API's REST conventions. A prior removal attempt was
+# reverted (see commit 75d05a5) because something still depended on them, so
+# they're marked deprecated in OpenAPI rather than deleted. Use /config for
+# any new integration.
 
-@router.get("/configs", dependencies=[Depends(require_auth)])
+@router.get("/configs", dependencies=[Depends(require_auth)], deprecated=True)
 async def cli_config_list() -> dict[str, Any]:
-    """CLI-compatible config list wrapper."""
+    """CLI-compatible config list wrapper. Deprecated: use GET /config."""
     rows = query_all(
         "SELECT id, provider, name, credential_type, config, created_at, updated_at, "
         "last_test, last_test_at, err FROM cloud_config ORDER BY provider, name"
@@ -508,9 +513,9 @@ async def cli_config_list() -> dict[str, Any]:
         })
     return {"data": data, "total": len(data), "page": 1, "page_size": len(data), "has_next": False, "has_prev": False}
 
-@router.get("/configs/{config_id}", dependencies=[Depends(require_auth)])
+@router.get("/configs/{config_id}", dependencies=[Depends(require_auth)], deprecated=True)
 async def cli_config_get(config_id: str) -> dict[str, Any]:
-    """CLI-compatible config get."""
+    """CLI-compatible config get. Deprecated: use GET /config/{id}."""
     sql = (
         "SELECT id, provider, name, credential_type, config, created_at, "
         "updated_at, last_test, last_test_at, err FROM cloud_config WHERE id = %s"
@@ -550,9 +555,9 @@ class _ConfigCreate(_BM):
     service_category: str | None = None
     region: str | None = None
 
-@router.post("/configs", dependencies=[Depends(require_auth)], status_code=201)
+@router.post("/configs", dependencies=[Depends(require_auth)], status_code=201, deprecated=True)
 async def cli_configs_create(data: _ConfigCreate) -> dict[str, Any]:
-    """CLI-compatible config create."""
+    """CLI-compatible config create. Deprecated: use POST /config."""
     cfg_id = str(_uuid.uuid4())
     now = __dt.now(UTC)
     cfg_dict: dict[str, Any] = {"provider": data.provider}
@@ -586,9 +591,9 @@ async def cli_configs_create(data: _ConfigCreate) -> dict[str, Any]:
         "last_updated": now.isoformat(),
     }
 
-@router.put("/configs/{config_id}", dependencies=[Depends(require_auth)])
+@router.put("/configs/{config_id}", dependencies=[Depends(require_auth)], deprecated=True)
 async def cli_configs_update(config_id: str, data: _ConfigCreate) -> dict[str, Any]:
-    """CLI-compatible config update."""
+    """CLI-compatible config update. Deprecated: use PUT /config/{id}."""
     existing = query_one("SELECT id FROM cloud_config WHERE id = %s", (config_id,))
     if not existing:
         raise HTTPException(status_code=404, detail="Configuration not found")
@@ -614,9 +619,9 @@ async def cli_configs_update(config_id: str, data: _ConfigCreate) -> dict[str, A
         "last_updated": now.isoformat(),
     }
 
-@router.delete("/configs/{config_id}", dependencies=[Depends(require_auth)], status_code=204)
+@router.delete("/configs/{config_id}", dependencies=[Depends(require_auth)], status_code=204, deprecated=True)
 async def cli_configs_delete(config_id: str) -> None:
-    """CLI-compatible config delete."""
+    """CLI-compatible config delete. Deprecated: use DELETE /config/{id}."""
     existing = query_one("SELECT id FROM cloud_config WHERE id = %s", (config_id,))
     if not existing:
         raise HTTPException(status_code=404, detail="Configuration not found")
