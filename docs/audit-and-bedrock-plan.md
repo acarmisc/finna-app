@@ -16,13 +16,17 @@ enforced secrets validation at boot, CORS wildcard rejection, log sanitisation, 
 with real tests, and a documented price-catalog pattern.
 
 But **the core data path does not work.** Three of the four cost extractors cannot write a single
-row to the database, and OIDC single sign-on cannot complete a login. Both failures are invisible
-to the test suite because the tests assert against mocks rather than against a database or a real
-token. A reader of the test report would conclude the system is healthy; it is not.
+row to the database, and OIDC single sign-on is broken twice over — every ID token is rejected, and
+every provider read path returns 500. All three failures are invisible to the test suite, because
+it asserts against mocks rather than a real database, a real token, or a real response body. A
+reader of the test report would conclude the system is healthy; it is not.
 
 The headline items are small, surgical fixes — roughly a day of work for the P0s. They should land
 before any Bedrock work begins, because the Bedrock extractor would inherit the same broken insert
 path and the same unencrypted-credential storage.
+
+Baseline on a pristine database, run exactly as CI does: **24 failed, 478 passed, 5 skipped, 7
+errors** — plus 4 `mypy` errors that fail the typecheck gate outright.
 
 ---
 
@@ -125,6 +129,47 @@ then narrow the handler so `JWTClaimsError` reports a claim failure distinctly f
 failure. The manual `exp`/`iss`/`aud`/`nonce` checks below become belt-and-braces; keep the `nonce`
 check (jose does not validate it) and keep the `alg` allowlist above (it correctly rejects `none`
 and `HS*` before any key material is chosen).
+
+### P0-3 — Every OIDC provider *read* path returns 500 (raw UUID into a `str` field)
+
+Three sites pass psycopg's `uuid.UUID` straight into a Pydantic field declared `str`:
+
+| Site | Endpoint |
+|---|---|
+| `routes/auth_providers.py:89` | `GET /api/v1/auth/providers` (admin list) |
+| `routes/auth_providers.py:122` | `GET /api/v1/auth/providers/{provider_id}` |
+| `routes/oidc_auth.py:132` | provider list used by the login flow |
+
+Pydantic v2 does not coerce `UUID` → `str`, so each raises `ValidationError` → **500**:
+
+```
+pydantic_core.ValidationError: 1 validation error for AuthProviderResponse
+id
+  Input should be a valid string [type=string_type,
+   input_value=UUID('0b271ff0-dd03-468e-8773-3c7468dc260b'), input_type=UUID]
+```
+
+The create path escapes it (it stringifies), so **a provider can be created and then never read
+back** — not in the admin list, not individually, and not by the login flow. Reproduced directly
+against a pristine database:
+
+```
+CREATE:        200  0b271ff0-dd03-468e-8773-3c7468dc260b
+GET  by id:    500
+LIST (admin):  500
+```
+
+This is the second, independent break in OIDC: even with P0-2 fixed, the login flow cannot enumerate
+providers. It is also the true cause of most of the OIDC test noise — the `KeyError: 'state'`
+failures in `test_oidc_e2e.py` are downstream of a 500 from the login endpoint, not the test-data
+residue they superficially resemble (see the correction in P2-3).
+
+Commit `f804320` ("fix OIDC UUID crash") fixed one instance of this class; three remain.
+
+**Fix.** `id=str(row["id"])` at all three sites, matching what the create path already does. Better,
+declare the field as `uuid.UUID` and let Pydantic serialise it, so the next endpoint cannot
+reintroduce the bug. A response-model test that actually asserts on a 200 body would have caught it —
+the existing tests assert on status codes that were already failing.
 
 ### P1-1 — CI is red on `main`
 
@@ -249,12 +294,19 @@ A unit test must never depend on ambient credentials, and must never reach the n
 
 `tests/test_oidc_e2e.py` and `tests/test_auth_providers.py` `POST` providers with fixed names and
 never clean up. On a second run against the same database the create returns `409 Conflict` and the
-tests fail with `KeyError: 'id'` / `KeyError: 'state'` — cascading into ~12 failures and errors that
-look like product bugs but are residue. Auto-provisioned `auth_users` rows also hold a foreign key
-to `auth_providers`, so a naive cleanup is blocked.
+tests fail with `KeyError: 'id'`. Auto-provisioned `auth_users` rows also hold a foreign key to
+`auth_providers`, so a naive cleanup is blocked.
 
-Verified: the create endpoint itself is correct — called directly against a clean database it
-returns `200` with a well-formed body. The failures are purely test hygiene.
+Measured on those two files, recreating the database between the two runs:
+
+| Run | Result |
+|---|---|
+| 1 — pristine database | 7 failed, 7 passed |
+| 2 — same database, immediately after | 10 failed, 4 passed |
+
+So residue accounts for **3 extra failures**, not the bulk of them. The other 7 are genuine product
+bugs — P0-3 (UUID→`str`) and P0-2 (audience). This is a real hygiene problem worth fixing, but it is
+a P2, and it should not be used to explain away the OIDC failures: those are real.
 
 **Fix.** Wrap each test in a transaction that rolls back, or add a fixture that truncates
 `auth_users, auth_providers RESTART IDENTITY CASCADE` between tests, and randomise provider names.
@@ -527,7 +579,7 @@ Mirroring the existing extractor test layout, plus the gap that let P0-1 through
 
 | Phase | Work | Depends on |
 |---|---|---|
-| **0 — unblock** | P0-1 insert fix + arity guard test; P0-2 OIDC audience; P1-1 mypy; P1-2 CE key parsing; P1-3 AWS secret encryption | — |
+| **0 — unblock** | P0-1 insert fix + arity guard test; P0-2 OIDC audience; P0-3 UUID→`str` at three sites; P1-1 mypy; P1-2 CE key parsing; P1-3 AWS secret encryption | — |
 | **1 — billing** | Track A: Bedrock-filtered CE query, usage-type parsing, `UsageQuantity` metric | Phase 0 |
 | **2 — price book** | `bedrock` section in `aws_list_prices.json` + Price List API refresh script + miss counting | — (parallel with 1) |
 | **3 — usage** | `bedrock_usage.py`, entrypoint wiring, model-ID/inference-profile normalisation, tests | 0, 2 |
