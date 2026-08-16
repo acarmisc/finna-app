@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (must already exist, e.g. v1.5.1)'
+        description: 'Tag to create and release (e.g. v1.5.1). Does not need to exist yet — it will be created at the dispatched commit.'
         required: true
         type: string
 
@@ -49,8 +49,6 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.resolve.outputs.tag }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -94,8 +92,6 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.resolve.outputs.tag }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -161,7 +157,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ needs.resolve.outputs.tag }}
           fetch-depth: 0
 
       - name: Generate changelog
@@ -185,6 +180,7 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ needs.resolve.outputs.tag }}
+          commit: ${{ github.sha }}
           name: Release ${{ needs.resolve.outputs.tag }}
           draft: false
           prerelease: ${{ contains(needs.resolve.outputs.tag, '-') }}
