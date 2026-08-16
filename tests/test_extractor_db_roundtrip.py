@@ -26,9 +26,29 @@ from models import NormalizedCostRecord, Provider, ServiceCategory
 pytestmark = pytest.mark.integration
 
 
+def _resolve_pg_dsn() -> str:
+    """Resolve the real database DSN independent of os.environ["PG_DSN"].
+
+    Several other test files (test_api_integration.py, test_db_main_runner.py)
+    unconditionally overwrite PG_DSN with an unreachable dummy value at module
+    import time, on the assumption that nothing downstream reads it directly —
+    true for tests that go through the app's connection pool (which caches its
+    DSN once, before any of that runs) but not for a test that connects
+    directly. Rebuild the DSN from the discrete PG* vars conftest.py itself
+    uses, so this fixture is immune to import-order-dependent pollution.
+    """
+    return "postgresql://{user}:{pw}@{host}:{port}/{db}".format(
+        user=os.getenv("PGUSER", "finna"),
+        pw=os.getenv("PGPASSWORD", "finna"),
+        host=os.getenv("PGHOST", "localhost"),
+        port=os.getenv("PGPORT", "5432"),
+        db=os.getenv("PGDATABASE", "finna"),
+    )
+
+
 @pytest.fixture
 def db_conn():
-    conn = psycopg.connect(os.environ["PG_DSN"])
+    conn = psycopg.connect(_resolve_pg_dsn())
     yield conn
     conn.rollback()
     conn.close()
