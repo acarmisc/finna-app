@@ -10,22 +10,37 @@
 
 ## 0. Status update — Phase 0 implemented
 
-All six Phase 0 blockers (P0-1, P0-2, P0-3, P1-1, P1-2, P1-3) have been fixed, verified against a
-live database on every run, and covered by new or corrected regression-guard tests. Two additional
-defects were found and fixed while verifying these — both documented inline below, marked `[FOUND
-DURING FIX]`:
+All six Phase 0 blockers (P0-1, P0-2, P0-3, P1-1, P1-2, P1-3) have been fixed. Each was verified
+independently — in a focused, fresh-database run — and proven by reverting the fix in isolation and
+confirming the corresponding test fails, then re-applying it. `ruff check backend/ extractors/
+models/` and `mypy backend/ extractors/ models/` are both clean.
+
+Three additional defects were found while verifying these, documented inline below and marked
+`[FOUND DURING FIX]`:
 
 - A pre-existing test-cache-pollution bug in `tests/test_oidc.py` that masked the real audience fix
   (4 tests never cleared `oidc._jwks_cache` between runs).
 - A test-mock bug in `tests/test_auth_providers.py::test_test_provider_discovery` (`AsyncMock()`
   used for an `httpx.Response`, whose `.json()` is synchronous — the mock returned an unawaited
   coroutine to production code).
+- **P1-6** (new, below): a suite-wide connection-pool-poisoning defect that pre-dates this work and
+  was invisible until P0-2/P0-3 were fixed.
 
-Final state on this branch: `ruff check backend/ extractors/ models/` and
-`mypy backend/ extractors/ models/` both clean; full `pytest` run on a freshly recreated database
-passes with zero failures outside test-order residue (see P2-3, unchanged — a hygiene issue, not
-correctness). Every fix below was proven by reverting it in isolation and confirming the
-corresponding test fails, then re-applying it.
+**Full-suite comparison** (`pytest`, exactly as CI runs it, on a database recreated from scratch
+immediately before each run):
+
+| | Failed | Passed | Skipped | Errors |
+|---|---:|---:|---:|---:|
+| Baseline (before this work) | 24 | 478 | 5 | 7 |
+| After Phase 0 + regression tests | 19 | 491 | 5 | 7 |
+
+Net: 5 fewer failures, 13 more passing (8 of those are new tests added by this work; the other 5 are
+existing tests that now pass). Errors are unchanged at 7 — all in `test_oidc_auth_integration.py`,
+attributable to P1-6, not to anything fixed or introduced here. The remaining 19 failures split
+three ways: `test_oidc_e2e.py` (5) and most of `test_auth_providers.py` (7) trace to P1-6 below —
+newly reachable, not newly broken, since P0-2/P0-3 previously made these tests die early on a 500
+before they could ever reach the pool-dependent code path that fails; the rest are the pre-existing,
+out-of-scope P2-1 stale-test items (3) documented below.
 
 The Bedrock plan in §3 is unchanged and ready to build on top of this.
 
@@ -197,6 +212,12 @@ its mocked `httpx.Response` as `AsyncMock()`, but `httpx.Response.json()` is syn
 async client, so production code received an unawaited coroutine instead of a dict — switched to
 `MagicMock()`, matching the pattern already used correctly elsewhere in the same file.
 
+All of `test_auth_providers.py` passes reliably in isolation and in small groupings. Under the *full*
+suite it can still show `assert 500` / `KeyError: 'id'` failures — that's P1-6 (a different,
+pre-existing bug: another test file's import poisons the app's DB connection pool for the rest of
+the process), not a gap in this fix. Don't read those full-suite failures as this fix being
+incomplete.
+
 ### P1-1 — CI is red on `main` `[FIXED]`
 
 `backend-typecheck` is a hard gate and `mypy` fails:
@@ -299,6 +320,66 @@ distinguishable from an absent credential.
 `main.py:190` exposes connection-pool internals with no `Depends(require_auth)`, unlike every
 router endpoint. Low severity on its own, but it is free reconnaissance and trivially fixed.
 
+### P1-6 — A test-file import poisons the app's DB connection pool for the rest of the process `[FOUND DURING FIX]`
+
+Discovered while getting a true full-suite baseline after the Phase 0 fixes. Not introduced by this
+work — it pre-dates it — but P0-2/P0-3 previously kept it hidden (see below).
+
+`tests/test_api_integration.py:18` and `tests/test_db_main_runner.py:15` both run, unconditionally,
+at **module import time**:
+
+```python
+os.environ["PG_DSN"] = "postgresql://test:***@localhost/testdb"
+```
+
+This is a deliberate, established pattern — those files' own tests mock the DB layer and never need
+a real connection, so a dummy DSN is fine *for them*. The problem is that `os.environ` is
+process-global and pytest imports every collected test file into the same process before running
+any of them. If either of those files is imported before anything else has caused
+`backend.app.api.db.get_sync_pool()` / `get_async_pool()` to run for the first time, the app's
+connection pool — a module-level singleton, created lazily on first use and never re-reads its DSN
+afterward — gets permanently initialized against `postgresql://test:***@localhost/testdb` for the
+rest of the test process. Every subsequent request through that pool, in any other test file, then
+fails to authenticate:
+
+```
+WARNING psycopg.pool: error connecting in 'pool-10': connection failed: connection to server at
+"127.0.0.1", port 5432 failed: FATAL: role "test" does not exist
+```
+
+422 occurrences of this exact line in the full-suite log. Once the pool can never open a connection,
+any code that calls `pool.getconn(timeout=...)` blocks until that call's own timeout and raises
+`psycopg_pool.PoolTimeout` — which is exactly the failure signature on `test_oidc_e2e.py` (5 tests)
+and `test_oidc_auth_integration.py` (2 failures + 7 errors), and explains `test_auth_providers.py`'s
+`assert 500` / `KeyError: 'id'` failures under full-suite conditions (the create endpoint 500s
+because it can't get a connection; every test after it that depends on `create_resp.json()["id"]`
+then hits a `KeyError`).
+
+**Why this was invisible before.** P0-2 (audience validation) and P0-3 (UUID→`str`) both made these
+same OIDC code paths crash immediately, before ever reaching the point where they'd need a pool
+connection. Fixing them let the tests run further — straight into this. It is not a regression from
+this session's changes; it is newly *reachable*, not newly broken. Confirmed independently three
+ways: (1) every affected file passes cleanly in isolated/small-group runs where the poisoning file
+either isn't collected or the pool happens to initialize first; (2) `tests/test_extractor_db_roundtrip.py`
+(added by this work) hit the same class of bug for a different reason — its fixture read
+`os.environ["PG_DSN"]` directly at test time rather than going through the cached pool — and was
+fixed by resolving the DSN from the discrete `PGHOST`/`PGUSER`/`PGPASSWORD`/`PGPORT`/`PGDATABASE`
+vars instead, the same construction `conftest.py` itself uses; (3) the 422 authentication-failure
+log lines name the exact dummy credentials from the two offending files.
+
+**Fix (not implemented — out of scope for Phase 0).** Two independent options, either sufficient on
+its own:
+- Stop mutating `os.environ["PG_DSN"]` unconditionally in `test_api_integration.py` /
+  `test_db_main_runner.py`; use `monkeypatch.setenv` (auto-reverts) or set it only for the specific
+  tests that need the dummy value instead of at import time for the whole file.
+- Make `backend/app/api/db.py`'s pool initialization re-read `PG_DSN` per test session, or have
+  `tests/conftest.py` force-set (not `setdefault`) the real DSN early enough that no later import can
+  win the race — fragile either way; the first option is the more direct fix.
+
+This wasn't fixed here because it sits outside the audited Phase 0 scope and touches shared test
+infrastructure two other files depend on; flagging it precisely, with the reproduction and the exact
+log signature, should make it a fast fix for whoever picks it up next.
+
 ### P2-1 — Four tests have drifted from the implementation they cover
 
 | Test | Reality |
@@ -343,9 +424,12 @@ Measured on those two files, recreating the database between the two runs:
 | 1 — pristine database | 7 failed, 7 passed |
 | 2 — same database, immediately after | 10 failed, 4 passed |
 
-So residue accounts for **3 extra failures**, not the bulk of them. The other 7 are genuine product
-bugs — P0-3 (UUID→`str`) and P0-2 (audience). This is a real hygiene problem worth fixing, but it is
-a P2, and it should not be used to explain away the OIDC failures: those are real.
+So residue accounts for **3 extra failures**, not the bulk of them. The other 7 were genuine product
+bugs at the time this was measured — P0-3 (UUID→`str`) and P0-2 (audience), both now fixed. This is
+a real hygiene problem worth fixing on its own, but it is a distinct issue from P1-6 above: this one
+is about repeated runs against the *same* unreset database colliding on unique names; P1-6 is about
+one test file's import poisoning the connection pool's DSN for every *other* file in the *same* run,
+even a fresh one. Don't conflate them — they need different fixes.
 
 **Fix.** Wrap each test in a transaction that rolls back, or add a fixture that truncates
 `auth_users, auth_providers RESTART IDENTITY CASCADE` between tests, and randomise provider names.
