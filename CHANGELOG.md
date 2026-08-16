@@ -23,6 +23,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.1] — 2026-08-16
+
+### Fixed
+- **P0** — Azure, AWS, and LiteLLM cost-record batch inserts declared more SQL columns
+  than placeholders, so every insert failed at the database and only `gcp_billing.py`
+  ingested cost data correctly. `INSERT` statements are now derived from a single
+  column-tuple source of truth per extractor, with a dedicated regression guard
+  (`tests/test_extractor_insert_arity.py`, `tests/test_extractor_db_roundtrip.py`)
+  proven against mutation testing and a live database.
+- **P0** — OIDC ID-token verification omitted `audience`, so `python-jose` rejected
+  every spec-compliant token and SSO login could never complete.
+- **P0** — Three OIDC provider admin endpoints passed a raw `uuid.UUID` into a
+  Pydantic field declared `str`, returning 500 on every provider list/read call.
+- **P1** — `mypy` `no-any-return` errors that were blocking the CI typecheck gate.
+- **P1** — AWS Cost Explorer `GroupBy` results were parsed as a single tilde-joined
+  string instead of one array element per dimension, collapsing multi-account cost
+  attribution to `"unknown"` and colliding `record_id`s across linked accounts.
+- **P1** — AWS credentials (`aws_secret_access_key`, etc.) fell outside the
+  config-encryption allowlist and were stored in plaintext; the allowlist is now
+  supplemented with a pattern match on `secret|password|token|key`.
+
+### Added
+- `docs/audit-and-bedrock-plan.md` — full audit report and an AWS Bedrock
+  cost-tracking implementation plan for follow-up work.
+
 ## [1.5.0] — 2026-07-17
 
 ### Added
