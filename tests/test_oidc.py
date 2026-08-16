@@ -349,6 +349,8 @@ async def test_verify_id_token_success(rsa_keypair, mock_provider_metadata, mock
 @pytest.mark.asyncio
 async def test_verify_id_token_wrong_issuer(rsa_keypair, mock_provider_metadata, mock_jwks):
     """ID token with wrong issuer should fail."""
+    oidc._discovery_cache.clear()
+    oidc._jwks_cache.clear()
     nonce = "test_nonce"
     now = int(time.time())
     claims = {
@@ -380,6 +382,8 @@ async def test_verify_id_token_wrong_issuer(rsa_keypair, mock_provider_metadata,
 @pytest.mark.asyncio
 async def test_verify_id_token_expired(rsa_keypair, mock_provider_metadata, mock_jwks):
     """Expired ID token should fail."""
+    oidc._discovery_cache.clear()
+    oidc._jwks_cache.clear()
     nonce = "test_nonce"
     now = int(time.time())
     claims = {
@@ -411,6 +415,8 @@ async def test_verify_id_token_expired(rsa_keypair, mock_provider_metadata, mock
 @pytest.mark.asyncio
 async def test_verify_id_token_nonce_mismatch(rsa_keypair, mock_provider_metadata, mock_jwks):
     """Nonce mismatch should fail."""
+    oidc._discovery_cache.clear()
+    oidc._jwks_cache.clear()
     now = int(time.time())
     claims = {
         "iss": "https://keycloak.example.com/realms/test",
@@ -441,6 +447,8 @@ async def test_verify_id_token_nonce_mismatch(rsa_keypair, mock_provider_metadat
 @pytest.mark.asyncio
 async def test_verify_id_token_wrong_audience(rsa_keypair, mock_provider_metadata, mock_jwks):
     """Wrong audience should fail."""
+    oidc._discovery_cache.clear()
+    oidc._jwks_cache.clear()
     nonce = "test_nonce"
     now = int(time.time())
     claims = {

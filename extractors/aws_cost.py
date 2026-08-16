@@ -165,11 +165,11 @@ def normalize_aws_cost_records(
             if not keys:
                 continue
 
-            # Parse identity: SERVICE~LINKED_ACCOUNT
-            identity = keys[0]
-            parts = identity.split("~")
-            service_code = parts[0] if len(parts) > 0 else None
-            account_id = parts[1] if len(parts) > 1 else "unknown"
+            # Cost Explorer returns one list element per GroupBy dimension, in the
+            # order declared in get_cost_and_usage() — SERVICE, then LINKED_ACCOUNT.
+            # NOT a single tilde-joined key (that was a bug: see audit doc P1-2).
+            service_code = keys[0] if len(keys) > 0 else None
+            account_id = keys[1] if len(keys) > 1 else "unknown"
 
             cost_data = group.get("Metrics", {})
             unblended = cost_data.get("UnblendedCost", {})
@@ -224,32 +224,23 @@ def normalize_aws_cost_records(
 # PostgreSQL helpers                                                        #
 # ---------------------------------------------------------------------------#
 
-_INSERT_SQL = """
-INSERT INTO cost_records (
-    record_id, provider, usage_start, usage_end, ingestion_ts,
-    account_id, project_id, service_category, service_name,
-    resource_id, region, charge_type,
-    cost_usd, currency_original, cost_original, discount_usd, net_cost_usd,
-    usage_quantity, usage_unit, tags
-) VALUES (
-    %(record_id)s, %(provider)s, %(usage_start)s, %(usage_end)s, %(ingestion_ts)s,
-    %(account_id)s, %(project_id)s, %(service_category)s, %(service_name)s,
-    %(resource_id)s, %(region)s, %(charge_type)s,
-    %(cost_usd)s, %(currency_original)s, %(cost_original)s, %(discount_usd)s, %(net_cost_usd)s,
-    %(usage_quantity)s, %(usage_unit)s, %(tags)s
-) ON CONFLICT (record_id) DO NOTHING
-"""
+# Single source of truth for both the SQL column list and the row-tuple order,
+# so the two can never drift out of sync (see SECURITY_AUDIT.md / audit doc P0-1).
+# Safe from injection: this is a fixed module-level constant, never derived from
+# request or record data.
+_INSERT_COLUMNS = (
+    "record_id", "provider", "usage_start", "usage_end", "ingestion_ts",
+    "account_id", "project_id", "service_category", "service_name",
+    "resource_id", "region", "charge_type",
+    "cost_usd", "currency_original", "cost_original", "discount_usd", "net_cost_usd",
+    "usage_quantity", "usage_unit", "tags",
+)
 
-_INSERT_SQL_BATCH = """
-INSERT INTO cost_records (
-    record_id, provider, usage_start, usage_end, ingestion_ts,
-    account_id, project_id, service_category, service_name,
-    resource_id, region, charge_type,
-    cost_usd, currency_original, cost_original, discount_usd, net_cost_usd,
-    usage_quantity, usage_unit, tags
-) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-ON CONFLICT (record_id) DO NOTHING
-"""
+_INSERT_SQL_BATCH = (
+    f"INSERT INTO cost_records ({', '.join(_INSERT_COLUMNS)}) "  # noqa: S608
+    f"VALUES ({', '.join(['%s'] * len(_INSERT_COLUMNS))}) "
+    "ON CONFLICT (record_id) DO NOTHING"
+)
 
 
 def _insert_batch(conn: psycopg.Connection, records: list[NormalizedCostRecord]) -> int:
@@ -261,15 +252,7 @@ def _insert_batch(conn: psycopg.Connection, records: list[NormalizedCostRecord])
         row["provider"] = rec.provider.value
         row["service_category"] = rec.service_category.value
         row["tags"] = json.dumps(row.get("tags", {}))
-        rows.append((
-            row["record_id"], row["provider"], row["usage_start"], row["usage_end"],
-            row.get("ingestion_ts"), row["account_id"], row["project_id"],
-            row["service_category"], row["service_name"],
-            row.get("resource_id"), row.get("region"), row.get("charge_type"),
-            row["cost_usd"], row["currency_original"], row["cost_original"],
-            row["discount_usd"], row["net_cost_usd"],
-            row.get("usage_quantity"), row.get("usage_unit"), row["tags"],
-        ))
+        rows.append(tuple(row.get(col) for col in _INSERT_COLUMNS))
     with conn.cursor() as cur:
         cur.executemany(_INSERT_SQL_BATCH, rows)
     conn.commit()

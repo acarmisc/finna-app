@@ -279,38 +279,25 @@ def normalize_litellm_records(
 # PostgreSQL helpers                                                         #
 # ---------------------------------------------------------------------------#
 
-_INSERT_SQL = """
-INSERT INTO cost_records (
-    record_id, provider, usage_start, usage_end, ingestion_ts,
-    account_id, project_id, team, service_category, service_name,
-    resource_id, region, charge_type,
-    cost_usd, currency_original, cost_original, discount_usd, net_cost_usd,
-    usage_quantity, usage_unit,
-    model_name, input_tokens, output_tokens, total_tokens, trace_id,
-    tags
-) VALUES (
-    %(record_id)s, %(provider)s, %(usage_start)s, %(usage_end)s, %(ingestion_ts)s,
-    %(account_id)s, %(project_id)s, %(team)s, %(service_category)s, %(service_name)s,
-    %(resource_id)s, %(region)s, %(charge_type)s,
-    %(cost_usd)s, %(currency_original)s, %(cost_original)s, %(discount_usd)s, %(net_cost_usd)s,
-    %(usage_quantity)s, %(usage_unit)s,
-    %(model_name)s, %(input_tokens)s, %(output_tokens)s, %(total_tokens)s, %(trace_id)s,
-    %(tags)s
-) ON CONFLICT (record_id) DO NOTHING
-"""
+# Single source of truth for both the SQL column list and the row-tuple order,
+# so the two can never drift out of sync (see SECURITY_AUDIT.md / audit doc P0-1).
+# Safe from injection: this is a fixed module-level constant, never derived from
+# request or record data.
+_INSERT_COLUMNS = (
+    "record_id", "provider", "usage_start", "usage_end", "ingestion_ts",
+    "account_id", "project_id", "team", "service_category", "service_name",
+    "resource_id", "region", "charge_type",
+    "cost_usd", "currency_original", "cost_original", "discount_usd", "net_cost_usd",
+    "usage_quantity", "usage_unit",
+    "model_name", "input_tokens", "output_tokens", "total_tokens", "trace_id",
+    "tags",
+)
 
-_INSERT_SQL_BATCH = """
-INSERT INTO cost_records (
-    record_id, provider, usage_start, usage_end, ingestion_ts,
-    account_id, project_id, team, service_category, service_name,
-    resource_id, region, charge_type,
-    cost_usd, currency_original, cost_original, discount_usd, net_cost_usd,
-    usage_quantity, usage_unit,
-    model_name, input_tokens, output_tokens, total_tokens, trace_id,
-    tags
-) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-ON CONFLICT (record_id) DO NOTHING
-"""
+_INSERT_SQL_BATCH = (
+    f"INSERT INTO cost_records ({', '.join(_INSERT_COLUMNS)}) "  # noqa: S608
+    f"VALUES ({', '.join(['%s'] * len(_INSERT_COLUMNS))}) "
+    "ON CONFLICT (record_id) DO NOTHING"
+)
 
 
 def _insert_batch(conn: psycopg.Connection, records: list[NormalizedCostRecord]) -> int:
@@ -322,17 +309,7 @@ def _insert_batch(conn: psycopg.Connection, records: list[NormalizedCostRecord])
         row["provider"] = rec.provider.value
         row["service_category"] = rec.service_category.value
         row["tags"] = json.dumps(row.get("tags", {}))
-        rows.append((
-            row["record_id"], row["provider"], row["usage_start"], row["usage_end"],
-            row.get("ingestion_ts"), row["account_id"], row["project_id"],
-            row.get("team"), row["service_category"], row["service_name"],
-            row.get("resource_id"), row.get("region"), row.get("charge_type"),
-            row["cost_usd"], row["currency_original"], row["cost_original"],
-            row["discount_usd"], row["net_cost_usd"],
-            row.get("usage_quantity"), row.get("usage_unit"),
-            row.get("model_name"), row.get("input_tokens"), row.get("output_tokens"),
-            row.get("total_tokens"), row.get("trace_id"), row["tags"],
-        ))
+        rows.append(tuple(row.get(col) for col in _INSERT_COLUMNS))
     with conn.cursor() as cur:
         cur.executemany(_INSERT_SQL_BATCH, rows)
     conn.commit()

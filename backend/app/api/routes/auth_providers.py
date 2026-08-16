@@ -86,7 +86,7 @@ async def list_providers() -> list[AuthProviderResponse]:
         last_test_at_raw = row.get("last_test_at")
         result.append(
             AuthProviderResponse(
-                id=row["id"],
+                id=str(row["id"]),
                 name=row["name"],
                 kind=row["kind"],
                 enabled=row["enabled"],
@@ -119,7 +119,7 @@ async def get_provider(provider_id: str) -> AuthProviderResponse:
     config = decrypt_config(row["config"])
     masked = _mask_provider_secrets(config)
     return AuthProviderResponse(
-        id=row["id"],
+        id=str(row["id"]),
         name=row["name"],
         kind=row["kind"],
         enabled=row["enabled"],

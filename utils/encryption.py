@@ -10,10 +10,28 @@ import hashlib
 import json
 import logging
 import os
+import re
 
 from cryptography.fernet import Fernet, InvalidToken
 
 logger = logging.getLogger(__name__)
+
+# Explicit allowlist of known sensitive fields, kept for documentation and for
+# the __fields__ marker on already-encrypted rows.
+_SENSITIVE_FIELDS = {
+    "client_secret", "key_file_base64", "key_file_content",
+    "aws_secret_access_key", "secret_access_key", "session_token", "external_id",
+}
+
+# Defensive backstop: any field whose name matches this pattern is treated as
+# sensitive even if it isn't in the explicit allowlist above, so a future
+# provider can't silently store a credential in plaintext by naming its field
+# something we didn't anticipate (see audit doc P1-3).
+_SENSITIVE_FIELD_PATTERN = re.compile(r"(secret|password|token|key)", re.IGNORECASE)
+
+
+def _is_sensitive_field(name: str) -> bool:
+    return name in _SENSITIVE_FIELDS or bool(_SENSITIVE_FIELD_PATTERN.search(name))
 
 
 def get_encryption_key() -> bytes:
@@ -53,7 +71,8 @@ def encrypt_config(config: dict) -> dict:
     """
     Encrypt sensitive fields in a config dict using Fernet.
 
-    Sensitive fields: client_secret, key_file_base64, key_file_content
+    Sensitive fields: see _SENSITIVE_FIELDS, plus any field name matching
+    _SENSITIVE_FIELD_PATTERN (secret/password/token/key, case-insensitive).
     Non-sensitive fields remain in plaintext for DB queryability.
 
     Args:
@@ -66,19 +85,17 @@ def encrypt_config(config: dict) -> dict:
     if not isinstance(config, dict):
         return config
 
-    sensitive_fields = ["client_secret", "key_file_base64", "key_file_content"]
-    has_sensitive = any(field in config for field in sensitive_fields)
+    sensitive_field_names = [field for field in config if _is_sensitive_field(field)]
 
-    if not has_sensitive:
+    if not sensitive_field_names:
         return config
 
     # Extract sensitive fields
     to_encrypt = {}
     encrypted_field_names = []
-    for field in sensitive_fields:
-        if field in config:
-            to_encrypt[field] = config[field]
-            encrypted_field_names.append(field)
+    for field in sensitive_field_names:
+        to_encrypt[field] = config[field]
+        encrypted_field_names.append(field)
 
     # Encrypt the sensitive data as JSON
     key = get_encryption_key()
@@ -87,7 +104,7 @@ def encrypt_config(config: dict) -> dict:
     encrypted_token = f.encrypt(plaintext).decode()
 
     # Build result: non-sensitive fields + encrypted marker
-    result = {k: v for k, v in config.items() if k not in sensitive_fields}
+    result = {k: v for k, v in config.items() if k not in sensitive_field_names}
     result["__enc__"] = True
     result["__data__"] = encrypted_token
     result["__fields__"] = encrypted_field_names
