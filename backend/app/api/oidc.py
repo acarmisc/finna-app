@@ -16,6 +16,7 @@ from uuid import UUID
 
 import httpx
 from jose import JWTError, jwt
+from jose.exceptions import ExpiredSignatureError, JWTClaimsError
 
 logger = logging.getLogger("api.oidc")
 
@@ -308,9 +309,18 @@ async def verify_id_token(
     if not key:
         raise OIDCError("No suitable key found in JWKS")
 
-    # Verify signature
+    # Verify signature (disable jose's built-in aud check — we do it ourselves below,
+    # since jose defaults to requiring `audience=` and rejects every token that carries
+    # an aud claim otherwise; see verify_id_token_no_nonce for the same pattern)
     try:
-        claims = cast(dict[str, Any], jwt.decode(id_token, key, algorithms=[alg], options={"verify_signature": True}))
+        claims = cast(dict[str, Any], jwt.decode(
+            id_token, key, algorithms=[alg],
+            options={"verify_signature": True, "verify_aud": False},
+        ))
+    except ExpiredSignatureError as e:
+        raise OIDCError("ID token expired") from e
+    except JWTClaimsError as e:
+        raise OIDCError(f"ID token claim validation failed: {e}") from e
     except JWTError as e:
         raise OIDCError(f"Signature verification failed: {e}") from e
 
@@ -423,6 +433,10 @@ async def verify_id_token_no_nonce(
             id_token, key, algorithms=[alg],
             options={"verify_signature": True, "verify_aud": False},
         ))
+    except ExpiredSignatureError as e:
+        raise OIDCError("ID token expired") from e
+    except JWTClaimsError as e:
+        raise OIDCError(f"ID token claim validation failed: {e}") from e
     except JWTError as e:
         raise OIDCError(f"Signature verification failed: {e}") from e
 

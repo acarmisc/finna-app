@@ -61,7 +61,7 @@ def _make_group(
     currency: str = "USD",
 ) -> dict:
     return {
-        "Keys": [f"{service}~{account_id}"],
+        "Keys": [service, account_id],
         "Metrics": {
             "UnblendedCost": {
                 "Amount": amount,
@@ -396,7 +396,12 @@ class TestInsertRecords:
         ]
         total = insert_records(mock_conn, records, batch_size=2)
         assert total == 5
-        assert mock_conn.cursor.return_value.__enter__.return_value.execute.call_count == 5
+        # 5 records at batch_size=2 -> 3 batches (2, 2, 1); each batch is one
+        # executemany() call, not one execute() per record.
+        cursor_mock = mock_conn.cursor.return_value.__enter__.return_value
+        assert cursor_mock.executemany.call_count == 3
+        batch_sizes = [len(call.args[1]) for call in cursor_mock.executemany.call_args_list]
+        assert batch_sizes == [2, 2, 1]
 
 
 # ---------------------------------------------------------------------------

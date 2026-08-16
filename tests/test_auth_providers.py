@@ -1,6 +1,6 @@
 """Tests for OIDC auth providers CRUD."""
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -89,6 +89,43 @@ def test_create_provider_success(client, admin_token):
     assert data["config"]["issuer"] == "https://keycloak.example.com/realms/finna"
     assert data["config"]["client_id"] == "finna-app"
     assert data["config"]["auto_provision"] is False
+
+
+def test_list_providers_success(client, admin_token):
+    """List providers (admin) returns real data with usable UUIDs.
+
+    Regression guard: this is one of the three sites that used to pass a raw
+    psycopg uuid.UUID into a Pydantic field declared str, crashing with a
+    500 pydantic ValidationError on every call. See docs/audit-and-bedrock-plan.md P0-3.
+    """
+    create_resp = client.post(
+        "/api/v1/auth/providers",
+        json={
+            "name": "List Test",
+            "kind": "oidc",
+            "config": {
+                "issuer": "https://list-test.example.com",
+                "client_id": "test-id",
+                "client_secret": "test-secret",
+                "redirect_uri": "http://localhost:5173/auth/oidc/callback",
+            }
+        },
+        headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    provider_id = create_resp.json()["id"]
+
+    response = client.get(
+        "/api/v1/auth/providers",
+        headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, list)
+    matching = [p for p in data if p["id"] == provider_id]
+    assert len(matching) == 1, f"created provider {provider_id} not found in list: {data}"
+    assert matching[0]["name"] == "List Test"
+    # Secrets masked
+    assert "client_secret" not in matching[0]["config"]
 
 
 def test_create_provider_duplicate_name(client, admin_token):
@@ -303,13 +340,14 @@ async def test_test_provider_discovery(client, admin_token):
         mock_client = AsyncMock()
         mock_client_ctx.return_value.__aenter__.return_value = mock_client
 
-        # Mock discovery response
-        mock_disc_resp = AsyncMock()
+        # Mock discovery response — MagicMock, not AsyncMock: httpx.Response.json() is
+        # synchronous even on an async client, and production code calls it unawaited.
+        mock_disc_resp = MagicMock()
         mock_disc_resp.status_code = 200
         mock_disc_resp.json.return_value = mock_metadata
 
-        # Mock JWKS response
-        mock_jwks_resp = AsyncMock()
+        # Mock JWKS response (same reasoning)
+        mock_jwks_resp = MagicMock()
         mock_jwks_resp.status_code = 200
         mock_jwks_resp.json.return_value = {"keys": []}
 

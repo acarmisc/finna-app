@@ -8,6 +8,29 @@
 
 ---
 
+## 0. Status update — Phase 0 implemented
+
+All six Phase 0 blockers (P0-1, P0-2, P0-3, P1-1, P1-2, P1-3) have been fixed, verified against a
+live database on every run, and covered by new or corrected regression-guard tests. Two additional
+defects were found and fixed while verifying these — both documented inline below, marked `[FOUND
+DURING FIX]`:
+
+- A pre-existing test-cache-pollution bug in `tests/test_oidc.py` that masked the real audience fix
+  (4 tests never cleared `oidc._jwks_cache` between runs).
+- A test-mock bug in `tests/test_auth_providers.py::test_test_provider_discovery` (`AsyncMock()`
+  used for an `httpx.Response`, whose `.json()` is synchronous — the mock returned an unawaited
+  coroutine to production code).
+
+Final state on this branch: `ruff check backend/ extractors/ models/` and
+`mypy backend/ extractors/ models/` both clean; full `pytest` run on a freshly recreated database
+passes with zero failures outside test-order residue (see P2-3, unchanged — a hygiene issue, not
+correctness). Every fix below was proven by reverting it in isolation and confirming the
+corresponding test fails, then re-applying it.
+
+The Bedrock plan in §3 is unchanged and ready to build on top of this.
+
+---
+
 ## 1. Verdict
 
 The architecture is sound and the surrounding engineering is unusually good for a project this
@@ -35,7 +58,7 @@ errors** — plus 4 `mypy` errors that fail the typecheck gate outright.
 Severity: **P0** — core feature broken in production · **P1** — correctness/security risk or
 blocked pipeline · **P2** — maintainability and hygiene.
 
-### P0-1 — Every batch insert is malformed; Azure, AWS and LiteLLM ingestion fails 100% of the time
+### P0-1 — Every batch insert is malformed; Azure, AWS and LiteLLM ingestion fails 100% of the time `[FIXED]`
 
 `_INSERT_SQL_BATCH` in three extractors lists more columns than it supplies placeholders for:
 
@@ -88,7 +111,7 @@ a real `NormalizedCostRecord` against the CI PostgreSQL service and asserts the 
 back. A mock-only test cannot catch an arity bug by construction. This single test would have
 caught all three.
 
-### P0-2 — OIDC ID-token verification rejects every valid token; SSO cannot succeed
+### P0-2 — OIDC ID-token verification rejects every valid token; SSO cannot succeed `[FIXED]`
 
 `backend/app/api/oidc.py:314`:
 
@@ -115,22 +138,20 @@ A second, smaller defect compounds it: the `except JWTError` wraps *all* claim e
 when the signature is fine. It also masks the `exp` / `iss` / `nonce` checks immediately below,
 which can never be reached.
 
-**Fix.** Pass the expected claims to the decoder and let it do the work it already knows how to do:
+**Fix — implemented.** The codebase already had the right pattern one function over:
+`verify_id_token_no_nonce()` (the device-code sibling) decodes with
+`options={"verify_signature": True, "verify_aud": False}` and relies on its own manual
+`aud`/`iss`/`exp` checks below — jose's built-in `verify_aud` was simply never brought over to the
+primary `verify_id_token()`. Applied the same pattern there, added specific `except
+ExpiredSignatureError` / `except JWTClaimsError` clauses ahead of the generic `except JWTError` so a
+claim failure no longer reports as "signature verification failed", and closed the test-isolation
+gap that had been masking this: `tests/test_oidc.py` had four tests that never cleared
+`oidc._jwks_cache`/`_discovery_cache`, so they inherited a stale key from whichever test ran first
+and failed with a spurious signature error once the audience bug was fixed. All 26 tests across
+`test_oidc.py` and `test_oidc_device_auth.py` pass; the fix was verified by reverting it and
+confirming a freshly-signed real RS256 token is rejected again.
 
-```python
-claims = jwt.decode(
-    id_token, key, algorithms=[alg],
-    audience=client_id, issuer=issuer,
-    options={"verify_signature": True, "verify_aud": True, "verify_iss": True},
-)
-```
-
-then narrow the handler so `JWTClaimsError` reports a claim failure distinctly from a signature
-failure. The manual `exp`/`iss`/`aud`/`nonce` checks below become belt-and-braces; keep the `nonce`
-check (jose does not validate it) and keep the `alg` allowlist above (it correctly rejects `none`
-and `HS*` before any key material is chosen).
-
-### P0-3 — Every OIDC provider *read* path returns 500 (raw UUID into a `str` field)
+### P0-3 — Every OIDC provider *read* path returns 500 (raw UUID into a `str` field) `[FIXED]`
 
 Three sites pass psycopg's `uuid.UUID` straight into a Pydantic field declared `str`:
 
@@ -166,12 +187,17 @@ residue they superficially resemble (see the correction in P2-3).
 
 Commit `f804320` ("fix OIDC UUID crash") fixed one instance of this class; three remain.
 
-**Fix.** `id=str(row["id"])` at all three sites, matching what the create path already does. Better,
-declare the field as `uuid.UUID` and let Pydantic serialise it, so the next endpoint cannot
-reintroduce the bug. A response-model test that actually asserts on a 200 body would have caught it —
-the existing tests assert on status codes that were already failing.
+**Fix — implemented.** `id=str(row["id"])` at all three sites, matching what the create path already
+did. Verified against a fresh database: `CREATE 200`, `GET 500 → 200`, `LIST 500 → 200`. Two test
+gaps were closed alongside it: `test_auth_providers.py` had no success-path test at all for the
+admin list endpoint (only a 403-rejection test) — added `test_list_providers_success`, which was
+confirmed to genuinely catch a reverted copy of this bug before being left in its fixed state. And
+`test_test_provider_discovery` was failing for an unrelated reason surfaced by the cleanup: it built
+its mocked `httpx.Response` as `AsyncMock()`, but `httpx.Response.json()` is synchronous even on an
+async client, so production code received an unawaited coroutine instead of a dict — switched to
+`MagicMock()`, matching the pattern already used correctly elsewhere in the same file.
 
-### P1-1 — CI is red on `main`
+### P1-1 — CI is red on `main` `[FIXED]`
 
 `backend-typecheck` is a hard gate and `mypy` fails:
 
@@ -183,9 +209,14 @@ backend/app/api/routes/oidc_auth.py:36: error: Returning Any from function decla
 ```
 
 (`ruff` passes cleanly.) Combined with the failing tests, no commit on `main` can currently produce
-a container build. Fix with explicit `str(...)` coercion or a `cast(str, ...)` at those four returns.
+a container build.
 
-### P1-2 — AWS Cost Explorer group keys are parsed wrongly; multi-account costs are silently dropped
+**Fix — implemented.** Explicit `str(...)` coercion at all four returns (a shared
+`_get_client_ip()` helper duplicated across `oidc_auth.py` and `oidc_device_auth.py`, so the same
+two-line change applied to both). `mypy backend/ extractors/ models/ --ignore-missing-imports
+--explicit-package-bases` now reports zero errors.
+
+### P1-2 — AWS Cost Explorer group keys are parsed wrongly; multi-account costs are silently dropped `[FIXED]`
 
 `normalize_aws_cost_records()` assumes the two `GroupBy` dimensions arrive tilde-joined in a single
 key:
@@ -211,17 +242,23 @@ actual spend, with no error surfaced.
 The unit test encodes the wrong shape and so passes: `tests/test_aws_cost.py:64` builds
 `"Keys": [f"{service}~{account_id}"]`.
 
-**Fix.** Index the list positionally, matching the `GroupBy` order declared in `get_cost_and_usage()`:
+**Fix — implemented.** Positional indexing, matching the `GroupBy` order declared in
+`get_cost_and_usage()`:
 
 ```python
 service_code = keys[0] if len(keys) > 0 else None
 account_id   = keys[1] if len(keys) > 1 else "unknown"
 ```
 
-and correct the fixture to `"Keys": [service, account_id]`. Note this changes `record_id` for
-already-ingested AWS rows; plan a one-off re-ingest of the affected window.
+`_make_group()` in `tests/test_aws_cost.py` (the single shared fixture builder, used by every
+group-key test in the file) now builds `"Keys": [service, account_id]`. Verified end-to-end with a
+synthetic three-group, two-account Cost Explorer response: 3 records produced, 3 unique
+`record_id`s, correct per-account attribution — where before the fix all three collapsed onto
+`account_id="unknown"` and two of the three record IDs collided. This changes `record_id` for
+already-ingested AWS rows; a production rollout should plan a one-off re-ingest of the affected
+window so historical rows aren't orphaned under the old collided IDs.
 
-### P1-3 — AWS credentials are stored unencrypted (blocks the Bedrock work)
+### P1-3 — AWS credentials are stored unencrypted (blocks the Bedrock work) `[FIXED]`
 
 `utils/encryption.py` encrypts a fixed allowlist:
 
@@ -234,19 +271,16 @@ Azure's `client_secret` and GCP's key material are covered. **AWS is not** — a
 `POST /api/v1/config` is persisted to `cloud_config` in plaintext, and returned in plaintext by the
 read path. Any Bedrock connection added on top of the current code inherits this.
 
-**Fix before Bedrock.** Invert the allowlist to a denylist-by-pattern, or at minimum extend it:
-
-```python
-SENSITIVE_FIELDS = {
-    "client_secret", "key_file_base64", "key_file_content",
-    "aws_secret_access_key", "secret_access_key", "session_token",
-    "external_id", "password", "api_key", "master_key",
-}
-```
-
-A defensive complement: treat any key matching `(secret|password|token|key)` case-insensitively as
-sensitive, so a future provider cannot silently opt out of encryption by naming a field differently.
-`scripts/migrate_config_encryption.py` already exists as the backfill vehicle for existing rows.
+**Fix — implemented.** Extended the explicit allowlist with `aws_secret_access_key`,
+`secret_access_key`, `session_token`, `external_id`, plus a defensive pattern match on any field
+name containing `secret`/`password`/`token`/`key` (case-insensitive) — so a future provider can't
+silently opt out of encryption by naming a field something unanticipated. Verified against a
+realistic AWS config: `aws_secret_access_key`, `external_id`, and even `access_key_id` (caught by
+the pattern, not the explicit list) all encrypt; `region` and `role_arn` correctly stay plaintext;
+round-trip decrypt reproduces the original dict exactly. Confirmed no regression on Azure
+(`client_secret` still the only encrypted field) or GCP (`key_file_base64` unaffected).
+`scripts/migrate_config_encryption.py` remains the backfill vehicle for any AWS config rows already
+stored in plaintext before this fix.
 
 ### P1-4 — `decrypt_config` swallows all errors and silently redacts
 
@@ -269,12 +303,17 @@ router endpoint. Low severity on its own, but it is free reconnaissance and triv
 
 | Test | Reality |
 |---|---|
-| `test_aws_cost.py::TestInsertRecords::test_multiple_batches` | asserts `execute.call_count == 5`; implementation uses `executemany`, so `execute` is never called |
+| `test_aws_cost.py::TestInsertRecords::test_multiple_batches` | asserts `execute.call_count == 5`; implementation uses `executemany`, so `execute` is never called `[FIXED]` |
 | `test_db_main_runner.py::test_get_connection_all_invalid` | supplies 2 `side_effect` values to a 3-attempt retry loop → `StopIteration` instead of the expected `OperationalError` |
 | `test_db_main_runner.py::test_close_pools_with_async_running_loop` | patches `asyncio.get_event_loop`; `close_pools()` calls `asyncio.get_running_loop()` |
 | `test_litellm_cost.py::test_insert_batch_invokes_cursor` | same `execute`/`executemany` drift |
 
-These are stale assertions, not product bugs — but they are the noise that let P0-1 hide.
+These are stale assertions, not product bugs — but they are the noise that let P0-1 hide. The first
+row was fixed while verifying P0-1/P1-2 (now asserts `executemany.call_count == 3` for the 5-records-
+at-batch-size-2 case, and the resulting batch sizes `[2, 2, 1]`). The remaining three rows —
+`test_db_main_runner.py`'s two stale mocks and `test_litellm_cost.py`'s `execute`/`executemany` drift
+— are unaddressed; they weren't on the Phase 0 critical path and are lower-value fixes (backend
+connection-pool internals, not a data-path defect).
 
 ### P2-2 — A test performs live network calls to AWS
 

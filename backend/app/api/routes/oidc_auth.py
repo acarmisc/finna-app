@@ -30,10 +30,10 @@ def _get_client_ip(request: Request) -> str:
     """Resolve client IP respecting reverse-proxy headers."""
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        return str(forwarded.split(",")[0].strip())
     real_ip = request.headers.get("X-Real-IP")
     if real_ip:
-        return real_ip.strip()
+        return str(real_ip.strip())
     return request.client.host if request.client else "unknown"
 
 
@@ -129,7 +129,7 @@ async def list_enabled_providers() -> list[ProviderPublic]:
         config = decrypt_config(row["config"])
         providers.append(
             ProviderPublic(
-                id=row["id"],
+                id=str(row["id"]),
                 name=row["name"],
                 issuer=config.get("issuer", ""),
                 enabled=row["enabled"],
