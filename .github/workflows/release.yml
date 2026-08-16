@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (must already exist, e.g. v1.5.1)'
+        required: true
+        type: string
 
 env:
   REGISTRY: ghcr.io
@@ -11,14 +17,40 @@ env:
   EXTRACTOR_IMAGE: ${{ github.repository }}/finops-extractor
 
 jobs:
+  resolve:
+    name: Resolve release tag
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+      major_minor: ${{ steps.resolve.outputs.major_minor }}
+      major: ${{ steps.resolve.outputs.major }}
+    steps:
+      - name: Resolve tag and version parts
+        id: resolve
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "major_minor=$(echo "$VERSION" | cut -d. -f1,2)" >> "$GITHUB_OUTPUT"
+          echo "major=$(echo "$VERSION" | cut -d. -f1)" >> "$GITHUB_OUTPUT"
+
   build-api:
     name: Build & Push API Image
+    needs: resolve
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -36,9 +68,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.API_IMAGE }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=raw,value=${{ needs.resolve.outputs.version }}
+            type=raw,value=${{ needs.resolve.outputs.major_minor }}
+            type=raw,value=${{ needs.resolve.outputs.major }}
             type=sha,prefix=
 
       - name: Build and push
@@ -55,12 +87,15 @@ jobs:
 
   build-extractor:
     name: Build & Push Extractor Image
+    needs: resolve
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.resolve.outputs.tag }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -78,9 +113,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.EXTRACTOR_IMAGE }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
+            type=raw,value=${{ needs.resolve.outputs.version }}
+            type=raw,value=${{ needs.resolve.outputs.major_minor }}
+            type=raw,value=${{ needs.resolve.outputs.major }}
             type=sha,prefix=
 
       - name: Build and push
@@ -119,13 +154,14 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build-api, build-extractor]
+    needs: [resolve, build-api, build-extractor]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ needs.resolve.outputs.tag }}
           fetch-depth: 0
 
       - name: Generate changelog
@@ -141,17 +177,17 @@ jobs:
 
           ## Container Images
 
-          - \`ghcr.io/${{ github.repository }}/finops-api:${{ github.ref_name }}\`
-          - \`ghcr.io/${{ github.repository }}/finops-extractor:${{ github.ref_name }}\`
+          - \`ghcr.io/${{ github.repository }}/finops-api:${{ needs.resolve.outputs.tag }}\`
+          - \`ghcr.io/${{ github.repository }}/finops-extractor:${{ needs.resolve.outputs.tag }}\`
           EOF
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          tag: ${{ needs.resolve.outputs.tag }}
+          name: Release ${{ needs.resolve.outputs.tag }}
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(needs.resolve.outputs.tag, '-') }}
           bodyFile: CHANGELOG.md
           generateReleaseNotes: true
           allowUpdates: true
